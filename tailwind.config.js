@@ -4,12 +4,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        forest: '#2E7D32',
-        pine: '#1B4D2E',
+        forest: 'var(--theme-primary, #2E7D32)',
+        pine: 'var(--theme-dark, #1B4D2E)',
         ink: '#20241F',
         paper: '#FAFAF6',
-        leaf: '#E8F0E4',
-        amber: '#C9802D',
+        leaf: 'var(--theme-light, #E8F0E4)',
+        amber: 'var(--theme-accent, #C9802D)',
       },
       fontFamily: {
         display: ['Fraunces', 'serif'],

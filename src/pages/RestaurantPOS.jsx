@@ -11,7 +11,7 @@ import {
 
 const TABS = ['New Order', 'Orders', 'Menu']
 
-export default function RestaurantPOS({ userName }) {
+export default function RestaurantPOS({ userName, userRole, requestAdminPermission }) {
   const [tab, setTab] = useState('New Order')
   const [taxConfig, setTaxConfig] = useState([])
   const [company, setCompany] = useState(null)
@@ -64,7 +64,7 @@ export default function RestaurantPOS({ userName }) {
           userName={userName} existing={editOrder} flash={flash}
           onDone={(doc) => { setEditOrder(null); if (doc) setPrintDoc(doc); setTab('Orders') }} />
       )}
-      {tab === 'Orders' && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} />}
+      {tab === 'Orders' && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} userRole={userRole} requestAdminPermission={requestAdminPermission} />}
       {tab === 'Menu' && <MenuManager cats={cats} items={items} reload={loadMenu} />}
 
       {printDoc?.type === 'RECEIPT' && (
@@ -415,7 +415,7 @@ function GuestPicker({ close, pick }) {
 }
 
 /* ================= ORDERS LIST ================= */
-function OrdersList({ company, flash, resumeOrder, setPrintDoc }) {
+function OrdersList({ company, flash, resumeOrder, setPrintDoc, userRole, requestAdminPermission }) {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('TODAY')
 
@@ -442,8 +442,10 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc }) {
     if (inv) setPrintDoc({ type: 'MUSHAK', invoice: inv, refNo: o.order_no })
   }
   const cancel = async (o) => {
-    await supabase.from('pos_orders').update({ status: 'CANCELLED' }).eq('id', o.id)
-    flash(`${o.order_no} cancelled.`); load()
+    requestAdminPermission(async () => {
+      await supabase.from('pos_orders').update({ status: 'CANCELLED' }).eq('id', o.id)
+      flash(`${o.order_no} cancelled.`); load()
+    }, "Cancel POS Order")
   }
 
   const chip = {

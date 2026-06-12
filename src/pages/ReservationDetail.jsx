@@ -11,12 +11,12 @@ import Mushak63 from '../components/print/Mushak63.jsx'
 import { exportXLSX } from '../lib/helpers'
 import {
   ArrowLeft, MessageCircle, Mail, CheckCircle2, LogIn, BedDouble,
-  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban,
+  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, Pencil, Check
 } from 'lucide-react'
 
 const TABS = ['Overview', 'Quotation', 'Check-In', 'Folio & Payments', 'Invoices']
 
-export default function ReservationDetail({ id, back, userName }) {
+export default function ReservationDetail({ id, back, userName, userRole, requestAdminPermission }) {
   const [res, setRes] = useState(null)
   const [guest, setGuest] = useState(null)
   const [resGuests, setResGuests] = useState([])
@@ -101,11 +101,11 @@ export default function ReservationDetail({ id, back, userName }) {
         ))}
       </div>
 
-      {tab === 'Overview' && <Overview res={res} guest={guest} resRooms={resRooms} setStatus={setStatus} payments={payments} advance={advance} flash={flash} />}
+      {tab === 'Overview' && <Overview res={res} guest={guest} resRooms={resRooms} setStatus={setStatus} payments={payments} advance={advance} flash={flash} userRole={userRole} requestAdminPermission={requestAdminPermission} />}
       {tab === 'Quotation' && <QuotationTab res={res} guest={guest} nights={nights} taxConfig={taxConfig} company={company} reload={loadAll} flash={flash} userName={userName} resRooms={resRooms} />}
       {tab === 'Check-In' && <CheckInTab res={res} guest={guest} resGuests={resGuests} resRooms={resRooms} rooms={rooms} reload={loadAll} setStatus={setStatus} userName={userName} openCard={() => setPrintDoc({ type: 'REG' })} payments={payments} flash={flash} />}
-      {tab === 'Folio & Payments' && <FolioTab res={res} charges={charges} payments={payments} resRooms={resRooms} taxConfig={taxConfig} reload={loadAll} userName={userName} totals={totals} paid={paid} due={due} flash={flash} />}
-      {tab === 'Invoices' && <InvoicesTab res={res} guest={guest} charges={charges} totals={totals} paid={paid} due={due} invoices={invoices} company={company} reload={loadAll} userName={userName} setStatus={setStatus} setPrintDoc={setPrintDoc} flash={flash} />}
+      {tab === 'Folio & Payments' && <FolioTab res={res} charges={charges} payments={payments} resRooms={resRooms} taxConfig={taxConfig} reload={loadAll} userName={userName} totals={totals} paid={paid} due={due} flash={flash} userRole={userRole} requestAdminPermission={requestAdminPermission} />}
+      {tab === 'Invoices' && <InvoicesTab res={res} guest={guest} charges={charges} totals={totals} paid={paid} due={due} invoices={invoices} company={company} reload={loadAll} userName={userName} setStatus={setStatus} setPrintDoc={setPrintDoc} flash={flash} userRole={userRole} requestAdminPermission={requestAdminPermission} />}
 
       {printDoc?.type === 'REG' && (
         <PrintPortal title="Guest Registration Card" onClose={() => setPrintDoc(null)}>
@@ -127,8 +127,24 @@ export default function ReservationDetail({ id, back, userName }) {
 }
 
 /* ---------------- OVERVIEW ---------------- */
-function Overview({ res, guest, resRooms, setStatus, payments, advance, flash }) {
+function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, userRole, requestAdminPermission }) {
   const canConfirm = ['QUERY', 'QUOTED'].includes(res.status)
+  const canRecheckin = ['CHECKED_OUT', 'SETTLED'].includes(res.status)
+
+  const handleCancel = () => {
+    requestAdminPermission(async () => {
+      await setStatus('CANCELLED')
+      flash('Reservation cancelled.')
+    }, "Cancel Reservation")
+  }
+
+  const handleRecheckin = () => {
+    requestAdminPermission(async () => {
+      await setStatus('CHECKED_IN', { checked_out_at: null })
+      flash('Guest status reverted to checked-in. Folio reopened.')
+    }, "Re-checkin Guest")
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="card p-5 lg:col-span-2">
@@ -155,7 +171,12 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash })
             </button>
           )}
           {['QUERY', 'QUOTED', 'CONFIRMED'].includes(res.status) && (
-            <button className="btn-ghost w-full justify-center text-red-600" onClick={() => setStatus('CANCELLED')}><Ban size={15} /> Cancel reservation</button>
+            <button className="btn-ghost w-full justify-center text-red-600" onClick={handleCancel}><Ban size={15} /> Cancel reservation</button>
+          )}
+          {canRecheckin && (
+            <button className="btn-primary w-full justify-center" onClick={handleRecheckin}>
+              <LogIn size={16} /> Re-checkin Guest
+            </button>
           )}
           <p className="text-xs text-pine/50 pt-2">
             Advance received: <span className="money font-semibold">{fmtBDT(advance)}</span>. Per workflow, a booking is confirmed after the guest gives an advance.
@@ -166,7 +187,7 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash })
   )
 }
 
-/* ---------------- QUOTATION (req. 2) ---------------- */
+/* ---------------- QUOTATION ---------------- */
 function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, userName, resRooms = [] }) {
   const [roomRate, setRoomRate] = useState(res.room_rate || resRooms[0]?.rate || resRooms[0]?.rooms?.base_rate || 0)
   const [roomCount, setRoomCount] = useState(resRooms.length || 1)
@@ -257,7 +278,7 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
 
 const Row = ({ k, v }) => <div className="flex justify-between"><span>{k}</span><span>{v}</span></div>
 
-/* ---------------- CHECK-IN (req. 4) ---------------- */
+/* ---------------- CHECK-IN ---------------- */
 function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus, userName, openCard, payments, flash }) {
   const [f, setF] = useState({
     id_type: guest?.id_type || 'NID', id_number: guest?.id_number || '',
@@ -314,8 +335,24 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
         {resRooms.map((rr) => (
           <div key={rr.id} className="flex justify-between items-center text-sm border border-leaf rounded-lg px-3 py-2">
             <span className="font-semibold">Room {rr.rooms?.room_no} <span className="text-pine/50 font-normal">· {rr.rooms?.room_type}</span></span>
-            <span className="flex items-center gap-3 money">{fmtBDT(rr.rate)}/night
-              {res.status !== 'CHECKED_OUT' && <button onClick={() => removeRoom(rr.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14} /></button>}
+            <span className="flex items-center gap-3 money">
+              <span className="flex items-center gap-1">
+                ৳ <input type="number" className="input !w-20 !py-0.5 !px-1.5 text-xs text-right money"
+                  defaultValue={rr.rate}
+                  disabled={res.status === 'CHECKED_OUT' || res.status === 'SETTLED' || res.status === 'CANCELLED'}
+                  onBlur={async (e) => {
+                    const val = +e.target.value
+                    if (val !== rr.rate) {
+                      await supabase.from('reservation_rooms').update({ rate: val }).eq('id', rr.id)
+                      await reload()
+                      flash(`Room ${rr.rooms?.room_no} rate updated to ৳${val}.`)
+                    }
+                  }}
+                /> /night
+              </span>
+              {res.status !== 'CHECKED_OUT' && res.status !== 'SETTLED' && res.status !== 'CANCELLED' && (
+                <button onClick={() => removeRoom(rr.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14} /></button>
+              )}
             </span>
           </div>
         ))}
@@ -370,9 +407,47 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
 }
 
 /* ---------------- FOLIO & PAYMENTS (req. 5–8) ---------------- */
-function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userName, totals, paid, due, flash }) {
+function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userName, totals, paid, due, flash, userRole, requestAdminPermission }) {
   const [c, setC] = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
   const [p, setP] = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
+
+  // Inline editing state
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({ description: '', base_amount: '', discount_pct: 0, charge_type: '', charge_date: '' })
+
+  const startEdit = (ch) => {
+    setEditingId(ch.id)
+    setEditForm({
+      description: ch.description,
+      base_amount: ch.base_amount,
+      discount_pct: Number(ch.discount_pct || 0) || Math.round((Number(ch.discount || 0) / Number(ch.base_amount || 1)) * 100),
+      charge_type: ch.charge_type,
+      charge_date: ch.charge_date,
+    })
+  }
+
+  const saveEdit = async (chId) => {
+    requestAdminPermission(async () => {
+      const rate = rateFor(taxConfig, editForm.charge_type, editForm.charge_date)
+      const computed = computeCharge(editForm.base_amount, editForm.discount_pct, rate)
+      
+      const { error } = await supabase.from('folio_charges').update({
+        description: editForm.description,
+        charge_type: editForm.charge_type,
+        charge_date: editForm.charge_date,
+        discount_pct: Number(editForm.discount_pct),
+        ...computed,
+      }).eq('id', chId)
+      
+      if (error) {
+        flash(error.message)
+      } else {
+        setEditingId(null)
+        await reload()
+        flash('Charge updated.')
+      }
+    }, "Edit Folio Charge")
+  }
 
   const postRoomCharges = async () => {
     if (resRooms.length === 0) { flash('Assign rooms first (Check-In tab).'); return }
@@ -411,10 +486,20 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
   }
 
   const toggleStatus = async (ch) => {
-    await supabase.from('folio_charges').update({ status: ch.status === 'PAID' ? 'DUE' : 'PAID' }).eq('id', ch.id)
-    await reload()
+    requestAdminPermission(async () => {
+      await supabase.from('folio_charges').update({ status: ch.status === 'PAID' ? 'DUE' : 'PAID' }).eq('id', ch.id)
+      await reload()
+      flash(`Charge status toggled to ${ch.status === 'PAID' ? 'DUE' : 'PAID'}.`)
+    }, "Toggle Charge Status")
   }
-  const delCharge = async (chId) => { await supabase.from('folio_charges').delete().eq('id', chId); await reload() }
+  
+  const delCharge = async (chId) => {
+    requestAdminPermission(async () => {
+      await supabase.from('folio_charges').delete().eq('id', chId)
+      await reload()
+      flash('Charge deleted successfully.')
+    }, "Delete Folio Charge")
+  }
 
   return (
     <div className="space-y-4">
@@ -426,7 +511,9 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
           </div>
           <div className="grid grid-cols-6 gap-2">
             <select className="input" value={c.charge_type} onChange={(e) => setC({ ...c, charge_type: e.target.value })}>
-              {['ROOM', 'RESTAURANT', 'LAUNDRY', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
+              {['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA_SALE', 'PICKLE_SALE', 'SPORTS_RENTAL', 'OTHER'].map((t) => (
+                <option key={t} value={t}>{t.replace('_', ' ')}</option>
+              ))}
             </select>
             <input className="input col-span-2" placeholder="Description" value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
             <input type="number" className="input money" placeholder="Base ৳" value={c.base_amount} onChange={(e) => setC({ ...c, base_amount: e.target.value })} />
@@ -460,23 +547,84 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
             <th className="th">Status</th><th className="th"></th>
           </tr></thead>
           <tbody>
-            {charges.map((ch) => (
-              <tr key={ch.id} className="hover:bg-leaf/20">
-                <td className="td money text-xs">{fmtDate(ch.charge_date)}</td>
-                <td className="td text-xs">{ch.charge_type}</td>
-                <td className="td text-sm">{ch.description}</td>
-                <td className="td money text-right">{Number(ch.base_amount).toFixed(2)}</td>
-                <td className="td money text-right">{Number(ch.discount).toFixed(2)}</td>
-                <td className="td money text-right">{Number(ch.service_charge).toFixed(2)}</td>
-                <td className="td money text-right">{Number(ch.sd).toFixed(2)}</td>
-                <td className="td money text-right">{Number(ch.vat).toFixed(2)}</td>
-                <td className="td money text-right font-semibold">{Number(ch.total).toFixed(2)}</td>
-                <td className="td">
-                  <button onClick={() => toggleStatus(ch)} className={`status-chip ${ch.status === 'PAID' ? 'bg-forest/15 text-forest' : 'bg-red-100 text-red-600'}`}>{ch.status}</button>
-                </td>
-                <td className="td"><button onClick={() => delCharge(ch.id)} className="text-red-300 hover:text-red-600"><Trash2 size={13} /></button></td>
-              </tr>
-            ))}
+            {charges.map((ch) => {
+              const isEditing = ch.id === editingId
+              if (isEditing) {
+                return (
+                  <tr key={ch.id} className="bg-leaf/10">
+                    <td className="td">
+                      <input type="date" className="input !py-0.5 !px-1.5 text-xs w-28"
+                        value={editForm.charge_date}
+                        onChange={(e) => setEditForm({ ...editForm, charge_date: e.target.value })}
+                      />
+                    </td>
+                    <td className="td">
+                      <select className="input !py-0.5 !px-1 text-xs w-24"
+                        value={editForm.charge_type}
+                        onChange={(e) => setEditForm({ ...editForm, charge_type: e.target.value })}
+                      >
+                        {['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA_SALE', 'PICKLE_SALE', 'SPORTS_RENTAL', 'OTHER'].map((t) => (
+                          <option key={t} value={t}>{t.replace('_', ' ')}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="td">
+                      <input className="input !py-0.5 !px-1.5 text-xs"
+                        value={editForm.description}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      />
+                    </td>
+                    <td className="td text-right">
+                      <input type="number" className="input !py-0.5 !px-1 text-xs text-right money w-16"
+                        value={editForm.base_amount}
+                        onChange={(e) => setEditForm({ ...editForm, base_amount: e.target.value })}
+                      />
+                    </td>
+                    <td className="td text-right">
+                      <input type="number" min="0" max="100" className="input !py-0.5 !px-1 text-xs text-right money w-12"
+                        value={editForm.discount_pct}
+                        onChange={(e) => setEditForm({ ...editForm, discount_pct: e.target.value })}
+                      />
+                    </td>
+                    <td className="td money text-right text-xs text-pine/50">—</td>
+                    <td className="td money text-right text-xs text-pine/50">—</td>
+                    <td className="td money text-right text-xs text-pine/50">—</td>
+                    <td className="td money text-right text-xs font-semibold text-pine/50">—</td>
+                    <td className="td">
+                      <span className="status-chip bg-stone-100 text-stone-600">{ch.status}</span>
+                    </td>
+                    <td className="td">
+                      <div className="flex gap-1.5 justify-end">
+                        <button onClick={() => saveEdit(ch.id)} className="text-forest hover:text-pine" title="Save"><Check size={14} /></button>
+                        <button onClick={() => setEditingId(null)} className="text-pine/50 hover:text-pine" title="Cancel">✕</button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }
+              return (
+                <tr key={ch.id} className="hover:bg-leaf/20">
+                  <td className="td money text-xs">{fmtDate(ch.charge_date)}</td>
+                  <td className="td text-xs">{ch.charge_type.replace('_', ' ')}</td>
+                  <td className="td text-sm">{ch.description}</td>
+                  <td className="td money text-right">{Number(ch.base_amount).toFixed(2)}</td>
+                  <td className="td money text-right">{Number(ch.discount).toFixed(2)}</td>
+                  <td className="td money text-right">{Number(ch.service_charge).toFixed(2)}</td>
+                  <td className="td money text-right">{Number(ch.sd).toFixed(2)}</td>
+                  <td className="td money text-right">{Number(ch.vat).toFixed(2)}</td>
+                  <td className="td money text-right font-semibold">{Number(ch.total).toFixed(2)}</td>
+                  <td className="td">
+                    <button onClick={() => toggleStatus(ch)} className={`status-chip ${ch.status === 'PAID' ? 'bg-forest/15 text-forest' : 'bg-red-100 text-red-600'}`}>{ch.status}</button>
+                  </td>
+                  <td className="td">
+                    <div className="flex gap-1.5 justify-end">
+                      <button onClick={() => startEdit(ch)} className="text-pine/50 hover:text-forest" title="Edit"><Pencil size={13} /></button>
+                      <button onClick={() => delCharge(ch.id)} className="text-red-300 hover:text-red-600" title="Delete"><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
             {charges.length === 0 && <tr><td className="td text-pine/50" colSpan={11}>No charges yet — post room charges or add a line.</td></tr>}
           </tbody>
           {charges.length > 0 && (
@@ -522,12 +670,14 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
 }
 
 /* ---------------- INVOICES & CHECK-OUT (req. 9) ---------------- */
-function InvoicesTab({ res, guest, charges, totals, paid, due, invoices, company, reload, userName, setStatus, setPrintDoc, flash }) {
+function InvoicesTab({ res, guest, charges, totals, paid, due, invoices, company, reload, userName, setStatus, setPrintDoc, flash, userRole, requestAdminPermission }) {
   const canCheckout = res.status === 'CHECKED_IN'
   const hasInvoices = invoices.length > 0
 
   const generateInvoices = async () => {
     if (charges.length === 0) { flash('No charges on the folio — post room charges first.'); return }
+    if (due > 0) { flash(`Checkout Stopped: Outstanding balance of ${fmtBDT(due)} must be fully paid (৳0) before checking out.`); return }
+    
     const t = { ...totals, paid, due }
     const snapshot = charges.map((c) => ({
       charge_date: c.charge_date, charge_type: c.charge_type, description: c.description,
@@ -573,11 +723,15 @@ function InvoicesTab({ res, guest, charges, totals, paid, due, invoices, company
           <h3 className="font-display font-semibold text-pine">Check-out & invoice generation</h3>
           <p className="text-sm text-pine/60">Generates both documents from the folio: the Guest Bill and the NBR Mushak-6.3 tax invoice (auto-entered into the 6.2 sales register).</p>
         </div>
-        <button className="btn-primary" onClick={generateInvoices} disabled={!canCheckout && hasInvoices}>
+        <button className="btn-primary" onClick={generateInvoices} disabled={(!canCheckout && hasInvoices) || (canCheckout && due > 0)}>
           <CheckCircle2 size={16} /> {canCheckout ? 'Check out & generate invoices' : 'Generate invoices'}
         </button>
       </div>
-      {due > 0 && <div className="px-4 py-3 rounded-lg bg-amber/10 text-amber text-sm font-medium money">Balance due {fmtBDT(due)} — guest can still check out. When the due is paid later (record it in Folio & Payments), the Paid/Due figures on both invoices update automatically and the reservation auto-settles to SETTLED.</div>}
+      {due > 0 && (
+        <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-semibold flex items-center gap-2">
+          <span>⚠️ Checkout Stopped: Outstanding balance of {fmtBDT(due)} must be fully paid (৳0) before checking out.</span>
+        </div>
+      )}
 
       <div className="card overflow-hidden">
         <table className="w-full">
