@@ -11,7 +11,7 @@ import Mushak63 from '../components/print/Mushak63.jsx'
 import { exportXLSX } from '../lib/helpers'
 import {
   ArrowLeft, MessageCircle, Mail, CheckCircle2, LogIn, BedDouble,
-  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, Percent,
+  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban,
 } from 'lucide-react'
 
 const TABS = ['Overview', 'Quotation', 'Check-In', 'Folio & Payments', 'Invoices']
@@ -28,9 +28,8 @@ export default function ReservationDetail({ id, back, userName }) {
   const [taxConfig, setTaxConfig] = useState([])
   const [company, setCompany] = useState(null)
   const [tab, setTab] = useState('Overview')
-  const [printDoc, setPrintDoc] = useState(null)
+  const [printDoc, setPrintDoc] = useState(null) // {type:'REG'|'BILL'|'MUSHAK', invoice?}
   const [msg, setMsg] = useState('')
-  const [showDiscountModal, setShowDiscountModal] = useState(false)
 
   const loadAll = async () => {
     const { data: r } = await supabase.from('reservations').select('*').eq('id', id).single()
@@ -81,7 +80,7 @@ export default function ReservationDetail({ id, back, userName }) {
             <span className={`status-chip ${STATUS_COLORS[res.status]}`}>{res.status.replace('_', ' ')}</span>
           </div>
           <p className="text-sm text-pine/60 money mt-1">
-            {res.res_no} · {fmtDate(res.check_in)} → {fmtDate(res.check_out)} · {nights} night{nights !== 1 && 's'} · {res.pax_adults} adult{res.pax_adults !== 1 && 's'}{res.pax_children > 0 && ` + ${res.pax_children} child${res.pax_children !== 1 ? 'ren' : ''}`}
+            {res.res_no} · {fmtDate(res.check_in)} → {fmtDate(res.check_out)} · {nights} night{nights !== 1 && 's'} · {res.pax_adults} adult{res.pax_adults !== 1 && 's'}{res.pax_children > 0 && `, ${res.pax_children} child`}
           </p>
         </div>
         <div className="text-right">
@@ -102,8 +101,8 @@ export default function ReservationDetail({ id, back, userName }) {
         ))}
       </div>
 
-      {tab === 'Overview' && <Overview res={res} guest={guest} resRooms={resRooms} setStatus={setStatus} payments={payments} advance={advance} flash={flash} reload={loadAll} openDiscountModal={() => setShowDiscountModal(true)} />}
-      {tab === 'Quotation' && <QuotationTab res={res} guest={guest} nights={nights} taxConfig={taxConfig} company={company} reload={loadAll} flash={flash} userName={userName} />}
+      {tab === 'Overview' && <Overview res={res} guest={guest} resRooms={resRooms} setStatus={setStatus} payments={payments} advance={advance} flash={flash} />}
+      {tab === 'Quotation' && <QuotationTab res={res} guest={guest} nights={nights} taxConfig={taxConfig} company={company} reload={loadAll} flash={flash} userName={userName} resRooms={resRooms} />}
       {tab === 'Check-In' && <CheckInTab res={res} guest={guest} resGuests={resGuests} resRooms={resRooms} rooms={rooms} reload={loadAll} setStatus={setStatus} userName={userName} openCard={() => setPrintDoc({ type: 'REG' })} payments={payments} flash={flash} />}
       {tab === 'Folio & Payments' && <FolioTab res={res} charges={charges} payments={payments} resRooms={resRooms} taxConfig={taxConfig} reload={loadAll} userName={userName} totals={totals} paid={paid} due={due} flash={flash} />}
       {tab === 'Invoices' && <InvoicesTab res={res} guest={guest} charges={charges} totals={totals} paid={paid} due={due} invoices={invoices} company={company} reload={loadAll} userName={userName} setStatus={setStatus} setPrintDoc={setPrintDoc} flash={flash} />}
@@ -123,56 +122,12 @@ export default function ReservationDetail({ id, back, userName }) {
           <Mushak63 invoice={printDoc.invoice} res={res} company={company} />
         </PrintPortal>
       )}
-
-      {showDiscountModal && <DiscountModal res={res} reload={loadAll} close={() => setShowDiscountModal(false)} flash={flash} />}
     </div>
   )
 }
 
-/* ---------- DISCOUNT MODAL ---------- */
-function DiscountModal({ res, reload, close, flash }) {
-  const [discount_pct, setDiscount] = useState(res.discount_pct || 0)
-  const [discount_reason, setReason] = useState(res.discount_reason || '')
-  const [busy, setBusy] = useState(false)
-
-  const save = async () => {
-    setBusy(true)
-    await supabase.from('reservations').update({
-      discount_pct: +discount_pct,
-      discount_reason: discount_reason.trim(),
-    }).eq('id', res.id)
-    await reload()
-    flash('Discount policy updated.')
-    setBusy(false)
-    close()
-  }
-
-  return (
-    <div className="fixed inset-0 bg-ink/60 z-50 flex items-center justify-center p-4">
-      <div className="card max-w-md w-full p-6">
-        <h2 className="font-display text-lg font-bold text-pine mb-4 flex items-center gap-2"><Percent size={18} /> Discount Policy</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="label">Discount percentage (%)</label>
-            <input type="number" min="0" max="100" step="0.5" className="input money" value={discount_pct} onChange={(e) => setDiscount(e.target.value)} />
-            <p className="text-xs text-pine/50 mt-1">Applied to room charges only. Discount is subtracted from the base before taxes.</p>
-          </div>
-          <div>
-            <label className="label">Discount reason (optional)</label>
-            <input className="input" placeholder="e.g., Corporate rate, Early bird, Referral" value={discount_reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button className="btn-ghost" onClick={close}>Cancel</button>
-          <button className="btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save discount'}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ---------- OVERVIEW ---------- */
-function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, reload, openDiscountModal }) {
+/* ---------------- OVERVIEW ---------------- */
+function Overview({ res, guest, resRooms, setStatus, payments, advance, flash }) {
   const canConfirm = ['QUERY', 'QUOTED'].includes(res.status)
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -183,14 +138,12 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, r
           <div><dt className="label">Contact</dt><dd>{guest?.phone || '—'}{guest?.email ? ` · ${guest.email}` : ''}</dd></div>
           <div><dt className="label">Address</dt><dd>{guest?.address || '—'}</dd></div>
           <div><dt className="label">Source</dt><dd>{res.source}</dd></div>
+          <div><dt className="label">Discount</dt><dd>{Number(res.discount_pct) > 0 ? `${res.discount_pct}% — applied on room charges` : '—'}</dd></div>
           <div><dt className="label">Rooms assigned</dt><dd>{resRooms.length ? resRooms.map((r) => r.rooms?.room_no).join(', ') : 'Not yet assigned'}</dd></div>
           <div><dt className="label">Notes</dt><dd>{res.notes || '—'}</dd></div>
-          {res.discount_pct > 0 && (
-            <div><dt className="label">Discount applied</dt><dd className="font-semibold">{res.discount_pct}% {res.discount_reason && `(${res.discount_reason})`}</dd></div>
-          )}
         </dl>
       </div>
-      <div className="card p-5 space-y-3">
+      <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Pipeline actions</h3>
         <div className="space-y-2">
           {canConfirm && (
@@ -204,7 +157,6 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, r
           {['QUERY', 'QUOTED', 'CONFIRMED'].includes(res.status) && (
             <button className="btn-ghost w-full justify-center text-red-600" onClick={() => setStatus('CANCELLED')}><Ban size={15} /> Cancel reservation</button>
           )}
-          <button className="btn-ghost w-full justify-center text-pine/70" onClick={openDiscountModal}><Percent size={15} /> Set discount policy</button>
           <p className="text-xs text-pine/50 pt-2">
             Advance received: <span className="money font-semibold">{fmtBDT(advance)}</span>. Per workflow, a booking is confirmed after the guest gives an advance.
           </p>
@@ -214,15 +166,21 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, r
   )
 }
 
-/* ---------- QUOTATION ---------- */
-function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, userName }) {
-  const [roomRate, setRoomRate] = useState(res.room_rate || 0)
-  const [roomCount, setRoomCount] = useState(1)
+/* ---------------- QUOTATION (req. 2) ---------------- */
+function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, userName, resRooms = [] }) {
+  const [roomRate, setRoomRate] = useState(res.room_rate || resRooms[0]?.rate || resRooms[0]?.rooms?.base_rate || 0)
+  const [roomCount, setRoomCount] = useState(resRooms.length || 1)
+  const [disc, setDisc] = useState(Number(res.discount_pct) || 0)
   const [validDays, setValidDays] = useState(7)
   const [quotes, setQuotes] = useState([])
   const rate = rateFor(taxConfig, 'ROOM', todayISO())
 
-  const perNight = computeCharge(Number(roomRate) * Number(roomCount), res.discount_pct, rate)
+  const saveDisc = async () => {
+    await supabase.from('reservations').update({ discount_pct: +disc || 0 }).eq('id', res.id)
+    reload()
+  }
+
+  const perNight = computeCharge(Number(roomRate) * Number(roomCount), disc, rate)
   const total = +(perNight.total * nights).toFixed(2)
 
   const loadQuotes = async () => {
@@ -232,8 +190,8 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
   useEffect(() => { loadQuotes() }, [res.id])
 
   const message = useMemo(() => (
-    `Dear ${guest?.full_name || 'Guest'},\n\nGreetings from ${company?.name || 'Novem Eco Resort'}, Sreemangal!\n\nQuotation for your stay:\n• Check-in: ${fmtDate(res.check_in)}\n• Check-out: ${fmtDate(res.check_out)}\n• Rooms: ${roomCount}\n• Rate: ${fmtBDT(roomRate)} / room / night\n• Duration: ${nights} night${nights !== 1 ? 's' : ''}\n\n${res.discount_pct > 0 ? `Special Discount: ${res.discount_pct}%${res.discount_reason ? ` (${res.discount_reason})` : ''}\n\n` : ''}Charges breakdown:\n• Room charge: ${fmtBDT(perNight.base_amount * nights)}\n${res.discount_pct > 0 ? `• Discount (${res.discount_pct}%): −${fmtBDT(perNight.discount * nights)}\n` : ''}• Service charge (${rate.service_charge_pct}%): ${fmtBDT(perNight.service_charge * nights)}\n${rate.sd_pct > 0 ? `• SD (${rate.sd_pct}%): ${fmtBDT(perNight.sd * nights)}\n` : ''}• VAT (${rate.vat_pct}%): ${fmtBDT(perNight.vat * nights)}\n\nTotal: ${fmtBDT(total)}\n\nThis quotation is valid until ${fmtDate(new Date(Date.now() + validDays * 86400000).toISOString().slice(0, 10))}.\n\nThank you,\n${company?.name || 'Novem Eco Resort'}`
-  ), [guest, res, nights, roomCount, roomRate, total, validDays, rate, company])
+    `Dear ${guest?.full_name || 'Guest'},\n\nGreetings from ${company?.name || 'Novem Eco Resort'}, Sreemangal!\n\nQuotation for your stay:\n• Check-in: ${fmtDate(res.check_in)}\n• Check-out: ${fmtDate(res.check_out)} (${nights} night${nights !== 1 ? 's' : ''})\n• Rooms: ${roomCount} × ${fmtBDT(roomRate)}/night${disc > 0 ? `\n• Special discount: ${disc}%` : ''}\n• Service charge ${rate.service_charge_pct}% & VAT ${rate.vat_pct}% included\n• Total: ${fmtBDT(total)}\n\nAn advance payment confirms your booking. This quotation is valid for ${validDays} days.\n\nWarm regards,\n${company?.name || 'Novem Eco Resort'}\n${company?.phone || ''}`
+  ), [guest, res, nights, roomCount, roomRate, disc, total, validDays, rate, company])
 
   const record = async (via) => {
     const validUntil = new Date(Date.now() + validDays * 86400000).toISOString().slice(0, 10)
@@ -241,8 +199,8 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
       reservation_id: res.id, total_amount: total, valid_until: validUntil,
       status: 'SENT', sent_via: via, sent_at: new Date().toISOString(), message,
     })
-    if (['QUERY'].includes(res.status)) await supabase.from('reservations').update({ status: 'QUOTED', room_rate: roomRate }).eq('id', res.id)
-    else await supabase.from('reservations').update({ room_rate: roomRate }).eq('id', res.id)
+    if (['QUERY'].includes(res.status)) await supabase.from('reservations').update({ status: 'QUOTED', room_rate: roomRate, discount_pct: +disc || 0 }).eq('id', res.id)
+    else await supabase.from('reservations').update({ room_rate: roomRate, discount_pct: +disc || 0 }).eq('id', res.id)
     await reload(); await loadQuotes(); flash(`Quotation recorded as sent via ${via}.`)
   }
 
@@ -261,14 +219,15 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Build quotation</h3>
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-4 gap-3 mb-4">
           <div><label className="label">Rate / room / night</label><input type="number" className="input money" value={roomRate} onChange={(e) => setRoomRate(e.target.value)} /></div>
           <div><label className="label">Rooms</label><input type="number" min="1" className="input money" value={roomCount} onChange={(e) => setRoomCount(e.target.value)} /></div>
+          <div><label className="label">Discount %</label><input type="number" min="0" max="100" className="input money" value={disc} onChange={(e) => setDisc(e.target.value)} onBlur={saveDisc} /></div>
           <div><label className="label">Valid (days)</label><input type="number" min="1" className="input money" value={validDays} onChange={(e) => setValidDays(e.target.value)} /></div>
         </div>
         <div className="bg-leaf/40 rounded-lg p-4 text-sm space-y-1 money">
           <Row k={`Room charge × ${nights} night(s)`} v={fmtBDT(perNight.base_amount * nights)} />
-          {res.discount_pct > 0 && <Row k={`Discount ${res.discount_pct}%`} v={'− ' + fmtBDT(perNight.discount * nights)} />}
+          {disc > 0 && <Row k={`Discount ${disc}%`} v={'− ' + fmtBDT(perNight.discount * nights)} />}
           <Row k={`Service charge ${rate.service_charge_pct}%`} v={fmtBDT(perNight.service_charge * nights)} />
           {rate.sd_pct > 0 && <Row k={`SD ${rate.sd_pct}%`} v={fmtBDT(perNight.sd * nights)} />}
           <Row k={`VAT ${rate.vat_pct}%`} v={fmtBDT(perNight.vat * nights)} />
@@ -282,7 +241,7 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
       </div>
       <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Message preview</h3>
-        <pre className="text-xs whitespace-pre-wrap bg-paper border border-leaf rounded-lg p-3 max-h-96 overflow-auto">{message}</pre>
+        <pre className="text-xs whitespace-pre-wrap bg-paper border border-leaf rounded-lg p-3">{message}</pre>
         <h4 className="label mt-4">Sent quotations</h4>
         {quotes.length === 0 && <p className="text-sm text-pine/50">None yet.</p>}
         {quotes.map((q) => (
@@ -298,7 +257,7 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
 
 const Row = ({ k, v }) => <div className="flex justify-between"><span>{k}</span><span>{v}</span></div>
 
-/* ---------- CHECK-IN ---------- */
+/* ---------------- CHECK-IN (req. 4) ---------------- */
 function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus, userName, openCard, payments, flash }) {
   const [f, setF] = useState({
     id_type: guest?.id_type || 'NID', id_number: guest?.id_number || '',
@@ -404,15 +363,15 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
           )}
           <button className="btn-amber flex-1 justify-center" onClick={openCard}><Printer size={16} /> Registration Card</button>
         </div>
-        <p className="text-xs text-pine/50">Advance on record: <span className="money font-semibold">{fmtBDT(payments.filter((p) => p.payment_class === 'ADVANCE').reduce((a, p) => a + +p.amount, 0))}</span></p>
+        <p className="text-xs text-pine/50">Advance on record: <span className="money font-semibold">{fmtBDT(payments.filter((p) => p.payment_class === 'ADVANCE').reduce((a, p) => a + +p.amount, 0))}</span> — shown on the card.</p>
       </div>
     </div>
   )
 }
 
-/* ---------- FOLIO & PAYMENTS ---------- */
+/* ---------------- FOLIO & PAYMENTS (req. 5–8) ---------------- */
 function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userName, totals, paid, due, flash }) {
-  const [c, setC] = useState({ charge_type: 'OTHER', description: '', base_amount: '', charge_date: todayISO() })
+  const [c, setC] = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
   const [p, setP] = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
 
   const postRoomCharges = async () => {
@@ -422,12 +381,12 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
     for (const night of eachNight(res.check_in, res.check_out)) {
       const rate = rateFor(taxConfig, 'ROOM', night)
       for (const rr of resRooms) {
-        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Room ${rr.rooms?.room_no} — Night of ${fmtDate(night)}`, ...computeCharge(rr.rate, res.discount_pct, rate) })
+        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Room ${rr.rooms?.room_no} — Night of ${fmtDate(night)}`, ...computeCharge(rr.rate, res.discount_pct, rate), created_by: userName })
       }
       if (res.extra_pax > 0 && res.extra_pax_rate > 0)
-        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Extra pax × ${res.extra_pax} — ${fmtDate(night)}`, ...computeCharge(res.extra_pax * res.extra_pax_rate, 0, rate) })
+        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Extra pax × ${res.extra_pax} — ${fmtDate(night)}`, ...computeCharge(res.extra_pax * res.extra_pax_rate, res.discount_pct, rate), created_by: userName })
       if (res.driver_accommodation && res.driver_count > 0 && res.driver_rate > 0)
-        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Driver accommodation × ${res.driver_count} — ${fmtDate(night)}`, ...computeCharge(res.driver_count * res.driver_rate, 0, rate) })
+        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Driver accommodation × ${res.driver_count} — ${fmtDate(night)}`, ...computeCharge(res.driver_count * res.driver_rate, res.discount_pct, rate), created_by: userName })
     }
     const { error } = await supabase.from('folio_charges').insert(rows)
     if (error) flash(error.message); else { await reload(); flash(`${rows.length} room charge line(s) posted.`) }
@@ -438,10 +397,10 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
     const rate = rateFor(taxConfig, c.charge_type, c.charge_date)
     const { error } = await supabase.from('folio_charges').insert({
       reservation_id: res.id, charge_date: c.charge_date, charge_type: c.charge_type,
-      description: c.description, ...computeCharge(c.base_amount, 0, rate), created_by: userName,
+      description: c.description, ...computeCharge(c.base_amount, c.discount_pct, rate), created_by: userName,
     })
     if (error) flash(error.message)
-    else { setC({ charge_type: 'OTHER', description: '', base_amount: '', charge_date: todayISO() }); await reload() }
+    else { setC({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() }); await reload() }
   }
 
   const addPayment = async () => {
@@ -465,15 +424,16 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
             <h3 className="font-display font-semibold text-pine">Add charge</h3>
             <button className="btn-ghost" onClick={postRoomCharges}><BedDouble size={15} /> Post room charges ({nightsBetween(res.check_in, res.check_out)} nights)</button>
           </div>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-6 gap-2">
             <select className="input" value={c.charge_type} onChange={(e) => setC({ ...c, charge_type: e.target.value })}>
               {['ROOM', 'RESTAURANT', 'LAUNDRY', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
             </select>
             <input className="input col-span-2" placeholder="Description" value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
             <input type="number" className="input money" placeholder="Base ৳" value={c.base_amount} onChange={(e) => setC({ ...c, base_amount: e.target.value })} />
+            <input type="number" min="0" max="100" className="input money" placeholder="Disc %" value={c.discount_pct} onChange={(e) => setC({ ...c, discount_pct: e.target.value })} />
             <button className="btn-primary justify-center" onClick={addCharge}><Plus size={15} /> Add</button>
           </div>
-          <p className="text-xs text-pine/50 mt-2">SC, SD & VAT are computed automatically from the Settings rates for the charge type. Restaurant orders for room guests post here as <b>RESTAURANT</b>.</p>
+          <p className="text-xs text-pine/50 mt-2">SC, SD & VAT are computed automatically from the Settings rates for the charge type. Restaurant orders for room guests post here as <b>RESTAURANT — Due</b> when not paid instantly.</p>
         </div>
         <div className="card p-4">
           <h3 className="font-display font-semibold text-pine mb-3">Record payment</h3>
@@ -561,7 +521,7 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
   )
 }
 
-/* ---------- INVOICES & CHECK-OUT ---------- */
+/* ---------------- INVOICES & CHECK-OUT (req. 9) ---------------- */
 function InvoicesTab({ res, guest, charges, totals, paid, due, invoices, company, reload, userName, setStatus, setPrintDoc, flash }) {
   const canCheckout = res.status === 'CHECKED_IN'
   const hasInvoices = invoices.length > 0
@@ -617,7 +577,7 @@ function InvoicesTab({ res, guest, charges, totals, paid, due, invoices, company
           <CheckCircle2 size={16} /> {canCheckout ? 'Check out & generate invoices' : 'Generate invoices'}
         </button>
       </div>
-      {due > 0 && <div className="px-4 py-3 rounded-lg bg-amber/10 text-amber text-sm font-medium money">Balance due {fmtBDT(due)} — guest can still check out; the reservation stays CHECKED_OUT until settled.</div>}
+      {due > 0 && <div className="px-4 py-3 rounded-lg bg-amber/10 text-amber text-sm font-medium money">Balance due {fmtBDT(due)} — guest can still check out. When the due is paid later (record it in Folio & Payments), the Paid/Due figures on both invoices update automatically and the reservation auto-settles to SETTLED.</div>}
 
       <div className="card overflow-hidden">
         <table className="w-full">

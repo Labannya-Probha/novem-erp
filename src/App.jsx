@@ -5,12 +5,14 @@ import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
 import ReservationDetail from './pages/ReservationDetail.jsx'
 import VatRegister from './pages/VatRegister.jsx'
+import RestaurantPOS from './pages/RestaurantPOS.jsx'
 import Settings from './pages/Settings.jsx'
-import { Leaf, LayoutDashboard, CalendarRange, FileSpreadsheet, Settings2, LogOut } from 'lucide-react'
+import { Leaf, LayoutDashboard, CalendarRange, UtensilsCrossed, FileSpreadsheet, Settings2, LogOut } from 'lucide-react'
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'reservations', label: 'Reservations', icon: CalendarRange },
+  { id: 'pos', label: 'Restaurant POS', icon: UtensilsCrossed },
   { id: 'vat', label: 'VAT Register (6.2)', icon: FileSpreadsheet },
   { id: 'settings', label: 'Settings', icon: Settings2 },
 ]
@@ -40,7 +42,7 @@ export default function App() {
           <div className="w-9 h-9 rounded-lg bg-forest flex items-center justify-center"><Leaf size={18} /></div>
           <div>
             <div className="font-display font-bold leading-tight">Novem ERP</div>
-            <div className="text-[11px] text-white/50">Phase 1 · Front Office</div>
+            <div className="text-[11px] text-white/50">Phase 2 · Front Office + POS</div>
           </div>
         </div>
         <nav className="flex-1 py-4 space-y-1 px-3">
@@ -64,6 +66,7 @@ export default function App() {
         {page === 'detail' && activeRes && (
           <ReservationDetail id={activeRes} back={() => setPage('reservations')} userName={userName} />
         )}
+        {page === 'pos' && <RestaurantPOS userName={userName} />}
         {page === 'vat' && <VatRegister />}
         {page === 'settings' && <Settings />}
       </main>

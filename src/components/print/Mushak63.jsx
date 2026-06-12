@@ -1,7 +1,7 @@
 import { fmtBDT, fmtDate, takaInWords } from '../../lib/helpers'
 
 // NBR-prescribed Mushak-6.3 (কর চালানপত্র) layout — strict black on white
-export default function Mushak63({ invoice, res, company }) {
+export default function Mushak63({ invoice, res, company, refNo }) {
   const lines = invoice.line_snapshot || []
   const t = invoice.totals || {}
   const issued = new Date(invoice.issued_at)
@@ -58,7 +58,7 @@ export default function Mushak63({ invoice, res, company }) {
           </tr>
           <tr>
             <td style={b}><b>সরবরাহের গন্তব্যস্থল</b> (Destination of supply): {company?.name}, {company?.address}</td>
-            <td style={b}><b>যানবাহনের প্রকৃতি ও নম্বর</b> (Vehicle type & no.): প্রযোজ্য নয় (N/A) · Ref: {res?.res_no}</td>
+            <td style={b}><b>যানবাহনের প্রকৃতি ও নম্বর</b> (Vehicle type & no.): প্রযোজ্য নয় (N/A) · Ref: {refNo || res?.res_no || '—'}</td>
           </tr>
         </tbody>
       </table>
