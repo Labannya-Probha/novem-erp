@@ -216,14 +216,14 @@ function TaxCard() {
 /* ---------- Rooms ---------- */
 function RoomsCard() {
   const [rows, setRows] = useState([])
-  const [n, setN] = useState({ room_no: '', room_type: 'Standard', base_rate: '' })
+  const [n, setN] = useState({ room_no: '', room_type: 'Standard & Deluxe', base_rate: '' })
   const load = () => supabase.from('rooms').select('*').order('room_no').then(({ data }) => setRows(data || []))
   useEffect(() => { load() }, [])
 
   const add = async () => {
     if (!n.room_no || n.base_rate === '') return
     const { error } = await supabase.from('rooms').insert({ ...n, base_rate: +n.base_rate })
-    if (!error) { setN({ room_no: '', room_type: 'Standard', base_rate: '' }); load() }
+    if (!error) { setN({ room_no: '', room_type: 'Standard & Deluxe', base_rate: '' }); load() }
   }
   const toggle = async (r) => { await supabase.from('rooms').update({ is_active: !r.is_active }).eq('id', r.id); load() }
   const del = async (r) => { await supabase.from('rooms').delete().eq('id', r.id); load() }
@@ -235,7 +235,7 @@ function RoomsCard() {
         <div><label className="label">Room no.</label><input className="input" value={n.room_no} onChange={(e) => setN({ ...n, room_no: e.target.value })} /></div>
         <div><label className="label">Room type</label>
           <select className="input" value={n.room_type} onChange={(e) => setN({ ...n, room_type: e.target.value })}>
-            {['Standard', 'Deluxe', 'Premium', 'Cottage', 'Villa', 'Suite', 'Family'].map((t) => <option key={t}>{t}</option>)}
+            {['Standard & Deluxe', 'Cottage', 'Executive', 'Villa', 'Hideouts'].map((t) => <option key={t}>{t}</option>)}
           </select></div>
         <div><label className="label">Base rate / night</label><input type="number" className="input money" value={n.base_rate} onChange={(e) => setN({ ...n, base_rate: e.target.value })} /></div>
         <button className="btn-primary justify-center col-span-2" onClick={add}><Plus size={15} /> Add room</button>
