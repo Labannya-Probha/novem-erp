@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import { Analytics } from '@vercel/analytics/react'
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
@@ -284,6 +285,9 @@ export default function App() {
         }}
         title={pinRequest?.title}
       />
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   )
 }
