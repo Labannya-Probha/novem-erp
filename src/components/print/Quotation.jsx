@@ -1,5 +1,4 @@
 import { fmtBDT, fmtDate, nightsBetween, computeCharge, rateFor, todayISO } from '../../lib/helpers'
-import { ReportHeader } from './ReportHeader'
 
 export default function Quotation({ res, guest, resRooms, company, taxConfig, terms, roomRate, roomCount, discountPct, validDays }) {
   const nights = nightsBetween(res.check_in, res.check_out)
@@ -18,8 +17,14 @@ export default function Quotation({ res, guest, resRooms, company, taxConfig, te
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <ReportHeader title="Quotation" showNBR={false} />
-      
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '2px solid #000', paddingBottom: 8, marginBottom: 12 }}>
+        {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 54, width: 54, objectFit: 'contain' }} />}
+        <div style={{ flex: 1, textAlign: company?.logo_url ? 'left' : 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Fraunces, serif' }}>{company?.name || 'Novem Eco Resort'}</div>
+          <div style={{ fontSize: 11 }}>{company?.address} · {company?.phone} · {company?.email}</div>
+          {company?.bin && <div style={{ fontSize: 10 }}>BIN: {company.bin}</div>}
+        </div>
+      </div>
       <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, letterSpacing: 1, marginBottom: 10 }}>QUOTATION</div>
 
       <table style={{ width: '100%', fontSize: 12, marginBottom: 10 }}>

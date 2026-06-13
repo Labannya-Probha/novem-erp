@@ -82,9 +82,7 @@ function NewReservation({ close, openReservation, userName }) {
   const t = todayISO()
   const [f, setF] = useState({
     guest_name: '', phone: '', email: '', address: '', reservation_name: '',
-    check_in: t, check_out: t, pax_adults: 2, pax_children: 0, source: 'Phone', notes: 'discount_pct', 
-    discount_type: 'percentage', 
-  discount_val: 0 ,
+    check_in: t, check_out: t, pax_adults: 2, pax_children: 0, source: 'Phone', notes: '', discount_pct: 0,
   })
   const [rooms, setRooms] = useState([])
   const [busyIds, setBusyIds] = useState(new Set())
@@ -125,7 +123,6 @@ function NewReservation({ close, openReservation, userName }) {
         reservation_name: f.reservation_name || f.guest_name,
         primary_guest_id: g.id, check_in: f.check_in, check_out: f.check_out,
         pax_adults: +f.pax_adults, pax_children: +f.pax_children,
-        discount_type: f.discount_type, discount_val: f.discount_val,
         discount_pct: +f.discount_pct || 0, room_rate: firstRoom ? firstRoom.base_rate : null,
         source: f.source, notes: f.notes, created_by: userName,
       }).select().single()
@@ -173,19 +170,7 @@ function NewReservation({ close, openReservation, userName }) {
           </div>
           <div><label className="label">Adults</label><input type="number" min="1" className="input" value={f.pax_adults} onChange={(e) => set('pax_adults', e.target.value)} /></div>
           <div><label className="label">Children</label><input type="number" min="0" className="input" value={f.pax_children} onChange={(e) => set('pax_children', e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-4">
-  <div>
-    <label className="label">Discount Type</label>
-    <select className="input" value={f.discount_type} onChange={(e) => set('discount_type', e.target.value)}>
-      <option value="percentage">Percentage (%)</option>
-      <option value="fixed">Fixed Amount (BDT)</option>
-    </select>
-  </div>
-  <div>
-    <label className="label">Discount Value</label>
-    <input type="number" className="input" value={f.discount_val} onChange={(e) => set('discount_val', +e.target.value)} />
-  </div>
-</div>
+          <div><label className="label">Discount %</label><input type="number" min="0" max="100" className="input money" value={f.discount_pct} onChange={(e) => set('discount_pct', e.target.value)} /></div>
           <div><label className="label">Source</label>
             <select className="input" value={f.source} onChange={(e) => set('source', e.target.value)}>
               {['Phone', 'WhatsApp', 'Facebook', 'Walk-in', 'Email', 'OTA', 'Agent'].map((s) => <option key={s}>{s}</option>)}

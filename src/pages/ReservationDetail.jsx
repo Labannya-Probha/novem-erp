@@ -12,7 +12,7 @@ import Quotation from '../components/print/Quotation.jsx'
 import { exportXLSX } from '../lib/helpers'
 import {
   ArrowLeft, MessageCircle, Mail, CheckCircle2, LogIn, BedDouble,
-  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban,
+  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, BadgePercent,
 } from 'lucide-react'
 
 const TABS = ['Overview', 'Quotation', 'Check-In', 'Folio & Payments', 'Invoices']
@@ -366,7 +366,7 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
           <div key={rr.id} className="flex justify-between items-center text-sm border border-leaf rounded-lg px-3 py-2">
             <span className="font-semibold">Room {rr.rooms?.room_no}{rr.rooms?.room_name ? ` · ${rr.rooms.room_name}` : ''} <span className="text-pine/50 font-normal">· {rr.rooms?.room_type}</span></span>
             <span className="flex items-center gap-2 money">
-              {locked || ['CHECKED_OUT', 'SETTLED'].includes(res.status) ? (
+              {locked ? (
                 <>{fmtBDT(rr.rate)}/night</>
               ) : (
                 <><input type="number" defaultValue={rr.rate} onBlur={(e) => updateRoomRate(rr.id, e.target.value)} className="input !w-28 !py-1 money text-right" title="Edit rate — then Repost room charges in Folio" />/night
@@ -430,6 +430,9 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
 function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userName, totals, paid, due, flash, isAdmin }) {
   const editable = isAdmin || ['QUERY', 'QUOTED', 'CONFIRMED'].includes(res.status)
   const [c, setC] = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
+  const [discAmt, setDiscAmt] = useState('')
+  const [discReason, setDiscReason] = useState('')
+  const [discType, setDiscType] = useState('ROOM')
   const [p, setP] = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
 
   const postRoomCharges = async () => {
@@ -501,6 +504,23 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
   }
   const delCharge = async (chId) => { await supabase.from('folio_charges').delete().eq('id', chId); await reload() }
 
+  // Additional / discretionary discount (admin) — recorded as a negative charge so SC, SD & VAT
+  // reverse proportionally at the chosen tax rate, keeping the Mushak 6.2 register consistent.
+  const addDiscount = async () => {
+    const amt = +discAmt
+    if (!amt || amt <= 0) { flash('Enter a positive discount amount.'); return }
+    const rate = rateFor(taxConfig, discType, todayISO())
+    const calc = computeCharge(-amt, 0, rate)
+    const { error } = await supabase.from('folio_charges').insert({
+      reservation_id: res.id, charge_date: todayISO(), charge_type: 'DISCOUNT', status: 'PAID',
+      description: `Additional discount (${discType})${discReason ? ' — ' + discReason : ''}`,
+      ...calc, created_by: userName,
+    })
+    if (error) { flash(error.message); return }
+    await supabase.from('audit_log').insert({ actor: userName, action: 'ADD_DISCOUNT', entity: 'reservation', entity_id: res.res_no, details: { amount: amt, type: discType, reason: discReason } })
+    setDiscAmt(''); setDiscReason(''); await reload(); flash(`Additional discount of ${fmtBDT(amt)} applied.`)
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -539,6 +559,21 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
           <p className="text-xs text-pine/50 mt-2">Before {fmtDate(res.check_in)} → <b>ADVANCE</b>; from check-in day → <b>REGULAR</b>. Set automatically.</p>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="card p-4 border-amber/40">
+          <h3 className="font-display font-semibold text-pine flex items-center gap-2 mb-3"><BadgePercent size={16} className="text-amber" /> Additional discount (admin)</h3>
+          <div className="grid grid-cols-6 gap-2">
+            <input type="number" min="0" className="input money" placeholder="Discount ৳" value={discAmt} onChange={(e) => setDiscAmt(e.target.value)} />
+            <select className="input" value={discType} onChange={(e) => setDiscType(e.target.value)} title="Tax category the discount applies against">
+              {['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
+            </select>
+            <input className="input col-span-2" placeholder="Reason (loyal guest, goodwill, complaint…)" value={discReason} onChange={(e) => setDiscReason(e.target.value)} />
+            <button className="btn-amber justify-center col-span-2" onClick={addDiscount}><BadgePercent size={15} /> Apply discount</button>
+          </div>
+          <p className="text-xs text-pine/50 mt-2">Posts a discount line that proportionally reduces service charge, SD & VAT at the selected category's tax rate, lowers the balance due, and is logged in the audit trail. Remove it like any other line if entered by mistake.</p>
+        </div>
+      )}
 
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Guest Total Billing History</div>

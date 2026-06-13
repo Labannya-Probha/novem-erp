@@ -4,7 +4,6 @@ import { setCurrency } from './lib/helpers'
 import { can, ROLE_LABELS } from './lib/roles'
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
-import HousekeepingHub from './pages/HousekeepingHub.jsx'
 import Reservations from './pages/Reservations.jsx'
 import ReservationDetail from './pages/ReservationDetail.jsx'
 import BookingCalendar from './pages/BookingCalendar.jsx'
@@ -19,7 +18,7 @@ import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
 import {
   Leaf, LayoutDashboard, CalendarRange, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
-  FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, Brush,
+  FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -40,7 +39,6 @@ const NAV_GROUPS = [
     { id: 'facilities', label: 'Facilities', icon: ShoppingBasket },
   ]},
   { title: 'Back Office', items: [
-    { id: 'housekeeping', label: 'Housekeeping', icon: Brush },
     { id: 'inventory', label: 'Inventory', icon: Boxes },
     { id: 'vat', label: 'VAT Center', icon: FileSpreadsheet },
     { id: 'accounting', label: 'Accounting', icon: Calculator },
@@ -124,11 +122,7 @@ export default function App() {
               <div className="truncate font-semibold text-white/80">{userName}</div>
               <div className="text-[10px] text-white/40">{ROLE_LABELS[role] || role}</div>
             </div>
-            <button 
-  title="Sign out" 
-  onClick={async () => {
-    await supabase.auth.signOut(); window.location.reload();}} 
-  className="hover:text-white shrink-0">  <LogOut size={15} /></button>
+            <button title="Sign out" onClick={() => supabase.auth.signOut()} className="hover:text-white shrink-0"><LogOut size={15} /></button>
           </div>
         </div>
       </aside>
@@ -149,7 +143,6 @@ export default function App() {
         {page === 'hr' && can(role, 'hr') && <HrOffice userName={userName} role={role} isAdmin={isAdmin} company={company} />}
         {page === 'reports' && can(role, 'reports') && <ReportsHub userName={userName} />}
         {page === 'settings' && can(role, 'settings') && <Settings userName={userName} role={role} isAdmin={isAdmin} reloadCompany={loadCompany} />}
-        {page === 'housekeeping' && <HousekeepingHub />}          
       </main>
     </div>
   )

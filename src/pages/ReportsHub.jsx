@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, exportXLSX, nightsBetween } from '../lib/helpers'
-import { BarChart3, FileDown, AlertCircle } from 'lucide-react'
+import { BarChart3, FileDown } from 'lucide-react'
 
 const firstOfMonth = () => todayISO().slice(0, 8) + '01'
 
@@ -10,47 +10,34 @@ export default function ReportsHub() {
   const [to, setTo] = useState(todayISO())
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
 
   const run = async () => {
     setLoading(true)
-    setError(null)
-    try {
-      const { data: ch, error: chErr } = await supabase.from('folio_charges').select('*').gte('charge_date', from).lte('charge_date', to)
-      const { data: pm, error: pmErr } = await supabase.from('payments').select('*').gte('received_date', from).lte('received_date', to)
-      const { data: rooms, error: rmErr } = await supabase.from('rooms').select('id').eq('is_active', true)
-      const { data: dues, error: resErr } = await supabase.from('reservations').select('*, folio_charges(total), payments(amount)').eq('status', 'CHECKED_OUT')
-
-      if (chErr || pmErr || rmErr || resErr) throw new Error("Database fetch error")
-
-      const revByCat = {}
-      for (const c of ch || []) { const k = c.charge_type; revByCat[k] = (revByCat[k] || 0) + +c.total }
-      const payByMethod = {}
-      for (const p of pm || []) payByMethod[p.method] = (payByMethod[p.method] || 0) + +p.amount
-      
-      const roomNights = (ch || []).filter((c) => c.charge_type === 'ROOM').length
-      const roomRev = (ch || []).filter((c) => c.charge_type === 'ROOM').reduce((a, c) => a + +c.base_amount - +c.discount, 0)
-      const adr = roomNights > 0 ? roomRev / roomNights : 0
-      
-      const days = Math.max(1, nightsBetween(from, to) + 1)
-      const capacity = (rooms?.length || 0) * days
-      const occupancy = capacity > 0 ? (roomNights / capacity) * 100 : 0
-      
-      const dueList = (dues || []).map((r) => {
-        const billed = (r.folio_charges || []).reduce((a, c) => a + +c.total, 0)
-        const paid = (r.payments || []).reduce((a, p) => a + +p.amount, 0)
-        return { res_no: r.res_no, name: r.reservation_name, due: +(billed - paid).toFixed(2) }
-      }).filter((r) => r.due > 0.009)
-
-      setData({ revByCat, payByMethod, roomNights, adr, occupancy, capacity, dueList, totalRev: Object.values(revByCat).reduce((a, v) => a + v, 0), totalPay: Object.values(payByMethod).reduce((a, v) => a + v, 0) })
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+    const [{ data: ch }, { data: pm }, { data: rooms }, { data: dues }] = await Promise.all([
+      supabase.from('folio_charges').select('*').gte('charge_date', from).lte('charge_date', to),
+      supabase.from('payments').select('*').gte('received_date', from).lte('received_date', to),
+      supabase.from('rooms').select('id').eq('is_active', true),
+      supabase.from('reservations').select('*, folio_charges(total), payments(amount)').eq('status', 'CHECKED_OUT'),
+    ])
+    const revByCat = {}
+    for (const c of ch || []) { const k = c.charge_type; revByCat[k] = (revByCat[k] || 0) + +c.total }
+    const payByMethod = {}
+    for (const p of pm || []) payByMethod[p.method] = (payByMethod[p.method] || 0) + +p.amount
+    const roomNights = (ch || []).filter((c) => c.charge_type === 'ROOM').length
+    const roomRev = (ch || []).filter((c) => c.charge_type === 'ROOM').reduce((a, c) => a + +c.base_amount - +c.discount, 0)
+    const adr = roomNights > 0 ? roomRev / roomNights : 0
+    const days = Math.max(1, nightsBetween(from, to) + 1)
+    const capacity = (rooms?.length || 0) * days
+    const occupancy = capacity > 0 ? (roomNights / capacity) * 100 : 0
+    const dueList = (dues || []).map((r) => {
+      const billed = (r.folio_charges || []).reduce((a, c) => a + +c.total, 0)
+      const paid = (r.payments || []).reduce((a, p) => a + +p.amount, 0)
+      return { res_no: r.res_no, name: r.reservation_name, due: +(billed - paid).toFixed(2) }
+    }).filter((r) => r.due > 0.009)
+    setData({ revByCat, payByMethod, roomNights, adr, occupancy, capacity, dueList, totalRev: Object.values(revByCat).reduce((a, v) => a + v, 0), totalPay: Object.values(payByMethod).reduce((a, v) => a + v, 0) })
+    setLoading(false)
   }
-
-  useEffect(() => { run() }, [from, to])
+  useEffect(() => { run() }, []) // eslint-disable-line
 
   const exportAll = () => {
     if (!data) return
@@ -77,7 +64,6 @@ export default function ReportsHub() {
         </div>
       </div>
 
-      {error && <div className="p-4 bg-red-50 text-red-600 rounded-lg flex items-center gap-2"><AlertCircle size={18}/> {error}</div>}
       {loading && <div className="text-pine/50">Loading…</div>}
       {data && (
         <>
