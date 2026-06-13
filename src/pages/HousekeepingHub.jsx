@@ -25,10 +25,19 @@ const HousekeepingHub = () => {
           <div key={room.id} className="card p-4 shadow">
             <h3>Room: {room.room_no}</h3>
             <p>Status: <b>{room.status}</b></p>
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => updateStatus(room.id, 'Clean')} className="btn-primary py-1 px-3 text-xs">Clean</button>
-              <button onClick={() => updateStatus(room.id, 'Dirty')} className="btn-ghost py-1 px-3 text-xs">Dirty</button>
-            </div>
+            <div className="mt-2">
+  <label className="text-xs text-gray-500">Change Status:</label>
+  <select 
+    value={room.status} 
+    onChange={(e) => updateStatus(room.id, e.target.value)}
+    className="block w-full mt-1 p-2 border rounded-md text-sm"
+  >
+    <option value="Clean">Clean</option>
+    <option value="Dirty">Dirty</option>
+    <option value="Occupied">Occupied</option>
+    <option value="Out of Service">Out of Service</option>
+  </select>
+</div>
           </div>
         ))}
       </div>
