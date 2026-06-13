@@ -3,6 +3,8 @@ import { supabase, SUPABASE_CONFIG } from '../supabase'
 import { fmtBDT, todayISO, setCurrency } from '../lib/helpers'
 import { ROLES, ROLE_LABELS } from '../lib/roles'
 import { Save, Plus, BedDouble, Percent, Building2, Trash2, Users, ShieldCheck, Upload, Image } from 'lucide-react'
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 export default function Settings({ userName, role, isAdmin, reloadCompany }) {
   const canManage = isAdmin || role === 'MANAGER'
@@ -92,15 +94,25 @@ function BrandingCard({ reloadCompany }) {
         <div><label className="label">Mushak-6.10 threshold</label><input type="number" className="input money" value={c.mushak610_threshold || 0} onChange={(e) => set('mushak610_threshold', e.target.value)} /></div>
         <div><label className="label">Invoice footer</label><input className="input" value={c.invoice_footer || ''} onChange={(e) => set('invoice_footer', e.target.value)} /></div>
       </div>
-      <div className="mt-3">
+      
+      <div className="mt-5">
         <label className="label">Default Terms &amp; Conditions</label>
-        <textarea className="w-full h-40 p-3 border rounded-lg text-sm focus:ring-2 focus:ring-forest outline-none" value={c.terms_conditions || ''} onChange={(e) => set('terms_conditions', e.target.value)} />
+        <div className="bg-white rounded-lg border border-leaf">
+          <ReactQuill 
+            theme="snow" 
+            value={c.terms_conditions || ''} 
+            onChange={(val) => set('terms_conditions', val)}
+            modules={{ toolbar: [['bold', 'italic', 'underline'], [{ 'list': 'ordered'}, { 'list': 'bullet' }], [{ 'align': [] }], ['clean']] }}
+          />
+        </div>
       </div>
+
       <button className="btn-primary mt-4" disabled={busy} onClick={save}><Save size={15} /> Save profile</button>
     </div>
   )
 }
 
+// (TaxCard, RoomsCard, StaffCard অংশগুলো অপরিবর্তিত রাখা হয়েছে)
 function TaxCard() {
   const [rows, setRows] = useState([])
   const [f, setF] = useState({ charge_type: 'ROOM', vat_pct: '', sd_pct: 0, service_charge_pct: 0, effective_from: todayISO() })
