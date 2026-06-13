@@ -3,6 +3,36 @@ import { supabase } from '../supabase';
 import { fmtBDT, fmtDate, todayISO, exportXLSX } from '../lib/helpers';
 import { Calculator, Plus, Trash2, FileDown, Scale, Building2 } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
+
+export default function AccountingHub({ userName, isAdmin }) {
+  const [tab, setTab] = useState('Journal Vouchers');
+  const [accounts, setAccounts] = useState([]);
+  const [msg, setMsg] = useState('');
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000); };
+  
+  const loadAccounts = async () => { 
+    const { data } = await supabase.from('chart_of_accounts').select('*').eq('is_active', true).order('code'); 
+    setAccounts(data || []); 
+  };
+  
+  useEffect(() => { loadAccounts() }, []);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><Calculator className="text-forest" /> Accounting</h1>
+      </div>
+      {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
+      <div className="flex gap-1 border-b border-leaf flex-wrap">
+        {['Journal Vouchers', 'Trial Balance', 'Chart of Accounts', 'Fixed Assets'].map((t) => (
+          <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-semibold rounded-t-lg ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>{t}</button>
+        ))}
+      </div>
+      {tab === 'Journal Vouchers' && <JournalsTab accounts={accounts} userName={userName} flash={flash} />}
+    </div>
+  );
+}
+
 function JournalsTab({ accounts, userName, flash }) {
   const [rows, setRows] = useState([]);
   const [head, setHead] = useState({ jv_date: todayISO(), narration: '' });
@@ -27,8 +57,8 @@ function JournalsTab({ accounts, userName, flash }) {
     const valid = lines.filter((l) => l.account_id && (+l.debit || +l.credit));
     const { data: jv, error } = await supabase.from('journal_entries').insert({ jv_date: head.jv_date, narration: head.narration, source: 'MANUAL', posted_by: userName }).select().single();
     if (error) { flash(error.message); return; }
-    const { error: le } = await supabase.from('journal_lines').insert(valid.map((l) => ({ entry_id: jv.id, account_id: l.account_id, debit: +l.debit || 0, credit: +l.credit || 0, line_note: l.line_note })));
-    if (le) flash(le.message); else { setHead({ jv_date: todayISO(), narration: '' }); setLines([{ account_id: '', debit: '', credit: '', line_note: '' }, { account_id: '', debit: '', credit: '', line_note: '' }]); load(); flash(`${jv.jv_no} posted.`); }
+    await supabase.from('journal_lines').insert(valid.map((l) => ({ entry_id: jv.id, account_id: l.account_id, debit: +l.debit || 0, credit: +l.credit || 0, line_note: l.line_note })));
+    setHead({ jv_date: todayISO(), narration: '' }); setLines([{ account_id: '', debit: '', credit: '', line_note: '' }, { account_id: '', debit: '', credit: '', line_note: '' }]); load(); flash(`${jv.jv_no} posted.`);
   };
 
   const openPrint = (r) => { setSelectedVoucher(r); setTimeout(() => handlePrint(), 100); };
@@ -48,10 +78,6 @@ function JournalsTab({ accounts, userName, flash }) {
             <input className="input col-span-3" placeholder="Note" value={l.line_note} onChange={(e) => upd(i, 'line_note', e.target.value)} />
           </div>
         ))}
-        <div className="flex items-center justify-between">
-          <button className="btn-ghost !py-1" onClick={() => setLines([...lines, { account_id: '', debit: '', credit: '', line_note: '' }])}><Plus size={14} /> Add line</button>
-          <div className={`money font-semibold ${balanced ? 'text-forest' : 'text-red-600'}`}>Dr {totDr.toFixed(2)} · Cr {totCr.toFixed(2)} {balanced ? '✓ balanced' : '✗ not balanced'}</div>
-        </div>
         <button className="btn-primary" disabled={!balanced} onClick={post}><Plus size={15} /> Post journal</button>
       </div>
       <div className="card overflow-hidden">
