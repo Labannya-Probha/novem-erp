@@ -18,7 +18,7 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
     <div>
       <h1 className="font-display text-2xl font-bold text-pine mb-1">Settings</h1>
       <p className="text-sm text-pine/60 mb-6">White-label branding, company profile, NBR tax rates, room inventory and user roles.</p>
-      <div className="space-y-5">
+      <div className="space-y-8">
         <BrandingCard reloadCompany={reloadCompany} />
         <TaxCard />
         <RoomsCard />
@@ -81,7 +81,7 @@ function BrandingCard({ reloadCompany }) {
           </label>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Software name</label><input className="input" value={c.software_name || ''} onChange={(e) => set('software_name', e.target.value)} /></div>
         <div><label className="label">Currency symbol</label><input className="input" value={c.currency || ''} onChange={(e) => set('currency', e.target.value)} /></div>
         <div><label className="label">Property name</label><input className="input" value={c.name || ''} onChange={(e) => set('name', e.target.value)} /></div>
@@ -97,13 +97,13 @@ function BrandingCard({ reloadCompany }) {
       </div>
       <div className="mt-5">
         <label className="label">Default Terms & Conditions</label>
-        <div className="flex gap-2 p-2 bg-stone-100 rounded-t-lg border border-leaf">
-          <button type="button" onClick={() => exec('bold')} className="p-1 hover:bg-white rounded"><Bold size={16}/></button>
-          <button type="button" onClick={() => exec('insertUnorderedList')} className="p-1 hover:bg-white rounded"><List size={16}/></button>
-          <button type="button" onClick={() => exec('justifyLeft')} className="p-1 hover:bg-white rounded"><AlignLeft size={16}/></button>
-          <button type="button" onClick={() => exec('justifyCenter')} className="p-1 hover:bg-white rounded"><AlignCenter size={16}/></button>
+        <div className="flex gap-1 p-1 bg-stone-100 rounded-t-lg border border-leaf">
+          <button type="button" onClick={() => exec('bold')} className="p-2 hover:bg-white rounded"><Bold size={16}/></button>
+          <button type="button" onClick={() => exec('insertUnorderedList')} className="p-2 hover:bg-white rounded"><List size={16}/></button>
+          <button type="button" onClick={() => exec('justifyLeft')} className="p-2 hover:bg-white rounded"><AlignLeft size={16}/></button>
+          <button type="button" onClick={() => exec('justifyCenter')} className="p-2 hover:bg-white rounded"><AlignCenter size={16}/></button>
         </div>
-        <div ref={editorRef} contentEditable className="w-full h-40 p-3 border-x border-b border-leaf rounded-b-lg text-sm focus:outline-none" dangerouslySetInnerHTML={{ __html: c.terms_conditions || '' }} />
+        <div ref={editorRef} contentEditable className="w-full h-60 p-4 border-x border-b border-leaf rounded-b-lg text-sm focus:outline-none bg-white" dangerouslySetInnerHTML={{ __html: c.terms_conditions || '' }} />
       </div>
       <button className="btn-primary mt-4" disabled={busy} onClick={save}><Save size={15} /> Save profile</button>
     </div>
