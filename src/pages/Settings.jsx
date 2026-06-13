@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase, SUPABASE_CONFIG } from '../supabase'
 import { fmtBDT, todayISO, setCurrency } from '../lib/helpers'
 import { ROLES, ROLE_LABELS } from '../lib/roles'
-import { Save, Plus, BedDouble, Percent, Building2, Trash2, Users, ShieldCheck, Upload, Image } from 'lucide-react'
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { Save, Plus, BedDouble, Percent, Building2, Trash2, Users, ShieldCheck, Upload, Image, Bold, List, AlignLeft, AlignCenter } from 'lucide-react'
 
 export default function Settings({ userName, role, isAdmin, reloadCompany }) {
   const canManage = isAdmin || role === 'MANAGER'
@@ -34,11 +32,13 @@ function BrandingCard({ reloadCompany }) {
   const [c, setC] = useState(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+  const editorRef = useRef(null)
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
   const load = async () => { const { data } = await supabase.from('company_settings').select('*').eq('id', 1).single(); setC(data) }
   useEffect(() => { load() }, [])
   if (!c) return <div className="card p-5 text-pine/50">Loading…</div>
   const set = (k, v) => setC((p) => ({ ...p, [k]: v }))
+  const exec = (cmd, val = null) => document.execCommand(cmd, false, val)
 
   const uploadLogo = async (file) => {
     if (!file) return
@@ -55,11 +55,12 @@ function BrandingCard({ reloadCompany }) {
 
   const save = async () => {
     setBusy(true)
+    const content = editorRef.current.innerHTML
     const { error } = await supabase.from('company_settings').update({
       name: c.name, legal_name: c.legal_name, address: c.address, phone: c.phone, email: c.email,
       bin: c.bin, vat_circle: c.vat_circle, invoice_footer: c.invoice_footer,
       short_code: c.short_code, software_name: c.software_name, currency: c.currency,
-      mushak610_threshold: +c.mushak610_threshold || 0, terms_conditions: c.terms_conditions, updated_at: new Date().toISOString(),
+      mushak610_threshold: +c.mushak610_threshold || 0, terms_conditions: content, updated_at: new Date().toISOString(),
     }).eq('id', 1)
     setBusy(false)
     if (error) flash(error.message)
@@ -94,25 +95,21 @@ function BrandingCard({ reloadCompany }) {
         <div><label className="label">Mushak-6.10 threshold</label><input type="number" className="input money" value={c.mushak610_threshold || 0} onChange={(e) => set('mushak610_threshold', e.target.value)} /></div>
         <div><label className="label">Invoice footer</label><input className="input" value={c.invoice_footer || ''} onChange={(e) => set('invoice_footer', e.target.value)} /></div>
       </div>
-      
       <div className="mt-5">
-        <label className="label">Default Terms &amp; Conditions</label>
-        <div className="bg-white rounded-lg border border-leaf">
-          <ReactQuill 
-            theme="snow" 
-            value={c.terms_conditions || ''} 
-            onChange={(val) => set('terms_conditions', val)}
-            modules={{ toolbar: [['bold', 'italic', 'underline'], [{ 'list': 'ordered'}, { 'list': 'bullet' }], [{ 'align': [] }], ['clean']] }}
-          />
+        <label className="label">Default Terms & Conditions</label>
+        <div className="flex gap-2 p-2 bg-stone-100 rounded-t-lg border border-leaf">
+          <button type="button" onClick={() => exec('bold')} className="p-1 hover:bg-white rounded"><Bold size={16}/></button>
+          <button type="button" onClick={() => exec('insertUnorderedList')} className="p-1 hover:bg-white rounded"><List size={16}/></button>
+          <button type="button" onClick={() => exec('justifyLeft')} className="p-1 hover:bg-white rounded"><AlignLeft size={16}/></button>
+          <button type="button" onClick={() => exec('justifyCenter')} className="p-1 hover:bg-white rounded"><AlignCenter size={16}/></button>
         </div>
+        <div ref={editorRef} contentEditable className="w-full h-40 p-3 border-x border-b border-leaf rounded-b-lg text-sm focus:outline-none" dangerouslySetInnerHTML={{ __html: c.terms_conditions || '' }} />
       </div>
-
       <button className="btn-primary mt-4" disabled={busy} onClick={save}><Save size={15} /> Save profile</button>
     </div>
   )
 }
 
-// (TaxCard, RoomsCard, StaffCard অংশগুলো অপরিবর্তিত রাখা হয়েছে)
 function TaxCard() {
   const [rows, setRows] = useState([])
   const [f, setF] = useState({ charge_type: 'ROOM', vat_pct: '', sd_pct: 0, service_charge_pct: 0, effective_from: todayISO() })
