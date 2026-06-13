@@ -16,11 +16,15 @@ export default function Mushak63({ invoice, res, company, refNo }) {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#000', position: 'relative' }}>
-      {invoice.is_void && <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>VOID / বাতিল</div>}
+      {invoice.is_void && (
+        <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>
+          VOID / বাতিল
+        </div>
+      )}
       
       <ReportHeader title="Mushak 6.3" showNBR={true} />
 
-      <table style={{ width: '100%' }}>
+      <table style={{ width: '100%', marginTop: '10px' }}>
         <tbody>
           <tr>
             <td style={{ textAlign: 'center' }}>
@@ -34,6 +38,7 @@ export default function Mushak63({ invoice, res, company, refNo }) {
           </tr>
         </tbody>
       </table>
+
       <div style={{ textAlign: 'center', fontSize: 9, marginTop: 2 }}>[বিধি ৪০ এর উপ-বিধি (১) এর দফা (গ) দ্রষ্টব্য]</div>
       <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, margin: '6px 0 10px', textDecoration: 'underline' }}>কর চালানপত্র (Tax Invoice)</div>
 
@@ -69,14 +74,14 @@ export default function Mushak63({ invoice, res, company, refNo }) {
         <thead>
           <tr>
             <th style={bc}>ক্রমিক<br />নং</th>
-            <th style={bc}>পণ্য বা সেবার বর্ণনা<br />(Description of goods/services)</th>
-            <th style={bc}>সরবরাহের<br />একক</th>
+            <th style={bc}>পণ্য বা সেবার বর্ণনা</th>
+            <th style={bc}>সরবরাহের একক</th>
             <th style={bc}>পরিমাণ</th>
-            <th style={bc}>মূল্য (টাকায়)<br />(Value)</th>
-            <th style={bc}>সম্পূরক শুল্কের<br />পরিমাণ (টাকায়)</th>
-            <th style={bc}>মূসক হার<br />(VAT rate)</th>
-            <th style={bc}>মূসকের পরিমাণ<br />(টাকায়)</th>
-            <th style={bc}>সকল প্রকার শুল্ক ও<br />করসহ মূল্য</th>
+            <th style={bc}>মূল্য (টাকায়)</th>
+            <th style={bc}>সম্পূরক শুল্ক</th>
+            <th style={bc}>মূসক হার</th>
+            <th style={bc}>মূসকের পরিমাণ</th>
+            <th style={bc}>মোট মূল্য</th>
           </tr>
         </thead>
         <tbody>
@@ -111,22 +116,6 @@ export default function Mushak63({ invoice, res, company, refNo }) {
       <div style={{ fontSize: 10.5, marginTop: 6 }}>
         <b>কথায় (In words):</b> {takaInWords(t.grand_total)}
       </div>
-
-      <table style={{ width: '100%', marginTop: 40, fontSize: 10.5 }}>
-        <tbody>
-          <tr>
-            <td style={{ width: '55%' }}>
-              <b>প্রতিষ্ঠান কর্তৃপক্ষের দায়িত্বপ্রাপ্ত ব্যক্তির নাম</b> (Name of responsible person): {invoice.created_by || '________________'}<br />
-              <b>পদবি</b> (Designation): ________________
-            </td>
-            <td style={{ width: '45%', textAlign: 'right', verticalAlign: 'bottom' }}>
-              <div style={{ borderTop: '1px solid #000', display: 'inline-block', paddingTop: 4, minWidth: 180, textAlign: 'center' }}>
-                <b>স্বাক্ষর</b> (Signature) ও সিল (Seal)
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </div>
   )
 }
