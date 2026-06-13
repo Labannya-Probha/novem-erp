@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { setCurrency } from './lib/helpers'
 import { can, ROLE_LABELS } from './lib/roles'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
 import ReservationDetail from './pages/ReservationDetail.jsx'
 import BookingCalendar from './pages/BookingCalendar.jsx'
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import HousekeepingHub from './pages/HousekeepingHub';
 import RestaurantPOS from './pages/RestaurantPOS.jsx'
@@ -36,13 +36,13 @@ const NAV_GROUPS = [
     { id: 'reservations', label: 'Reservations', icon: CalendarRange },
     { id: 'calendar', label: 'Booking Calendar', icon: CalendarDays },
     { id: 'nightaudit', label: 'Night Audit', icon: MoonStar },
-    { id: 'housekeeping', label: 'Housekeeping', icon: Brush },
   ]},
   { title: 'Sales', items: [
     { id: 'pos', label: 'Restaurant POS', icon: UtensilsCrossed },
     { id: 'facilities', label: 'Facilities', icon: ShoppingBasket },
   ]},
   { title: 'Back Office', items: [
+    { id: 'housekeeping', label: 'Housekeeping', icon: Brush },
     { id: 'inventory', label: 'Inventory', icon: Boxes },
     { id: 'vat', label: 'VAT Center', icon: FileSpreadsheet },
     { id: 'accounting', label: 'Accounting', icon: Calculator },
