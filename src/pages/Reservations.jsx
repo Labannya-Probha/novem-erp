@@ -125,6 +125,7 @@ function NewReservation({ close, openReservation, userName }) {
         reservation_name: f.reservation_name || f.guest_name,
         primary_guest_id: g.id, check_in: f.check_in, check_out: f.check_out,
         pax_adults: +f.pax_adults, pax_children: +f.pax_children,
+        discount_type: f.discount_type, discount_val: f.discount_val,
         discount_pct: +f.discount_pct || 0, room_rate: firstRoom ? firstRoom.base_rate : null,
         source: f.source, notes: f.notes, created_by: userName,
       }).select().single()
