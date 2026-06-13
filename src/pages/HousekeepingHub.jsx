@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ReportHeader } from '../components/print/ReportHeader';
+import HousekeepingHub from './pages/HousekeepingHub';
 
 const HousekeepingHub = () => {
   const [rooms, setRooms] = useState([{ id: 101, status: 'Clean' }]);
@@ -21,3 +22,4 @@ const HousekeepingHub = () => {
     </div>
   );
 };
+export default HousekeepingHub;
