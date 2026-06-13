@@ -1,4 +1,5 @@
 import { fmtBDT, fmtDate, nightsBetween } from '../../lib/helpers'
+import { ReportHeader } from './ReportHeader'
 
 export default function RegistrationCard({ res, guest, resGuests, resRooms, payments, company }) {
   const advance = (payments || []).filter((p) => p.payment_class === 'ADVANCE')
@@ -8,14 +9,7 @@ export default function RegistrationCard({ res, guest, resGuests, resRooms, paym
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '2px solid #000', paddingBottom: 8, marginBottom: 10 }}>
-        {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 50, width: 50, objectFit: 'contain' }} />}
-        <div style={{ flex: 1, textAlign: company?.logo_url ? 'left' : 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Fraunces, serif' }}>{company?.name || 'Novem Eco Resort'}</div>
-          <div style={{ fontSize: 11 }}>{company?.address} · {company?.phone} · {company?.email}</div>
-          <div style={{ fontSize: 14, fontWeight: 700, marginTop: 6, letterSpacing: 1 }}>GUEST REGISTRATION CARD</div>
-        </div>
-      </div>
+      <ReportHeader title="Guest Registration Card" showNBR={false} />
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <tbody>
