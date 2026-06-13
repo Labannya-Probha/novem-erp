@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
 import ReservationDetail from './pages/ReservationDetail.jsx'
 import BookingCalendar from './pages/BookingCalendar.jsx'
+import HousekeepingHub from './pages/HousekeepingHub'; 
 import RestaurantPOS from './pages/RestaurantPOS.jsx'
 import Facilities from './pages/Facilities.jsx'
 import InventoryHub from './pages/InventoryHub.jsx'
@@ -33,6 +34,7 @@ const NAV_GROUPS = [
     { id: 'reservations', label: 'Reservations', icon: CalendarRange },
     { id: 'calendar', label: 'Booking Calendar', icon: CalendarDays },
     { id: 'nightaudit', label: 'Night Audit', icon: MoonStar },
+    { id: 'housekeeping', label: 'Housekeeping', icon: Brush },
   ]},
   { title: 'Sales', items: [
     { id: 'pos', label: 'Restaurant POS', icon: UtensilsCrossed },
@@ -133,6 +135,7 @@ export default function App() {
         {page === 'calendar' && can(role, 'calendar') && <BookingCalendar openReservation={openReservation} />}
         {page === 'detail' && activeRes && (
           <ReservationDetail id={activeRes} back={() => setPage('reservations')} userName={userName} role={role} isAdmin={isAdmin} />
+          {page === 'housekeeping' && <HousekeepingHub />}
         )}
         {page === 'nightaudit' && can(role, 'nightaudit') && <NightAudit userName={userName} isAdmin={isAdmin} />}
         {page === 'pos' && can(role, 'pos') && <RestaurantPOS userName={userName} role={role} isAdmin={isAdmin} />}
