@@ -27,9 +27,28 @@ body {
 @media print {
   #root { display: none !important; }
   #print-root { display: block !important; }
-  body { background: #fff !important; }
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
   @page { size: A4; margin: 12mm; }
-  .print-doc { font-family: 'IBM Plex Sans', 'SolaimanLipi', sans-serif; color: #000; font-size: 12px; }
-  .print-doc table { width: 100%; border-collapse: collapse; }
+
+  .print-doc {
+    font-family: 'IBM Plex Sans', 'SolaimanLipi', sans-serif;
+    color: #000;
+    font-size: 11px;
+    width: 186mm !important;      /* A4 210mm − 2×12mm margin */
+    max-width: 186mm !important;
+    margin: 0 auto !important;
+  }
+  /* component গুলোর ভেতরের maxWidth:720px / fixed width override করে A4-তে বসাও */
+  .print-doc > div,
+  .print-doc > table { max-width: 100% !important; width: 100% !important; }
+
+  .print-doc * { box-sizing: border-box; }
+  .print-doc table { width: 100% !important; border-collapse: collapse; table-layout: fixed; }
+  .print-doc td, .print-doc th { word-wrap: break-word; overflow-wrap: break-word; }
+  .print-doc img { max-width: 100%; height: auto; }
+
+  /* সারি/টেবিল/লোগো যেন পাতার মাঝে কাটা না পড়ে */
+  .print-doc tr, .print-doc thead, .print-doc svg { page-break-inside: avoid; }
+
   .no-print { display: none !important; }
 }
