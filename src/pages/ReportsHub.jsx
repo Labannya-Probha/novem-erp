@@ -173,4 +173,91 @@ function VatPurchaseReport({ company }) {
         <table className="w-full">
           <thead><tr><th className="th">Date</th><th className="th">Vendor</th><th className="th">Invoice</th><th className="th text-right">Taxable</th><th className="th text-right">VAT</th><th className="th text-right">Total</th></tr></thead>
           <tbody>
-            {rows.map((r) => <tr key={r.id}><td className="td text-xs">{fmtDate(r.entry_date)}</td><td className="td text-sm">{r.vendor_name || '—'}</td><td className="td money text-xs">{r.invoice_no || '—'}</td><td className="td money
+            {rows.map((r) => <tr key={r.id}><td className="td text-xs">{fmtDate(r.entry_date)}</td><td className="td text-sm">{r.vendor_name || '—'}</td><td className="td money text-xs">{r.invoice_no || '—'}</td><td className="td money text-right">{(+r.taxable_value).toFixed(2)}</td><td className="td money text-right">{(+r.vat_amount).toFixed(2)}</td><td className="td money text-right font-semibold">{(+r.total).toFixed(2)}</td></tr>)}
+            {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={6}>No purchases in this period.</td></tr>}
+          </tbody>
+          <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={3}>TOTAL</td><td className="td text-right">{tot.tv.toFixed(2)}</td><td className="td text-right">{tot.vat.toFixed(2)}</td><td className="td text-right">{tot.total.toFixed(2)}</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- COLLECTIONS (cash basis, by method) ---------------- */
+function CollectionsReport({ company }) {
+  const [from, setFrom] = useState(monthStart())
+  const [to, setTo] = useState(todayISO())
+  const [rows, setRows] = useState([])
+  const [printing, setPrinting] = useState(false)
+  const run = async () => {
+    const { data } = await supabase.from('payments').select('*').gte('received_date', from).lte('received_date', to)
+    const agg = {}
+    for (const p of data || []) agg[p.method] = (agg[p.method] || 0) + +p.amount
+    setRows(Object.entries(agg).map(([method, amount]) => ({ method, amount })))
+  }
+  useEffect(() => { run() }, []) // eslint-disable-line
+  const tot = rows.reduce((a, r) => a + r.amount, 0)
+  const xls = () => exportXLSX(`Collections_${from}_${to}.xlsx`, [{ name: 'Collections', rows: [['Collections Report', `${from} to ${to}`], [], ['Method', 'Amount'], ...rows.map((r) => [r.method, r.amount]), ['TOTAL', tot]] }])
+  return (
+    <div className="space-y-4">
+      <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onRun={run} onXls={xls} onPrint={() => setPrinting(true)} />
+      {printing && (
+        <PrintPortal title="Collections Report" onClose={() => setPrinting(false)}>
+          <ReportHead company={company} title="COLLECTIONS REPORT (Cash basis)" from={from} to={to} />
+          <table style={{ width: '60%', borderCollapse: 'collapse', margin: '0 auto' }}>
+            <thead><tr style={{ background: '#eee' }}><th style={{ border: '1px solid #000', padding: '5px 8px', fontSize: 11, textAlign: 'left' }}>Method</th><th style={{ border: '1px solid #000', padding: '5px 8px', fontSize: 11, textAlign: 'right' }}>Amount</th></tr></thead>
+            <tbody>{rows.map((r) => <tr key={r.method}><td style={{ border: '1px solid #000', padding: '5px 8px', fontSize: 11 }}>{r.method}</td><td style={{ border: '1px solid #000', padding: '5px 8px', fontSize: 11, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }}>{fmtBDT(r.amount)}</td></tr>)}</tbody>
+            <tfoot><tr style={{ fontWeight: 700, background: '#f5f5f5' }}><td style={{ border: '1px solid #000', padding: '5px 8px', fontSize: 11 }}>TOTAL</td><td style={{ border: '1px solid #000', padding: '5px 8px', fontSize: 11, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }}>{fmtBDT(tot)}</td></tr></tfoot>
+          </table>
+        </PrintPortal>
+      )}
+      <div className="card overflow-hidden">
+        <table className="w-full">
+          <thead><tr><th className="th">Method</th><th className="th text-right">Amount</th></tr></thead>
+          <tbody>
+            {rows.map((r) => <tr key={r.method}><td className="td">{r.method}</td><td className="td money text-right font-semibold">{fmtBDT(r.amount)}</td></tr>)}
+            {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={2}>No collections in this period.</td></tr>}
+          </tbody>
+          <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td">TOTAL</td><td className="td text-right">{fmtBDT(tot)}</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- TRIAL BALANCE ---------------- */
+function TrialBalanceReport({ company }) {
+  const [rows, setRows] = useState([])
+  const [printing, setPrinting] = useState(false)
+  useEffect(() => { supabase.from('v_trial_balance').select('*').then(({ data }) => setRows(data || [])) }, [])
+  const tot = rows.reduce((a, r) => ({ d: a.d + +r.total_debit, c: a.c + +r.total_credit }), { d: 0, c: 0 })
+  const xls = () => exportXLSX('Trial_Balance.xlsx', [{ name: 'Trial Balance', rows: [['Trial Balance', fmtDate(todayISO())], [], ['Code', 'Account', 'Type', 'Debit', 'Credit', 'Balance'], ...rows.map((r) => [r.code, r.name, r.type, +r.total_debit, +r.total_credit, +r.balance]), ['', 'TOTAL', '', tot.d, tot.c, '']] }])
+  return (
+    <div className="space-y-4">
+      <div className="card p-4 flex items-center justify-end gap-2">
+        <button className="btn-ghost" onClick={xls}><FileDown size={14} /> Excel</button>
+        <button className="btn-ghost" onClick={() => setPrinting(true)}><Printer size={14} /> Print</button>
+      </div>
+      {printing && (
+        <PrintPortal title="Trial Balance" onClose={() => setPrinting(false)}>
+          <ReportHead company={company} title="TRIAL BALANCE" from={todayISO()} to={todayISO()} />
+          <table style={{ width: '100%', borderCollapse: 'collapse', maxWidth: 720, margin: '0 auto' }}>
+            <thead><tr style={{ background: '#eee' }}>{['Code', 'Account', 'Debit', 'Credit', 'Balance'].map((h, i) => <th key={h} style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5, textAlign: i > 1 ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
+            <tbody>{rows.map((r) => <tr key={r.code}><td style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5 }}>{r.code}</td><td style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5 }}>{r.name}</td><td style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5, textAlign: 'right' }}>{fmtBDT(r.total_debit)}</td><td style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5, textAlign: 'right' }}>{fmtBDT(r.total_credit)}</td><td style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5, textAlign: 'right' }}>{fmtBDT(r.balance)}</td></tr>)}</tbody>
+            <tfoot><tr style={{ fontWeight: 700, background: '#f5f5f5' }}><td style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5 }} colSpan={2}>TOTAL</td><td style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5, textAlign: 'right' }}>{fmtBDT(tot.d)}</td><td style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5, textAlign: 'right' }}>{fmtBDT(tot.c)}</td><td style={{ border: '1px solid #000', padding: '4px 8px' }}></td></tr></tfoot>
+          </table>
+        </PrintPortal>
+      )}
+      <div className="card overflow-hidden">
+        <table className="w-full">
+          <thead><tr><th className="th">Code</th><th className="th">Account</th><th className="th">Type</th><th className="th text-right">Debit</th><th className="th text-right">Credit</th><th className="th text-right">Balance</th></tr></thead>
+          <tbody>
+            {rows.map((r) => <tr key={r.code}><td className="td money text-xs">{r.code}</td><td className="td text-sm">{r.name}</td><td className="td text-xs">{r.type}</td><td className="td money text-right">{(+r.total_debit).toFixed(2)}</td><td className="td money text-right">{(+r.total_credit).toFixed(2)}</td><td className="td money text-right font-semibold">{(+r.balance).toFixed(2)}</td></tr>)}
+            {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={6}>No postings yet.</td></tr>}
+          </tbody>
+          <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={3}>TOTAL</td><td className="td text-right">{tot.d.toFixed(2)}</td><td className="td text-right">{tot.c.toFixed(2)}</td><td className="td"></td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  )
+}
