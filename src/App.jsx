@@ -137,6 +137,7 @@ export default function App() {
           <ReservationDetail id={activeRes} back={() => setPage('reservations')} userName={userName} role={role} isAdmin={isAdmin} />
         )}
         {page === 'nightaudit' && can(role, 'nightaudit') && <NightAudit userName={userName} isAdmin={isAdmin} />}
+        {page === 'housekeeping' && can(role, 'housekeeping') && <HousekeepingHub userName={userName} role={role} isAdmin={isAdmin} />}
         {page === 'pos' && can(role, 'pos') && <RestaurantPOS userName={userName} role={role} isAdmin={isAdmin} />}
         {page === 'facilities' && can(role, 'facilities') && <Facilities userName={userName} isAdmin={isAdmin} />}
         {page === 'inventory' && can(role, 'inventory') && <InventoryHub userName={userName} role={role} isAdmin={isAdmin} />}
