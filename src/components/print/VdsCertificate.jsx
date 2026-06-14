@@ -1,123 +1,130 @@
-import { fmtBDT, fmtDate, takaInWords } from '../../lib/helpers'
+import { fmtBDT, fmtDate } from '../../lib/helpers'
 
-function NbrLogo({ url, size = 54 }) {
+function NbrLogo({ url, size = 56 }) {
   if (url) return <img src={url} alt="NBR" style={{ height: size, width: size, objectFit: 'contain' }} />
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" aria-label="NBR">
       <circle cx="50" cy="50" r="47" fill="#fff" stroke="#0a5c2b" strokeWidth="3" />
-      <circle cx="50" cy="50" r="38" fill="none" stroke="#0a5c2b" strokeWidth="1" />
       <g fill="#0a5c2b">
         <path d="M50 30 C54 40 54 46 50 52 C46 46 46 40 50 30 Z" />
         <path d="M50 52 C58 48 64 44 70 44 C66 52 58 56 50 56 Z" />
         <path d="M50 52 C42 48 36 44 30 44 C34 52 42 56 50 56 Z" />
       </g>
-      <text x="50" y="74" textAnchor="middle" fontSize="15" fontWeight="700" fill="#0a5c2b" fontFamily="serif">NBR</text>
+      <text x="50" y="74" textAnchor="middle" fontSize="14" fontWeight="700" fill="#0a5c2b" fontFamily="serif">NBR</text>
     </svg>
   )
 }
 
-// মূসক-৬.৬ — উৎসে কর্তিত মূল্য সংযোজন কর সনদপত্র
+// মূসক-৬.৬ — উৎসে কর কর্তন সনদপত্র (NBR actual format)
 export default function VdsCertificate({ cert, company }) {
+  // ISSUED → আমরা (company) উৎসে কর্তনকারী সত্তা; party হলো সরবরাহকারী।
+  // RECEIVED → অন্য পক্ষ আমাদের থেকে কর্তন করেছে; আমরা সরবরাহকারী, party কর্তনকারী।
   const issued = cert.direction === 'ISSUED'
-  const deductor = issued
+  const withholder = issued
     ? { name: company?.legal_name || company?.name, bin: company?.bin, addr: company?.address }
     : { name: cert.party_name, bin: cert.party_bin, addr: '' }
-  const deductee = issued
-    ? { name: cert.party_name, bin: cert.party_bin, addr: '' }
-    : { name: company?.legal_name || company?.name, bin: company?.bin, addr: company?.address }
-  const b = { border: '1px solid #000', padding: '6px 8px', fontSize: 11, verticalAlign: 'top' }
-  const lbl = { fontWeight: 700 }
+  const supplier = issued
+    ? { name: cert.party_name, bin: cert.party_bin }
+    : { name: company?.legal_name || company?.name, bin: company?.bin }
+
+  const cell = { border: '1px solid #000', padding: '5px 6px', fontSize: 10.5, verticalAlign: 'top' }
+  const rt = { ...cell, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
+  const ct = { ...cell, textAlign: 'center' }
+  const mono = { fontFamily: '"IBM Plex Mono", monospace' }
+  const emptyRows = Array.from({ length: 4 })
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', color: '#000' }}>
-      {/* NBR logo (left) + title + company logo (right) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderBottom: '2px solid #000', paddingBottom: 8, marginBottom: 10 }}>
-        <NbrLogo url={company?.nbr_logo_url} size={56} />
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: 12, fontWeight: 700 }}>গণপ্রজাতন্ত্রী বাংলাদেশ সরকার</div>
-          <div style={{ fontSize: 11 }}>জাতীয় রাজস্ব বোর্ড · National Board of Revenue</div>
-          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 3 }}>উৎসে কর্তিত মূল্য সংযোজন কর সনদপত্র</div>
-          <div style={{ fontSize: 10.5 }}>Certificate of VAT Deduction at Source — মূসক-৬.৬</div>
-        </div>
-        {company?.logo_url
-          ? <img src={company.logo_url} alt="" style={{ height: 50, width: 50, objectFit: 'contain' }} />
-          : <div style={{ width: 56 }} />}
-      </div>
-      <div style={{ textAlign: 'center', fontSize: 9, marginBottom: 8 }}>[বিধি ৪০ এর উপ-বিধি (৫) দ্রষ্টব্য]</div>
-
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+    <div style={{ maxWidth: 760, margin: '0 auto', color: '#000', fontSize: 11 }}>
+      {/* Header: NBR logo | title block | মূসক-৬.৬ box */}
+      <table style={{ width: '100%' }}>
         <tbody>
           <tr>
-            <td style={b}><span style={lbl}>সনদপত্র নং (Certificate No.):</span> {cert.cert_no || '—'}</td>
-            <td style={b}><span style={lbl}>তারিখ (Date):</span> {fmtDate(cert.cert_date)}</td>
-          </tr>
-          <tr>
-            <td style={b} colSpan={2}>
-              <div style={lbl}>১। উৎসে কর্তনকারী সত্তার নাম ও ঠিকানা (Withholding entity):</div>
-              {deductor.name || '—'}{deductor.addr ? `, ${deductor.addr}` : ''}<br />
-              <span style={lbl}>বিআইএন (BIN):</span> <span style={{ fontFamily: '"IBM Plex Mono", monospace' }}>{deductor.bin || '—'}</span>
+            <td style={{ width: 70, verticalAlign: 'top' }}><NbrLogo url={company?.nbr_logo_url} size={58} /></td>
+            <td style={{ textAlign: 'center', verticalAlign: 'top' }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>গণপ্রজাতন্ত্রী বাংলাদেশ সরকার</div>
+              <div style={{ fontSize: 12, fontWeight: 700 }}>জাতীয় রাজস্ব বোর্ড</div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>উৎসে কর কর্তন সনদপত্র</div>
+              <div style={{ fontSize: 9 }}>[বিধি ৪০ এর উপ-বিধি (১) এর দফা (চ) দ্রষ্টব্য]</div>
             </td>
-          </tr>
-          <tr>
-            <td style={b} colSpan={2}>
-              <div style={lbl}>২। যাহার নিকট হইতে কর্তন (Supplier):</div>
-              {deductee.name || '—'}{deductee.addr ? `, ${deductee.addr}` : ''}<br />
-              <span style={lbl}>বিআইএন (BIN):</span> <span style={{ fontFamily: '"IBM Plex Mono", monospace' }}>{deductee.bin || '—'}</span>
+            <td style={{ width: 110, textAlign: 'right', verticalAlign: 'top' }}>
+              {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 40, width: 40, objectFit: 'contain', display: 'block', marginLeft: 'auto', marginBottom: 4 }} />}
+              <span style={{ display: 'inline-block', border: '1px solid #000', padding: '3px 10px', fontWeight: 700, fontSize: 12 }}>মূসক-৬.৬</span>
             </td>
           </tr>
         </tbody>
       </table>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+      {/* Withholding entity block */}
+      <div style={{ marginTop: 12, lineHeight: 1.9 }}>
+        <div>উৎসে কর কর্তনকারী সত্তার নাম: <b>{withholder.name || '—'}</b></div>
+        <div>উৎসে কর কর্তনকারী সত্তার ঠিকানা: <b>{withholder.addr || '—'}</b></div>
+        <div>উৎসে কর কর্তনকারী সত্তার বিআইএন (প্রযোজ্য ক্ষেত্রে): <b style={mono}>{withholder.bin || '—'}</b></div>
+        <table style={{ width: '100%', marginTop: 2 }}>
+          <tbody>
+            <tr>
+              <td>উৎসে কর কর্তন সনদপত্র নং: <b style={mono}>{cert.cert_no || '—'}</b></td>
+              <td style={{ textAlign: 'right' }}>জারির তারিখ: <b>{fmtDate(cert.cert_date)}</b></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Certification paragraph (sec. 49) */}
+      <div style={{ marginTop: 8, border: '1px solid #000', padding: '8px 10px', fontSize: 10, lineHeight: 1.6, textAlign: 'justify' }}>
+        এই মর্মে প্রত্যয়ন করা যাইতেছে যে, আইনের ধারা ৪৯ অনুযায়ী উৎসে কর কর্তনযোগ্য সরবরাহ হইতে প্রযোজ্য মূল্য সংযোজন কর বাবদ উৎসে কর কর্তন করা হইল।
+        কর্তনকৃত মূল্য সংযোজন করের অর্থ বুক ট্রান্সফার/ট্রেজারি চালান/দাখিলপত্রে বৃদ্ধিকারী সমন্বয়ের মাধ্যমে সরকারি কোষাগারে জমা প্রদান করা হইয়াছে।
+        কপি এতদসংগে সংযুক্ত করা হইল (প্রযোজ্য ক্ষেত্রে)।
+      </div>
+
+      {/* Main table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
         <thead>
           <tr style={{ background: '#eee' }}>
-            <th style={b}>৩। সরবরাহের বিবরণ (Description)</th>
-            <th style={{ ...b, textAlign: 'right' }}>৪। সরবরাহ মূল্য (Value)</th>
-            <th style={{ ...b, textAlign: 'right' }}>৫। হার (Rate)</th>
-            <th style={{ ...b, textAlign: 'right' }}>৬। কর্তিত মূসক (VAT deducted)</th>
+            <th style={ct} rowSpan={2}>ক্রমিক<br />নং</th>
+            <th style={ct} colSpan={2}>সরবরাহকারীর</th>
+            <th style={ct} colSpan={2}>সংশ্লিষ্ট কর চালানপত্র</th>
+            <th style={ct} rowSpan={2}>মোট সরবরাহ<br />মূল্য¹ (টাকা)</th>
+            <th style={ct} rowSpan={2}>মূসকের পরিমাণ<br />(টাকা)</th>
+            <th style={ct} rowSpan={2}>উৎসে কর্তিত মূসকের<br />পরিমাণ (টাকা)</th>
+          </tr>
+          <tr style={{ background: '#eee' }}>
+            <th style={ct}>নাম</th>
+            <th style={ct}>বিআইএন</th>
+            <th style={ct}>নম্বর</th>
+            <th style={ct}>ইস্যুর তারিখ</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style={b}>{cert.description || 'Supply of goods / services'}</td>
-            <td style={{ ...b, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }}>{fmtBDT(cert.base_amount)}</td>
-            <td style={{ ...b, textAlign: 'right' }}>{Number(cert.vds_rate || 0).toFixed(1)}%</td>
-            <td style={{ ...b, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }}>{fmtBDT(cert.vds_amount)}</td>
+            <td style={ct}>১</td>
+            <td style={cell}>{supplier.name || '—'}</td>
+            <td style={{ ...cell, ...mono }}>{supplier.bin || '—'}</td>
+            <td style={{ ...cell, ...mono }}>{cert.challan_no || '—'}</td>
+            <td style={ct}>{cert.challan_date ? fmtDate(cert.challan_date) : '—'}</td>
+            <td style={rt}>{fmtBDT(cert.base_amount)}</td>
+            <td style={rt}>{fmtBDT((+cert.base_amount * (+cert.vds_rate || 0) / 100).toFixed(2))}</td>
+            <td style={rt}>{fmtBDT(cert.vds_amount)}</td>
           </tr>
-          <tr>
-            <td style={{ ...b, fontWeight: 700, textAlign: 'right' }} colSpan={3}>সর্বমোট (Total VAT deducted)</td>
-            <td style={{ ...b, textAlign: 'right', fontWeight: 700, fontFamily: '"IBM Plex Mono", monospace' }}>{fmtBDT(cert.vds_amount)}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div style={{ fontSize: 10.5, marginTop: 6 }}><b>কথায় (In words):</b> {takaInWords(cert.vds_amount)}</div>
-
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
-        <tbody>
-          <tr>
-            <td style={b}><span style={lbl}>৭। ট্রেজারি চালান নং (Treasury challan):</span> {cert.challan_no || '—'}</td>
-            <td style={b}><span style={lbl}>চালান তারিখ (Date):</span> {cert.challan_date ? fmtDate(cert.challan_date) : '—'}</td>
-          </tr>
+          {emptyRows.map((_, i) => (
+            <tr key={i}>
+              <td style={ct}>{i + 2}</td>
+              <td style={cell}>&nbsp;</td><td style={cell}></td><td style={cell}></td><td style={cell}></td>
+              <td style={rt}></td><td style={rt}></td><td style={rt}></td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
-      <div style={{ fontSize: 10, marginTop: 10, lineHeight: 1.5 }}>
-        প্রত্যয়ন করা যাইতেছে যে, উপরে বর্ণিত মূসক উৎসে কর্তন করিয়া যথাযথভাবে সরকারি কোষাগারে জমা করা হইয়াছে।<br />
-        <i>Certified that the VAT shown above has been deducted at source and duly deposited to the Government treasury.</i>
+      {/* Authorised officer */}
+      <div style={{ marginTop: 26, lineHeight: 2.2 }}>
+        ক্ষমতাপ্রাপ্ত কর্মকর্তার -
+        <div>স্বাক্ষর: ____________________________</div>
+        <div>নাম: {issued ? (cert.officer_name || '____________________________') : '____________________________'}</div>
       </div>
 
-      <table style={{ width: '100%', marginTop: 44, fontSize: 12 }}>
-        <tbody>
-          <tr>
-            <td style={{ width: '55%' }}></td>
-            <td style={{ width: '45%', borderTop: '1px solid #000', paddingTop: 6, textAlign: 'center' }}>
-              উৎসে কর্তনকারী সত্তার স্বাক্ষর ও সিল<br />
-              <span style={{ fontSize: 10 }}>Signature & seal of withholding entity</span><br />
-              <span style={{ fontSize: 10 }}>{deductor.name || ''}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div style={{ borderTop: '1px solid #000', marginTop: 18, paddingTop: 4, fontSize: 9 }}>
+        ¹ মূসক ও সম্পূরক শুল্ক যদি থাকে সহ মূল্য
+      </div>
     </div>
   )
 }
