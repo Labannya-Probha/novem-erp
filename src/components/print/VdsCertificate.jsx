@@ -39,7 +39,7 @@ export default function VdsCertificate({ cert, company }) {
       <div style={{ position: 'relative', textAlign: 'center', paddingTop: 4 }}>
         {/* company logo + form-code box: top-right corner */}
         <div style={{ position: 'absolute', top: 0, right: 0, textAlign: 'right' }}>
-          {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 60, width: 60, objectFit: 'contain', display: 'block', marginLeft: 'auto', marginBottom: 4 }} />}
+          {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 75, width: 75, objectFit: 'contain', display: 'block', marginLeft: 'auto', marginBottom: 4 }} />}
           <span style={{ display: 'inline-block', border: '1px solid #000', padding: '3px 10px', fontWeight: 700, fontSize: 12 }}>মূসক-৬.৬</span>
         </div>
         {/* NBR logo centered, above the government heading */}
