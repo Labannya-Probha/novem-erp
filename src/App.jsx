@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
 import ReservationDetail from './pages/ReservationDetail.jsx'
 import BookingCalendar from './pages/BookingCalendar.jsx'
+import HousekeepingHub from './pages/HousekeepingHub.jsx'
 import RestaurantPOS from './pages/RestaurantPOS.jsx'
 import Facilities from './pages/Facilities.jsx'
 import InventoryHub from './pages/InventoryHub.jsx'
@@ -18,7 +19,7 @@ import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
 import {
   Leaf, LayoutDashboard, CalendarRange, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
-  FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut,
+  FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -37,6 +38,7 @@ const NAV_GROUPS = [
   { title: 'Sales', items: [
     { id: 'pos', label: 'Restaurant POS', icon: UtensilsCrossed },
     { id: 'facilities', label: 'Facilities', icon: ShoppingBasket },
+    { id: 'housekeeping', label: 'Housekeeping', icon: BedDouble },
   ]},
   { title: 'Back Office', items: [
     { id: 'inventory', label: 'Inventory', icon: Boxes },
