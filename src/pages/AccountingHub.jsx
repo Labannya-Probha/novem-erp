@@ -27,7 +27,11 @@ export default function AccountingHub({ userName, isAdmin }) {
         <p className="text-sm text-pine/60">Double-entry journals (IFRS), trial balance, chart of accounts and fixed-asset depreciation.</p>
       </div>
       {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
-      <div className="flex gap-1 border-b border-leaf flex-wrap">
+      <div className="flex gap-1 justify-end items-center flex-wrap">
+                      <button className="btn-ghost !py-1" title="Print voucher (auto Dr/Cr/JV)" onClick={() => openVoucher(r, undefined)}><Printer size={13} /> Voucher</button>
+                      <button className="btn-ghost !py-1" title="Edit" onClick={() => edit(r)}><Pencil size={13} /></button>
+                      {isAdmin && <button className="btn-ghost !py-1 text-red-600" title="Delete" onClick={() => del(r.id)}><Trash2 size={13} /></button>}
+                    </div>
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-semibold rounded-t-lg ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>{t}</button>
         ))}
