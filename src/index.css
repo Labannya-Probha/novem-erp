@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===================== LIGHT FROSTED GLASS THEME (Aura Stay) ===================== */
+/* Soft forest-tinted backdrop; white frosted panels float on top. All text stays dark & readable. */
+
+@layer base {
+  body {
+    @apply text-ink font-body antialiased;
+    background: #eef4ee;
+    background-image:
+      radial-gradient(1100px 700px at 10% -10%, rgba(46,125,50,0.16), transparent 60%),
+      radial-gradient(1000px 800px at 110% 5%, rgba(27,77,46,0.14), transparent 55%),
+      radial-gradient(900px 900px at 50% 120%, rgba(212,160,23,0.10), transparent 60%),
+      linear-gradient(160deg, #f1f7f1 0%, #e8f1ea 50%, #eef4ee 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .money { @apply font-money tabular-nums; }
+
+  /* Frosted white glass card */
+  .card {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 0.85rem;
+    box-shadow: 0 8px 30px rgba(27, 77, 46, 0.10), inset 0 1px 0 rgba(255,255,255,0.6);
+    -webkit-backdrop-filter: blur(14px) saturate(135%);
+    backdrop-filter: blur(14px) saturate(135%);
+  }
+
+  .label { @apply block text-xs font-semibold uppercase tracking-wider text-pine/70 mb-1; }
+
+  .input {
+    @apply w-full rounded-lg px-3 py-2 text-sm text-ink focus:outline-none;
+    background: rgba(255,255,255,0.85);
+    border: 1px solid rgba(27,77,46,0.18);
+    transition: border-color .15s, box-shadow .15s, background .15s;
+  }
+  .input::placeholder { color: rgba(27,77,46,0.40); }
+  .input:focus { border-color: #2E7D32; box-shadow: 0 0 0 3px rgba(46,125,50,0.18); background: #fff; }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white;
+    background: linear-gradient(135deg, #2E7D32, #1B4D2E);
+    border: 1px solid rgba(255,255,255,0.25);
+    box-shadow: 0 4px 14px rgba(46,125,50,0.28);
+  }
+  .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 6px 20px rgba(46,125,50,0.4); }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed text-pine;
+    background: rgba(255,255,255,0.65);
+    border: 1px solid rgba(27,77,46,0.18);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.92); }
+
+  .btn-amber {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white;
+    background: linear-gradient(135deg, #D4A017, #B8860B);
+    border: 1px solid rgba(255,255,255,0.3);
+    box-shadow: 0 4px 14px rgba(212,160,23,0.3);
+  }
+  .btn-amber:hover { filter: brightness(1.07); }
+
+  .th { @apply text-left text-xs font-semibold uppercase tracking-wider text-pine/60 px-3 py-2; border-bottom: 1px solid rgba(27,77,46,0.14); }
+  .td { @apply px-3 py-2 text-sm text-ink; border-bottom: 1px solid rgba(27,77,46,0.08); }
+
+  .status-chip { @apply inline-block px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide; }
+}
+
+/* ============================= PRINT (A4 documents) ============================= */
+#print-root { display: none; }
+@media print {
+  #root { display: none !important; }
+  #print-root { display: block !important; }
+  html, body {
+    background: #fff !important; background-image: none !important;
+    color: #000 !important; margin: 0 !important; padding: 0 !important;
+  }
+  @page { size: A4; margin: 12mm; }
+
+  .print-doc {
+    font-family: 'IBM Plex Sans', 'SolaimanLipi', sans-serif;
+    color: #000;
+    font-size: 11px;
+    width: 186mm !important;
+    max-width: 186mm !important;
+    margin: 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 270mm !important;
+  }
+  .print-doc > div,
+  .print-doc > table { max-width: 100% !important; width: 100% !important; }
+
+  .print-doc > * { flex-grow: 0; }
+  .print-doc > *:not(.footer-spacer):not(::after) { flex-grow: 1; }
+
+  .print-doc * { box-sizing: border-box; }
+  .print-doc table { width: 100% !important; border-collapse: collapse; table-layout: fixed; }
+  .print-doc td, .print-doc th { word-wrap: break-word; overflow-wrap: break-word; }
+  .print-doc img { max-width: 100%; height: auto; }
+  .print-doc tr, .print-doc thead, .print-doc svg { page-break-inside: avoid; }
+
+  .no-print { display: none !important; }
+
+  .print-doc::after, .epos-receipt::after {
+    content: "Powered by Aura Stay";
+    display: block;
+    text-align: center;
+    font-size: 9px;
+    margin-top: auto !important;
+    border-top: 1px solid #ccc;
+    padding-top: 5px;
+    color: #666;
+    width: 100%;
+  }
+
+  /* ePOS 80mm thermal receipt */
+  @page :first { size: 80mm auto; margin: 0; }
+  .epos-receipt {
+    width: 72mm !important;
+    font-family: 'monospace' !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100vh !important;
+  }
+  .epos-receipt > * { flex-grow: 0; }
+  .epos-receipt > *:not(.footer-spacer):not(::after) { flex-grow: 1; }
+  .epos-receipt table { border: none !important; }
+  .epos-receipt td { border: none !important; padding: 2px 0 !important; }
+}
