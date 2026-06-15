@@ -1,13 +1,13 @@
-export const ROLES = ['ADMIN', 'MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR']
+export const ROLES = ['ADMIN', 'MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR', 'HOUSEKEEPING']
 
 export const ROLE_LABELS = {
   ADMIN: 'Administrator', MANAGER: 'Manager', FRONT_OFFICE: 'Front Office',
-  RESTAURANT: 'Restaurant', STORE: 'Store', ACCOUNTS: 'Accounts', HR: 'HR & Admin',
+  RESTAURANT: 'Restaurant', STORE: 'Store', ACCOUNTS: 'Accounts', HR: 'HR & Admin', HOUSEKEEPING: 'Housekeeping',
 }
 
-// Which roles can open which module. ADMIN always passes.
 export const NAV_ACCESS = {
-  dashboard: ['MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR'],
+  dashboard: ['MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR', 'HOUSEKEEPING'],
+  frontdesk: ['ADMIN', 'MANAGER', 'FRONT_OFFICE', 'HOUSEKEEPING'], // নতুন লাইন
   reservations: ['MANAGER', 'FRONT_OFFICE'],
   calendar: ['MANAGER', 'FRONT_OFFICE'],
   nightaudit: ['MANAGER', 'FRONT_OFFICE'],
@@ -19,7 +19,7 @@ export const NAV_ACCESS = {
   accounting: ['MANAGER', 'ACCOUNTS'],
   hr: ['MANAGER', 'HR'],
   reports: ['MANAGER', 'ACCOUNTS'],
-  settings: ['MANAGER'],
+  settings: ['ADMIN'], // শুধুমাত্র ADMIN এর জন্য সীমাবদ্ধ করা হয়েছে
 }
 
 export const can = (role, pageId) =>
