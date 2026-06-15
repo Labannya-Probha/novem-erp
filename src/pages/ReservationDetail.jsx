@@ -170,6 +170,38 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, i
   )
 }
 
+/* ---------------- PARTNER ACCOUNTS ---------------- */
+function PartnerAccounts({ res, reload, flash }) {
+  const addAgencyDue = async () => {
+    const amt = prompt('Enter amount to add:');
+    if (!amt) return;
+    await supabase.from('agencies').update({ due_balance: (res.agencies?.due_balance || 0) + Number(amt) }).eq('id', res.agency_id);
+    reload(); flash('Agency due updated.');
+  }
+
+  const redeemShareholderBalance = async (amt) => {
+    if ((res.shareholders?.free_stay_balance || 0) < amt) { flash('Insufficient balance.'); return; }
+    await supabase.from('folio_charges').insert({ reservation_id: res.id, charge_type: 'SHAREHOLDER_REDEEM', description: 'Redeemed by Shareholder', total: -amt, status: 'PAID' });
+    await supabase.from('shareholders').update({ free_stay_balance: res.shareholders.free_stay_balance - amt }).eq('id', res.shareholder_id);
+    reload(); flash('Redeemed successfully.');
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div className="card p-4">
+        <h3 className="font-bold">Agency: {res.agencies?.name || 'N/A'}</h3>
+        <p>Due: {fmtBDT(res.agencies?.due_balance || 0)}</p>
+        <button onClick={addAgencyDue} className="btn-primary">Add Due</button>
+      </div>
+      <div className="card p-4">
+        <h3 className="font-bold">Shareholder: {res.shareholders?.name || 'N/A'}</h3>
+        <p>Balance: {fmtBDT(res.shareholders?.free_stay_balance || 0)}</p>
+        <button onClick={() => redeemShareholderBalance(1000)} disabled={(res.shareholders?.free_stay_balance || 0) < 1000} className="btn-amber">Redeem 1000</button>
+      </div>
+    </div>
+  )
+}
+
 /* ---------------- QUOTATION (req. 2) ---------------- */
 function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, userName, resRooms = [], setPrintDoc }) {
   const [roomRate, setRoomRate] = useState(res.room_rate || resRooms[0]?.rate || resRooms[0]?.rooms?.base_rate || 0)
@@ -694,13 +726,13 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
   
   const printLiveInvoice = (type) => {
     setPrintDoc({ 
-      type: type, 
+      type, 
       invoice: { 
         totals, 
         charges, 
         paid, 
         due, 
-        issued_at: new Date().toISOString(),
+        issued_at: new Date().toISOString(), 
         invoice_no: `INV-${res.res_no}` 
       } 
     });
@@ -710,7 +742,7 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
     <div className="space-y-4">
       <div className="card p-5 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h3 className="font-display font-semibold text-pine">Guest Billing</h3>
+          <h3 className="font-display font-semibold text-pine">Guest Billing & Check-out</h3>
           <p className="text-sm text-pine/60">Live billing: updates automatically from Folio.</p>
         </div>
         <div className="flex gap-2">
@@ -720,6 +752,7 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
           <button className="btn-primary" onClick={() => printLiveInvoice('MUSHAK')}>
             <Receipt size={16} /> Mushak 6.3
           </button>
+          
           {!isCheckedOut ? (
             <button className="btn-amber" onClick={async () => { 
               await setStatus('CHECKED_OUT', { checked_out_at: new Date().toISOString() }); 
@@ -752,16 +785,30 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Historical Invoices</div>
         <table className="w-full">
-          <thead><tr><th className="th">Invoice No.</th><th className="th">Issued</th><th className="th text-right">Total</th></tr></thead>
+          <thead>
+            <tr>
+              <th className="th">Invoice No.</th>
+              <th className="th">Issued Date</th>
+              <th className="th text-right">Grand Total</th>
+              <th className="th text-center">Status</th>
+            </tr>
+          </thead>
           <tbody>
             {invoices.map((inv) => (
-              <tr key={inv.id} className={inv.is_void ? 'opacity-60' : ''}>
-                <td className="td money font-semibold">{inv.invoice_no}</td>
-                <td className="td money text-xs">{fmtDate(inv.issued_at)}</td>
-                <td className="td money text-right">{fmtBDT(inv.totals?.grand_total)}</td>
+              <tr key={inv.id} className={inv.is_void ? 'opacity-60 bg-red-50' : ''}>
+                <td className="td font-semibold">{inv.invoice_no}</td>
+                <td className="td text-xs">{fmtDate(inv.issued_at)}</td>
+                <td className="td text-right">{fmtBDT(inv.totals?.grand_total || 0)}</td>
+                <td className="td text-center">
+                  {inv.is_void ? <span className="status-chip bg-red-100 text-red-600">VOID</span> : <span className="status-chip bg-green-100 text-green-700">ACTIVE</span>}
+                </td>
               </tr>
             ))}
-            {invoices.length === 0 && <tr><td className="td text-pine/50" colSpan={3}>No past invoices.</td></tr>}
+            {invoices.length === 0 && (
+              <tr>
+                <td className="td text-pine/50 text-center" colSpan={4}>No historical invoices found.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
