@@ -4,7 +4,7 @@ import { fmtBDT, fmtDate, todayISO, exportXLSX } from '../lib/helpers'
 import { FileSpreadsheet, Plus, FileDown, Printer, Trash2, Pencil } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 import VdsCertificate from '../components/print/VdsCertificate.jsx'
-import ChallanForm from '../tax/ChallanForm'
+import ChallanForm from './ChallanForm'
 const TABS = ['Sales 6.2', 'Purchase 6.1', 'VDS 6.6', 'Monthly 9.1', 'Over-threshold 6.10']
 const monthBounds = (ym) => { const [y, m] = ym.split('-').map(Number); const start = `${ym}-01`; const end = new Date(y, m, 0); return { start, end: `${ym}-${String(end.getDate()).padStart(2, '0')}` } }
 const thisMonth = () => todayISO().slice(0, 7)
