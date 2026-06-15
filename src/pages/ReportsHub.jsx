@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, exportXLSX } from '../lib/helpers'
-import { BarChart3, FileDown, Printer, CalendarRange, ChevronLeft, Lock, Search } from 'lucide-react'
+import { BarChart3, FileDown, Printer, CalendarRange, ChevronLeft, Lock, Search, Plus, Trash2 } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 
 const CYCLES = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', 'Date Range']
@@ -21,18 +21,21 @@ function cycleRange(cycle, anchorISO) {
   return { from: iso(from), to: iso(to) }
 }
 
-export default function ReportsHub({ userName }) {
+export default function ReportsHub({ userName, role }) {
+  const canManage = role === 'ADMIN' || role === 'MANAGER'
   const [defs, setDefs] = useState([])
   const [company, setCompany] = useState(null)
   const [active, setActive] = useState(null)
   const [q, setQ] = useState('')
+  const [showBuilder, setShowBuilder] = useState(false)
+  const loadDefs = () => supabase.from('report_definitions').select('*').order('sort_order').then(({ data }) => setDefs(data || []))
 
   useEffect(() => {
-    supabase.from('report_definitions').select('*').order('sort_order').then(({ data }) => setDefs(data || []))
+    loadDefs()
     supabase.from('company_settings').select('*').eq('id', 1).single().then(({ data }) => setCompany(data))
   }, [])
 
-  if (active) return <ReportRunner def={active} company={company} back={() => setActive(null)} />
+  if (active) return <ReportRunner def={active} company={company} canManage={canManage} back={() => setActive(null)} onDeleted={() => { setActive(null); loadDefs() }} />
 
   const filtered = defs.filter((d) => (d.report_name + ' ' + d.department).toLowerCase().includes(q.toLowerCase()))
   const groups = filtered.reduce((acc, d) => { (acc[d.department] = acc[d.department] || []).push(d); return acc }, {})
@@ -44,6 +47,12 @@ export default function ReportsHub({ userName }) {
         <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><BarChart3 className="text-forest" /> Report Center</h1>
         <p className="text-sm text-pine/60">{defs.length} reports · {readyCount} ready. Pick a report, choose a cycle, then print or export.</p>
       </div>
+      {canManage && (
+        <div className="flex justify-end">
+          <button className="btn-primary" onClick={() => setShowBuilder(true)}><Plus size={15} /> New custom report</button>
+        </div>
+      )}
+      {showBuilder && <ReportBuilder onClose={() => setShowBuilder(false)} onSaved={() => { setShowBuilder(false); loadDefs() }} />}
       <div className="card p-3 flex items-center gap-2">
         <Search size={16} className="text-pine/40" />
         <input className="input !border-0 !ring-0 flex-1" placeholder="Search reports…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -69,7 +78,7 @@ export default function ReportsHub({ userName }) {
   )
 }
 
-function ReportRunner({ def, company, back }) {
+function ReportRunner({ def, company, back, canManage, onDeleted }) {
   const [cycle, setCycle] = useState('Monthly')
   const [anchor, setAnchor] = useState(todayISO())
   const [from, setFrom] = useState(cycleRange('Monthly', todayISO()).from)
@@ -82,7 +91,12 @@ function ReportRunner({ def, company, back }) {
   const onCycle = (c) => { setCycle(c); applyCycle(c, anchor) }
   const onAnchor = (v) => { setAnchor(v); applyCycle(cycle, v) }
 
-  const run = async () => { setBusy(true); const res = await fetchReport(def.report_key, from, to); setData(res); setBusy(false) }
+  const run = async () => { setBusy(true); const res = await fetchReport(def, from, to); setData(res); setBusy(false) }
+  const delCustom = async () => {
+    if (!window.confirm('Delete this custom report?')) return
+    await supabase.from('report_definitions').delete().eq('id', def.id)
+    onDeleted && onDeleted()
+  }
   useEffect(() => { run() }, []) // eslint-disable-line
 
   const xls = () => {
@@ -94,7 +108,10 @@ function ReportRunner({ def, company, back }) {
 
   return (
     <div className="space-y-4">
-      <button className="btn-ghost !py-1" onClick={back}><ChevronLeft size={15} /> All reports</button>
+      <div className="flex items-center justify-between">
+        <button className="btn-ghost !py-1" onClick={back}><ChevronLeft size={15} /> All reports</button>
+        {canManage && def.is_custom && <button className="btn-ghost !py-1 text-red-600" onClick={delCustom}><Trash2 size={14} /> Delete report</button>}
+      </div>
       <div>
         <h1 className="font-display text-2xl font-bold text-pine">{def.report_name}</h1>
         <p className="text-sm text-pine/60">{def.department}</p>
@@ -119,9 +136,7 @@ function ReportRunner({ def, company, back }) {
         <button className="btn-ghost" onClick={() => setPrinting(true)} disabled={!data}><Printer size={14} /> Print</button>
       </div>
       <div className="text-xs text-pine/50">Showing {fmtDate(from)} — {fmtDate(to)}</div>
-
-      {printing && data && (
-        <PrintPortal title={def.report_name} onClose={() => setPrinting(false)}>
+      <PrintPortal title={def.report_name} onClose={() => setPrinting(false)}>
           <ReportHead company={company} title={def.report_name.toUpperCase()} from={from} to={to} />
           <table style={{ width: '100%', borderCollapse: 'collapse', maxWidth: 720, margin: '0 auto' }}>
             <thead><tr style={{ background: '#eee' }}>{data.head.map((h, i) => <th key={i} style={{ border: '1px solid #000', padding: '4px 8px', fontSize: 10.5, textAlign: data.align && data.align[i] === 'r' ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
@@ -161,7 +176,9 @@ function ReportHead({ company, title, from, to }) {
 }
 
 const money = (n) => fmtBDT(n)
-async function fetchReport(key, from, to) {
+async function fetchReport(def, from, to) {
+  if (def && def.is_custom && def.config) return runCustomReport(def.config, from, to)
+  const key = typeof def === 'string' ? def : def.report_key
   switch (key) {
     case 'acc_trial_balance': {
       const { data } = await supabase.from('v_trial_balance').select('*')
@@ -191,7 +208,8 @@ async function fetchReport(key, from, to) {
       const t = (data || []).reduce((a, r) => ({ tv: a.tv + +r.taxable_value, v: a.v + +r.vat_amount, tot: a.tot + +r.total }), { tv: 0, v: 0, tot: 0 })
       return { head: ['Date', 'Vendor', 'Invoice', 'Taxable', 'VAT', 'Total'], align: ['l', 'l', 'l', 'r', 'r', 'r'], rows, foot: ['', '', 'TOTAL', money(t.tv), money(t.v), money(t.tot)] }
     }
-        case 'sal_checkin_log': {
+    /* ---------- SALES / FRONT OFFICE ---------- */
+    case 'sal_checkin_log': {
       const { data } = await supabase.from('reservations').select('res_no, reservation_name, check_in, check_out, checked_in_at, checkin_by, pax_adults, pax_children').not('checked_in_at', 'is', null).gte('checked_in_at', from + 'T00:00:00').lte('checked_in_at', to + 'T23:59:59').order('checked_in_at')
       const rows = (data || []).map((r) => [fmtDate(r.checked_in_at), r.res_no, r.reservation_name || '—', `${r.pax_adults || 0}+${r.pax_children || 0}`, fmtDate(r.check_out), r.checkin_by || '—'])
       return { head: ['Check-in', 'Res No', 'Guest', 'Pax', 'Check-out', 'By'], align: ['l', 'l', 'l', 'l', 'l', 'l'], rows, foot: ['', '', '', '', 'Total', String(rows.length)] }
@@ -309,6 +327,7 @@ async function fetchReport(key, from, to) {
       const t = (data || []).reduce((a, r) => a + +r.amount, 0)
       return { head: ['Period', 'Asset code', 'Asset', 'Depreciation'], align: ['l', 'l', 'l', 'r'], rows, foot: ['', '', 'TOTAL', money(t)] }
     }
+
     /* ---------- CLASS B: financial statements ---------- */
     case 'acc_pnl': {
       const acc = await periodBalances(from, to)
@@ -386,10 +405,12 @@ async function fetchReport(key, from, to) {
       for (const rid of Object.keys(charged)) { const due = charged[rid] - (paid[rid] || 0); if (due > 0.5 && meta[rid] && meta[rid].status !== 'SETTLED') { rows.push([meta[rid].res_no, meta[rid].reservation_name || '—', meta[rid].status, money(charged[rid]), money(paid[rid] || 0), money(due)]); tot += due } }
       return { head: ['Res No', 'Guest', 'Status', 'Charged', 'Paid', 'Due'], align: ['l', 'l', 'l', 'r', 'r', 'r'], rows, foot: ['', '', '', '', 'TOTAL DUE', money(tot)] }
     }
+
     default:
       return { head: ['Info'], align: ['l'], rows: [['This report is not wired yet.']], foot: null }
   }
 }
+
 async function periodBalances(from, to) {
   let q = supabase.from('v_ledger').select('account_code, account_name, account_type, debit, credit')
   if (from) q = q.gte('jv_date', from)
@@ -403,10 +424,180 @@ async function periodBalances(from, to) {
   }
   return Object.values(agg).sort((a, b) => a.code < b.code ? -1 : 1)
 }
+
 async function ledgerForCodes(codes, from, to, label) {
   const { data } = await supabase.from('v_ledger').select('*').in('account_code', codes).gte('jv_date', from).lte('jv_date', to).order('jv_date')
   let bal = 0
   const rows = (data || []).map((r) => { bal += (+r.debit - +r.credit); return [fmtDate(r.jv_date), r.jv_no, r.line_note || r.narration || '', money(r.debit), money(r.credit), money(bal)] })
   const t = (data || []).reduce((a, r) => ({ d: a.d + +r.debit, c: a.c + +r.credit }), { d: 0, c: 0 })
   return { head: ['Date', 'JV', `Particulars (${label})`, 'Debit', 'Credit', 'Balance'], align: ['l', 'l', 'l', 'r', 'r', 'r'], rows, foot: ['', '', 'TOTAL', money(t.d), money(t.c), money(t.d - t.c)] }
+}
+
+/* ===================== REPORT BUILDER ===================== */
+const BUILDER_SOURCES = {
+  folio_charges: { label: 'Folio Charges', date_col: 'charge_date', fields: [
+    { field: 'charge_date', label: 'Date', type: 'date' }, { field: 'charge_type', label: 'Type', type: 'text' },
+    { field: 'description', label: 'Description', type: 'text' }, { field: 'base_amount', label: 'Base', type: 'money' },
+    { field: 'discount', label: 'Discount', type: 'money' }, { field: 'service_charge', label: 'Service charge', type: 'money' },
+    { field: 'sd', label: 'SD', type: 'money' }, { field: 'vat', label: 'VAT', type: 'money' },
+    { field: 'total', label: 'Total', type: 'money' }, { field: 'status', label: 'Status', type: 'text' } ] },
+  payments: { label: 'Payments', date_col: 'received_date', fields: [
+    { field: 'received_date', label: 'Date', type: 'date' }, { field: 'method', label: 'Method', type: 'text' },
+    { field: 'amount', label: 'Amount', type: 'money' }, { field: 'payment_class', label: 'Class', type: 'text' },
+    { field: 'reference', label: 'Reference', type: 'text' }, { field: 'received_by', label: 'By', type: 'text' } ] },
+  pos_orders: { label: 'POS Orders', date_col: 'settled_at', fields: [
+    { field: 'order_no', label: 'Order', type: 'text' }, { field: 'order_type', label: 'Type', type: 'text' },
+    { field: 'outlet', label: 'Outlet', type: 'text' }, { field: 'payment_method', label: 'Method', type: 'text' },
+    { field: 'total', label: 'Total', type: 'money' }, { field: 'status', label: 'Status', type: 'text' } ] },
+  facility_sales: { label: 'Facility Sales', date_col: 'sale_date', fields: [
+    { field: 'sale_date', label: 'Date', type: 'date' }, { field: 'item_name', label: 'Item', type: 'text' },
+    { field: 'qty', label: 'Qty', type: 'num' }, { field: 'total', label: 'Total', type: 'money' },
+    { field: 'status', label: 'Status', type: 'text' } ] },
+  vat_sales_register: { label: 'VAT Sales Register', date_col: 'issue_date', fields: [
+    { field: 'issue_date', label: 'Date', type: 'date' }, { field: 'invoice_no', label: 'Invoice', type: 'text' },
+    { field: 'buyer_name', label: 'Buyer', type: 'text' }, { field: 'taxable_value', label: 'Taxable', type: 'money' },
+    { field: 'sd', label: 'SD', type: 'money' }, { field: 'vat', label: 'VAT', type: 'money' }, { field: 'total', label: 'Total', type: 'money' } ] },
+  vat_purchase_register: { label: 'VAT Purchase Register', date_col: 'entry_date', fields: [
+    { field: 'entry_date', label: 'Date', type: 'date' }, { field: 'vendor_name', label: 'Vendor', type: 'text' },
+    { field: 'invoice_no', label: 'Invoice', type: 'text' }, { field: 'taxable_value', label: 'Taxable', type: 'money' },
+    { field: 'vat_amount', label: 'VAT', type: 'money' }, { field: 'total', label: 'Total', type: 'money' } ] },
+  reservations: { label: 'Reservations', date_col: 'check_in', fields: [
+    { field: 'res_no', label: 'Res No', type: 'text' }, { field: 'reservation_name', label: 'Guest', type: 'text' },
+    { field: 'check_in', label: 'Check-in', type: 'date' }, { field: 'check_out', label: 'Check-out', type: 'date' },
+    { field: 'status', label: 'Status', type: 'text' }, { field: 'room_rate', label: 'Room rate', type: 'money' },
+    { field: 'source', label: 'Source', type: 'text' }, { field: 'created_by', label: 'Created by', type: 'text' } ] },
+  v_ledger: { label: 'Ledger (journal lines)', date_col: 'jv_date', fields: [
+    { field: 'jv_date', label: 'Date', type: 'date' }, { field: 'jv_no', label: 'JV', type: 'text' },
+    { field: 'account_code', label: 'A/C code', type: 'text' }, { field: 'account_name', label: 'Account', type: 'text' },
+    { field: 'debit', label: 'Debit', type: 'money' }, { field: 'credit', label: 'Credit', type: 'money' },
+    { field: 'line_note', label: 'Note', type: 'text' }, { field: 'source', label: 'Source', type: 'text' } ] },
+}
+
+function fmtCell(val, type) {
+  if (val === null || val === undefined || val === '') return type === 'money' ? money(0) : '—'
+  if (type === 'money') return money(val)
+  if (type === 'date') return fmtDate(val)
+  return String(val)
+}
+
+async function runCustomReport(config, from, to) {
+  const src = BUILDER_SOURCES[config.source]
+  if (!src) return { head: ['Error'], align: ['l'], rows: [['Unknown source']], foot: null }
+  const cols = config.columns || src.fields
+  const sel = cols.map((c) => c.field).join(', ')
+  let q = supabase.from(config.source).select(sel)
+  const dcol = config.date_col || src.date_col
+  if (dcol) {
+    const isTs = dcol.endsWith('_at')
+    q = q.gte(dcol, isTs ? from + 'T00:00:00' : from).lte(dcol, isTs ? to + 'T23:59:59' : to)
+  }
+  for (const f of config.filters || []) if (f.field && f.value !== '') q = q.eq(f.field, f.value)
+  q = q.order(dcol || cols[0].field)
+  const { data, error } = await q
+  if (error) return { head: ['Error'], align: ['l'], rows: [[error.message]], foot: null }
+  const head = cols.map((c) => c.label)
+  const align = cols.map((c) => (c.type === 'money' || c.type === 'num') ? 'r' : 'l')
+  const rows = (data || []).map((r) => cols.map((c) => fmtCell(r[c.field], c.type)))
+  let foot = null
+  if ((config.totals || []).length) {
+    foot = cols.map((c, i) => {
+      if (config.totals.includes(c.field)) { const s = (data || []).reduce((a, r) => a + (+r[c.field] || 0), 0); return money(s) }
+      return i === 0 ? 'TOTAL' : ''
+    })
+  }
+  return { head, align, rows, foot }
+}
+
+/* ===================== BUILDER UI (modal form) ===================== */
+function ReportBuilder({ onClose, onSaved }) {
+  const [name, setName] = useState('')
+  const [dept, setDept] = useState('Custom')
+  const [source, setSource] = useState('folio_charges')
+  const src = BUILDER_SOURCES[source]
+  const [picked, setPicked] = useState(src.fields.map((f) => f.field))
+  const [totals, setTotals] = useState([])
+  const [fStatusField, setFStatusField] = useState('')
+  const [fStatusVal, setFStatusVal] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const onSource = (s) => { setSource(s); const sf = BUILDER_SOURCES[s]; setPicked(sf.fields.map((f) => f.field)); setTotals([]); setFStatusField('') }
+  const toggle = (arr, set, v) => set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+
+  const save = async () => {
+    if (!name.trim()) { setErr('Give the report a name.'); return }
+    if (picked.length === 0) { setErr('Pick at least one column.'); return }
+    setBusy(true); setErr('')
+    const columns = src.fields.filter((f) => picked.includes(f.field))
+    const config = {
+      source, date_col: src.date_col, columns,
+      totals: totals.filter((t) => picked.includes(t)),
+      filters: fStatusField && fStatusVal ? [{ field: fStatusField, op: 'eq', value: fStatusVal }] : [],
+    }
+    const key = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') + '_' + Date.now().toString(36)
+    const { error } = await supabase.from('report_definitions').insert({
+      department: dept || 'Custom', report_name: name.trim(), report_key: key,
+      status: 'READY', is_custom: true, config, sort_order: 900,
+    })
+    setBusy(false)
+    if (error) { setErr(error.message); return }
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-ink/60 z-50 flex items-start justify-center overflow-auto p-6">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full my-4">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-leaf">
+          <h3 className="font-display font-semibold text-pine">Build a custom report</h3>
+          <button className="btn-ghost !py-1" onClick={onClose}>Close</button>
+        </div>
+        <div className="p-5 space-y-4">
+          {err && <div className="px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm">{err}</div>}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Report name</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Settled POS Orders" /></div>
+            <div><label className="label">Department</label><input className="input" value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Custom" /></div>
+          </div>
+          <div>
+            <label className="label">Data source</label>
+            <select className="input" value={source} onChange={(e) => onSource(e.target.value)}>
+              {Object.entries(BUILDER_SOURCES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <p className="text-[11px] text-pine/50 mt-1">Date filter uses “{src.date_col}”. Cycle/date range applies automatically.</p>
+          </div>
+          <div>
+            <label className="label">Columns to show</label>
+            <div className="flex flex-wrap gap-2">
+              {src.fields.map((f) => (
+                <button key={f.field} onClick={() => toggle(picked, setPicked, f.field)}
+                  className={`px-2 py-1 rounded-lg text-xs border ${picked.includes(f.field) ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`}>{f.label}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="label">Sum these columns (totals row)</label>
+            <div className="flex flex-wrap gap-2">
+              {src.fields.filter((f) => f.type === 'money' || f.type === 'num').map((f) => (
+                <button key={f.field} onClick={() => toggle(totals, setTotals, f.field)}
+                  className={`px-2 py-1 rounded-lg text-xs border ${totals.includes(f.field) ? 'bg-amber text-white border-amber' : 'border-leaf text-pine'}`}>{f.label}</button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Optional filter — field</label>
+              <select className="input" value={fStatusField} onChange={(e) => setFStatusField(e.target.value)}>
+                <option value="">(none)</option>
+                {src.fields.filter((f) => f.type === 'text').map((f) => <option key={f.field} value={f.field}>{f.label}</option>)}
+              </select>
+            </div>
+            <div><label className="label">equals</label><input className="input" value={fStatusVal} onChange={(e) => setFStatusVal(e.target.value)} placeholder="e.g. SETTLED" disabled={!fStatusField} /></div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button className="btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save report'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
