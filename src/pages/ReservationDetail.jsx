@@ -104,18 +104,21 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       {tab === 'Partners' && <PartnerAccounts res={res} reload={loadAll} flash={flash} />}
       
       {/* ---------------- PRINT PORTALS ---------------- */}
-      {printDoc?.type === 'REG' && <PrintPortal title="Registration Card" onClose={() => setPrintDoc(null)}><RegistrationCard res={res} guest={guest} resGuests={resGuests} resRooms={resRooms} payments={payments} company={company} /></PrintPortal>}
+      {printDoc?.type === 'REG' && (
+        <PrintPortal title="Registration Card" onClose={() => setPrintDoc(null)}>
+          <RegistrationCard res={res} guest={guest} resGuests={resGuests} resRooms={resRooms} payments={payments} company={company} />
+        </PrintPortal>
+      )}
       
       {printDoc?.type === 'BILL' && (
         <PrintPortal title="Guest Bill" onClose={() => setPrintDoc(null)}>
           <GuestBill 
-            charges={printDoc.invoiceData?.charges || charges} 
-            totals={printDoc.invoiceData?.totals || totals} 
-            paid={printDoc.invoiceData?.paid !== undefined ? printDoc.invoiceData.paid : paid} 
-            due={printDoc.invoiceData?.due !== undefined ? printDoc.invoiceData.due : due} 
-            res={res} guest={guest} company={company} 
-            invoice_no={printDoc.invoiceData?.invoice_no} 
-            issued_at={printDoc.invoiceData?.issued_at}
+            res={res} guest={guest} company={company}
+            charges={printDoc.invoiceData.charges} 
+            totals={printDoc.invoiceData.totals} 
+            paid={printDoc.invoiceData.paid} 
+            due={printDoc.invoiceData.due} 
+            invoice_no={printDoc.invoiceData.invoice_no} 
           />
         </PrintPortal>
       )}
@@ -123,11 +126,10 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       {printDoc?.type === 'MUSHAK' && (
         <PrintPortal title="Mushak-6.3" onClose={() => setPrintDoc(null)}>
           <Mushak63 
-            charges={printDoc.invoiceData?.charges || charges} 
-            totals={printDoc.invoiceData?.totals || totals} 
-            res={res} company={company} 
-            invoice_no={printDoc.invoiceData?.invoice_no} 
-            issued_at={printDoc.invoiceData?.issued_at}
+            res={res} company={company}
+            charges={printDoc.invoiceData.charges} 
+            totals={printDoc.invoiceData.totals} 
+            invoice_no={printDoc.invoiceData.invoice_no} 
           />
         </PrintPortal>
       )}
@@ -450,31 +452,74 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
   )
 }
 
-/* ---------------- BILLINGS & CHECK-OUT (Merged Tab) ---------------- */
+/* ---------------- BILLINGS & CHECK-OUT ---------------- */
 function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxConfig, invoices, company, reload, userName, setStatus, setPrintDoc, totals, paid, due, flash, isAdmin }) {
-  const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status)
-  const editable = isAdmin || !['CHECKED_OUT', 'SETTLED', 'CANCELLED'].includes(res.status)
+  const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status);
   
-  const [c, setC] = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
-  const [discAmt, setDiscAmt] = useState('')
-  const [discReason, setDiscReason] = useState('')
-  const [discType, setDiscType] = useState('ROOM')
-  const [p, setP] = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
-
-  // --- Printing Functions ---
-  const printLiveInvoice = (type) => {
-    setPrintDoc({ 
-      type: type, 
-      invoiceData: { charges, totals, paid, due, invoice_no: `DRAFT-${res.res_no}`, issued_at: new Date().toISOString() } 
-    });
+  // প্রিন্ট ফাংশনগুলো আপডেট করা হয়েছে
+  const handlePrint = (type, data) => {
+    setPrintDoc({ type, ...data });
   };
 
-  const printHistoryInvoice = (inv, type) => {
-    setPrintDoc({ 
-      type: type, 
-      invoiceData: { charges: inv.charges, totals: inv.totals, paid: inv.paid, due: inv.due, invoice_no: inv.invoice_no, issued_at: inv.issued_at } 
-    });
-  };
+  return (
+    <div className="space-y-6">
+      <div className="card p-5 border-l-4 border-l-pine">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 className="font-display font-semibold text-pine text-lg">Guest Billing & Check-out</h3>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-ghost" onClick={() => handlePrint('BILL', { invoiceData: { charges, totals, paid, due, invoice_no: `DRAFT-${res.res_no}`, issued_at: new Date().toISOString() } })}>
+              <Printer size={16} /> Preview Bill
+            </button>
+            <button className="btn-primary" onClick={() => handlePrint('MUSHAK', { invoiceData: { charges, totals, invoice_no: `DRAFT-${res.res_no}`, issued_at: new Date().toISOString() } })}>
+              <Receipt size={16} /> Live Mushak
+            </button>
+            
+            {!isCheckedOut ? (
+              <button className="btn-amber" onClick={async () => { 
+                await setStatus('CHECKED_OUT', { checked_out_at: new Date().toISOString() }); 
+                await reload(); 
+                flash('Checked out successfully.');
+              }}>
+                <CheckCircle2 size={16} /> Check Out
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      
+      {/* Historical Invoices Table */}
+      <div className="card overflow-hidden">
+        <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Historical Invoices</div>
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className="th">Invoice No.</th>
+              <th className="th">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((inv) => (
+              <tr key={inv.id}>
+                <td className="td font-semibold">{inv.invoice_no}</td>
+                <td className="td text-right">
+                  <button className="btn-ghost !py-1 !px-2 text-xs mr-2" onClick={() => handlePrint('BILL', { invoiceData: { charges: inv.charges, totals: inv.totals, paid: inv.paid, due: inv.due, invoice_no: inv.invoice_no, issued_at: inv.issued_at } })}>
+                    <Printer size={13} /> Bill
+                  </button>
+                  <button className="btn-ghost !py-1 !px-2 text-xs" onClick={() => handlePrint('MUSHAK', { invoiceData: { charges: inv.charges, totals: inv.totals, invoice_no: inv.invoice_no, issued_at: inv.issued_at } })}>
+                    <Receipt size={13} /> Mushak
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
 
   // --- Folio Actions ---
   const buildRoomRows = () => {
