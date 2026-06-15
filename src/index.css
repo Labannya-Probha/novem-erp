@@ -2,8 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===================== LIGHT FROSTED GLASS THEME (Aura Stay) ===================== */
-/* Soft forest-tinted backdrop; white frosted panels float on top. All text stays dark & readable. */
+/* ============================================================
+   AURA STAY — LIGHT FROSTED GLASS DESIGN SYSTEM
+   Consistent spacing, alignment, sizing across the whole app.
+   ============================================================ */
 
 @layer base {
   body {
@@ -16,62 +18,123 @@
       linear-gradient(160deg, #f1f7f1 0%, #e8f1ea 50%, #eef4ee 100%);
     background-attachment: fixed;
     min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
   }
+  h1, h2, h3, h4 { line-height: 1.25; }
+  /* Consistent vertical rhythm for headings */
+  h1 { letter-spacing: -0.01em; }
 }
 
 @layer components {
-  .money { @apply font-money tabular-nums; }
+  .money { @apply font-money tabular-nums; font-variant-numeric: tabular-nums; }
 
-  /* Frosted white glass card */
+  /* ---------- CARD ---------- */
   .card {
-    background: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.74);
     border: 1px solid rgba(255, 255, 255, 0.9);
-    border-radius: 0.85rem;
+    border-radius: 14px;
     box-shadow: 0 8px 30px rgba(27, 77, 46, 0.10), inset 0 1px 0 rgba(255,255,255,0.6);
     -webkit-backdrop-filter: blur(14px) saturate(135%);
     backdrop-filter: blur(14px) saturate(135%);
   }
 
-  .label { @apply block text-xs font-semibold uppercase tracking-wider text-pine/70 mb-1; }
+  .label {
+    @apply block text-pine/70 mb-1.5;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  }
 
+  /* ---------- FORM CONTROLS — all share the SAME height (38px) ---------- */
+  .input, .btn-primary, .btn-ghost, .btn-amber {
+    height: 38px;
+    box-sizing: border-box;
+  }
   .input {
-    @apply w-full rounded-lg px-3 py-2 text-sm text-ink focus:outline-none;
-    background: rgba(255,255,255,0.85);
+    @apply w-full text-ink focus:outline-none;
+    padding: 0 12px;
+    font-size: 14px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.9);
     border: 1px solid rgba(27,77,46,0.18);
     transition: border-color .15s, box-shadow .15s, background .15s;
   }
-  .input::placeholder { color: rgba(27,77,46,0.40); }
-  .input:focus { border-color: #2E7D32; box-shadow: 0 0 0 3px rgba(46,125,50,0.18); background: #fff; }
+  .input::placeholder { color: rgba(27,77,46,0.4); }
+  .input:focus { border-color: #2E7D32; box-shadow: 0 0 0 3px rgba(46,125,50,0.16); background: #fff; }
+  /* textarea & multiline override the fixed height */
+  textarea.input { height: auto; min-height: 76px; padding: 9px 12px; line-height: 1.5; }
+  select.input { padding-right: 8px; }
 
+  /* ---------- BUTTONS — identical padding, height, alignment ---------- */
+  .btn-primary, .btn-ghost, .btn-amber {
+    @apply inline-flex items-center justify-center gap-2 font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed;
+    padding: 0 16px;
+    font-size: 13.5px;
+    border-radius: 9px;
+    white-space: nowrap;
+  }
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white;
+    @apply text-white;
     background: linear-gradient(135deg, #2E7D32, #1B4D2E);
-    border: 1px solid rgba(255,255,255,0.25);
-    box-shadow: 0 4px 14px rgba(46,125,50,0.28);
+    border: 1px solid rgba(255,255,255,0.22);
+    box-shadow: 0 4px 14px rgba(46,125,50,0.26);
   }
-  .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 6px 20px rgba(46,125,50,0.4); }
-
+  .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 6px 20px rgba(46,125,50,0.38); }
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed text-pine;
-    background: rgba(255,255,255,0.65);
+    @apply text-pine;
+    background: rgba(255,255,255,0.66);
     border: 1px solid rgba(27,77,46,0.18);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   }
-  .btn-ghost:hover { background: rgba(255,255,255,0.92); }
-
+  .btn-ghost:hover { background: rgba(255,255,255,0.95); }
   .btn-amber {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white;
+    @apply text-white;
     background: linear-gradient(135deg, #D4A017, #B8860B);
     border: 1px solid rgba(255,255,255,0.3);
-    box-shadow: 0 4px 14px rgba(212,160,23,0.3);
+    box-shadow: 0 4px 14px rgba(212,160,23,0.28);
   }
   .btn-amber:hover { filter: brightness(1.07); }
+  /* compact buttons (when JSX adds !py-1 etc. they still align) */
+  .btn-primary svg, .btn-ghost svg, .btn-amber svg { flex-shrink: 0; }
 
-  .th { @apply text-left text-xs font-semibold uppercase tracking-wider text-pine/60 px-3 py-2; border-bottom: 1px solid rgba(27,77,46,0.14); }
-  .td { @apply px-3 py-2 text-sm text-ink; border-bottom: 1px solid rgba(27,77,46,0.08); }
+  /* ---------- TABLES — roomy cells, aligned numbers ---------- */
+  .th {
+    @apply text-left text-pine/60;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 11px 14px;
+    border-bottom: 1.5px solid rgba(27,77,46,0.16);
+    white-space: nowrap;
+    background: rgba(46,125,50,0.04);
+  }
+  .td {
+    @apply text-ink;
+    font-size: 13.5px;
+    padding: 11px 14px;
+    border-bottom: 1px solid rgba(27,77,46,0.08);
+    vertical-align: middle;
+  }
+  /* right-aligned numeric columns get tabular figures automatically */
+  .th.text-right, .td.text-right { text-align: right; font-variant-numeric: tabular-nums; }
+  /* zebra + hover for any table row inside a .card */
+  .card tbody tr { transition: background .12s; }
+  .card tbody tr:hover { background: rgba(46,125,50,0.05); }
+  .card tbody tr:last-child .td { border-bottom: none; }
+  tfoot .td, tfoot td { border-top: 1.5px solid rgba(27,77,46,0.16); }
 
-  .status-chip { @apply inline-block px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide; }
+  .status-chip {
+    @apply inline-flex items-center;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+
+  /* ---------- Spacing helpers (optional, used where JSX opts in) ---------- */
+  .card-pad { padding: 20px; }
+}
+
+/* tighten default gaps so grids look even (screen only) */
+@media screen {
+  table { border-collapse: collapse; width: 100%; }
 }
 
 /* ============================= PRINT (A4 documents) ============================= */
@@ -98,41 +161,26 @@
   }
   .print-doc > div,
   .print-doc > table { max-width: 100% !important; width: 100% !important; }
-
   .print-doc > * { flex-grow: 0; }
   .print-doc > *:not(.footer-spacer):not(::after) { flex-grow: 1; }
-
   .print-doc * { box-sizing: border-box; }
   .print-doc table { width: 100% !important; border-collapse: collapse; table-layout: fixed; }
   .print-doc td, .print-doc th { word-wrap: break-word; overflow-wrap: break-word; }
   .print-doc img { max-width: 100%; height: auto; }
   .print-doc tr, .print-doc thead, .print-doc svg { page-break-inside: avoid; }
-
   .no-print { display: none !important; }
 
   .print-doc::after, .epos-receipt::after {
     content: "Powered by Aura Stay";
-    display: block;
-    text-align: center;
-    font-size: 9px;
-    margin-top: auto !important;
-    border-top: 1px solid #ccc;
-    padding-top: 5px;
-    color: #666;
-    width: 100%;
+    display: block; text-align: center; font-size: 9px;
+    margin-top: auto !important; border-top: 1px solid #ccc; padding-top: 5px; color: #666; width: 100%;
   }
 
-  /* ePOS 80mm thermal receipt */
   @page :first { size: 80mm auto; margin: 0; }
   .epos-receipt {
-    width: 72mm !important;
-    font-family: 'monospace' !important;
-    color: #000 !important;
-    padding: 0 !important;
-    margin: 0 auto !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 100vh !important;
+    width: 72mm !important; font-family: 'monospace' !important; color: #000 !important;
+    padding: 0 !important; margin: 0 auto !important;
+    display: flex !important; flex-direction: column !important; min-height: 100vh !important;
   }
   .epos-receipt > * { flex-grow: 0; }
   .epos-receipt > *:not(.footer-spacer):not(::after) { flex-grow: 1; }
