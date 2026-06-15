@@ -17,9 +17,10 @@ import HrOffice from './pages/HrOffice.jsx'
 import NightAudit from './pages/NightAudit.jsx'
 import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
+import FrontDeskBoard from './pages/FrontDeskBoard.jsx'
 import {
   Leaf, LayoutDashboard, CalendarRange, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
-  FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble,
+  FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, LayoutGrid,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -31,6 +32,7 @@ function BrandLogo({ url }) {
 const NAV_GROUPS = [
   { title: 'Front Office', items: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'frontdesk', label: 'Front Desk', icon: LayoutGrid },
     { id: 'reservations', label: 'Reservations', icon: CalendarRange },
     { id: 'calendar', label: 'Booking Calendar', icon: CalendarDays },
     { id: 'nightaudit', label: 'Night Audit', icon: MoonStar },
@@ -56,7 +58,7 @@ const NAV_GROUPS = [
 
 export default function App() {
   const [session, setSession] = useState(undefined)
-  const [profile, setProfile] = useState(null)   // app_users row: role, full_name
+  const [profile, setProfile] = useState(null)
   const [company, setCompany] = useState(null)
   const [page, setPage] = useState('dashboard')
   const [activeRes, setActiveRes] = useState(null)
@@ -131,6 +133,7 @@ export default function App() {
 
       <main className="flex-1 ml-60 p-6 lg:p-8 max-w-[1400px]">
         {page === 'dashboard' && <Dashboard openReservation={openReservation} userName={userName} />}
+        {page === 'frontdesk' && can(role, 'frontdesk') && <FrontDeskBoard role={role} />}
         {page === 'reservations' && <Reservations openReservation={openReservation} userName={userName} />}
         {page === 'calendar' && can(role, 'calendar') && <BookingCalendar openReservation={openReservation} />}
         {page === 'detail' && activeRes && (
