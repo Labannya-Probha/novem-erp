@@ -38,7 +38,6 @@ body {
     max-width: 186mm !important;
     margin: 0 auto !important;
   }
-  /* component গুলোর ভেতরের maxWidth:720px / fixed width override করে A4-তে বসাও */
   .print-doc > div,
   .print-doc > table { max-width: 100% !important; width: 100% !important; }
 
@@ -47,20 +46,19 @@ body {
   .print-doc td, .print-doc th { word-wrap: break-word; overflow-wrap: break-word; }
   .print-doc img { max-width: 100%; height: auto; }
 
-  /* সারি/টেবিল/লোগো যেন পাতার মাঝে কাটা না পড়ে */
   .print-doc tr, .print-doc thead, .print-doc svg { page-break-inside: avoid; }
 
   .no-print { display: none !important; }
 }
+
 @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap');
 
 body {
   font-family: 'Google Sans', sans-serif;
-  background-color: #f8fafc; /* Professional soft gray background */
-  color: #334155; /* Soft dark text */
+  background-color: #f8fafc;
+  color: #334155;
 }
 
-/* Table styling for polish look */
 table {
   border-collapse: separate;
   border-spacing: 0;
@@ -82,4 +80,21 @@ th {
 td {
   padding: 12px 16px;
   border-bottom: 1px solid #e2e8f0;
+}
+
+/* ---------- EPOS THERMAL PRINTER SETTINGS (80mm) ---------- */
+@media print {
+  @page { size: 80mm auto; margin: 0; }
+  
+  /* Thermal receipt container settings */
+  .epos-receipt {
+    width: 72mm !important;
+    font-family: 'monospace' !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+  }
+  
+  .epos-receipt table { border: none !important; }
+  .epos-receipt td { border: none !important; padding: 2px 0 !important; }
 }
