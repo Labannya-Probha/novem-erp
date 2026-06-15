@@ -17,11 +17,7 @@ import {
 
 const TABS = ['Overview', 'Quotation', 'Check-In', 'Billings & Check-Out', 'Partners']
 
-// [6] Deterministic invoice number helper
-const generateInvoiceNo = (resNo) => {
-  const ts = Date.now().toString().slice(-6)
-  return `INV-${resNo}-${ts}`
-}
+const generateInvoiceNo = (resNo) => `INV-${resNo}-${Date.now().toString().slice(-6)}`
 
 export default function ReservationDetail({ id, back, userName, isAdmin }) {
   const [res, setRes] = useState(null)
@@ -49,26 +45,32 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       const { data: g } = await supabase.from('guests').select('*').eq('id', r.primary_guest_id).single()
       setGuest(g)
     }
-    const [{ data: rg }, { data: rr }, { data: rm }, { data: ch }, { data: pm }, { data: inv }, { data: tc }, { data: co }] =
-      await Promise.all([
-        supabase.from('reservation_guests').select('*').eq('reservation_id', id).order('is_primary', { ascending: false }),
-        supabase.from('reservation_rooms').select('*, rooms(*)').eq('reservation_id', id),
-        supabase.from('rooms').select('*').eq('is_active', true).order('room_no'),
-        supabase.from('folio_charges').select('*').eq('reservation_id', id).order('charge_date'),
-        supabase.from('payments').select('*').eq('reservation_id', id).order('received_date'),
-        supabase.from('invoices').select('*').eq('reservation_id', id).order('created_at', { ascending: false }),
-        supabase.from('tax_config').select('*'),
-        supabase.from('company_settings').select('*').eq('id', 1).single(),
-      ])
+    const [
+      { data: rg }, { data: rr }, { data: rm }, { data: ch },
+      { data: pm }, { data: inv }, { data: tc }, { data: co },
+    ] = await Promise.all([
+      supabase.from('reservation_guests').select('*').eq('reservation_id', id).order('is_primary', { ascending: false }),
+      supabase.from('reservation_rooms').select('*, rooms(*)').eq('reservation_id', id),
+      supabase.from('rooms').select('*').eq('is_active', true).order('room_no'),
+      supabase.from('folio_charges').select('*').eq('reservation_id', id).order('charge_date'),
+      supabase.from('payments').select('*').eq('reservation_id', id).order('received_date'),
+      supabase.from('invoices').select('*').eq('reservation_id', id).order('created_at', { ascending: false }),
+      supabase.from('tax_config').select('*'),
+      supabase.from('company_settings').select('*').eq('id', 1).single(),
+    ])
     setResGuests(rg || []); setResRooms(rr || []); setRooms(rm || [])
     setCharges(ch || []); setPayments(pm || []); setInvoices(inv || [])
     setTaxConfig(tc || []); setCompany(co)
   }
+
   useEffect(() => { loadAll() }, [id])
 
-  const totals = useMemo(() => applyRounding(sumCharges(charges), company?.rounding_mode || 'NEAREST_1'), [charges, company])
-  const paid = useMemo(() => payments.reduce((a, p) => a + Number(p.amount), 0), [payments])
-  const due = +(totals.grand_total - paid).toFixed(2)
+  const totals = useMemo(
+    () => applyRounding(sumCharges(charges), company?.rounding_mode || 'NEAREST_1'),
+    [charges, company],
+  )
+  const paid   = useMemo(() => payments.reduce((a, p) => a + Number(p.amount), 0), [payments])
+  const due    = +(totals.grand_total - paid).toFixed(2)
   const nights = res ? nightsBetween(res.check_in, res.check_out) : 0
 
   const setStatus = async (status, extra = {}) => {
@@ -79,6 +81,18 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
   if (!res) return <div className="text-pine/50">Loading…</div>
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
+
+  // ------------------------------------------------------------------
+  // [P5] invoiceData shape used by both live and historical print paths:
+  // {
+  //   charges    : ChargeRow[]   — folio charge array snapshot (JSONB from DB or live state)
+  //   totals     : TotalsObject  — { base, discount, service_charge, sd, vat, grand_total, ... }
+  //   paid       : number        — total payments received
+  //   due        : number        — outstanding balance (may be 0)
+  //   invoice_no : string | undefined — undefined for live/draft previews
+  //   issued_at  : string | undefined — ISO timestamp; undefined for live previews
+  // }
+  // ------------------------------------------------------------------
 
   return (
     <div>
@@ -134,48 +148,81 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
           totals={totals} paid={paid} due={due} flash={flash} isAdmin={isAdmin}
         />
       )}
-      {tab === 'Partners' && <PartnerAccounts res={res} reload={loadAll} flash={flash} userName={userName} />}
+      {tab === 'Partners' && (
+        <PartnerAccounts res={res} reload={loadAll} flash={flash} userName={userName} />
+      )}
 
-      {/* ---------------- PRINT PORTALS ---------------- */}
+      {/* ================================================================
+          PRINT PORTALS
+          All portals live here in the parent so they always have access
+          to the latest res, guest, company, charges, totals, paid, due.
+          ================================================================ */}
+
+      {/* REG — Registration Card [P4] */}
       {printDoc?.type === 'REG' && (
         <PrintPortal title="Registration Card" onClose={() => setPrintDoc(null)}>
-          <RegistrationCard res={res} guest={guest} resGuests={resGuests} resRooms={resRooms} payments={payments} company={company} />
+          <RegistrationCard
+            res={res} guest={guest} resGuests={resGuests}
+            resRooms={resRooms} payments={payments} company={company}
+          />
         </PrintPortal>
       )}
 
+      {/* BILL — Guest Bill [P1]
+          ?.length guard: empty snapshot [] is falsy-equivalent here; fall back to live charges.
+          ?? guard: preserves paid=0 / due=0 correctly (|| would wrongly fall back for zero). */}
       {printDoc?.type === 'BILL' && (
         <PrintPortal title="Guest Bill" onClose={() => setPrintDoc(null)}>
           <GuestBill
-            charges={printDoc.invoiceData?.charges?.length ? printDoc.invoiceData.charges : charges}
+            charges={
+              printDoc.invoiceData?.charges?.length
+                ? printDoc.invoiceData.charges   // historical snapshot
+                : charges                        // live folio
+            }
             totals={printDoc.invoiceData?.totals ?? totals}
             paid={printDoc.invoiceData?.paid ?? paid}
             due={printDoc.invoiceData?.due ?? due}
-            res={res} guest={guest} company={company}
+            res={res}
+            guest={guest}
+            company={company}
             invoice_no={printDoc.invoiceData?.invoice_no}
             issued_at={printDoc.invoiceData?.issued_at}
           />
         </PrintPortal>
       )}
 
+      {/* MUSHAK — Mushak-6.3 [P2] same guards as BILL */}
       {printDoc?.type === 'MUSHAK' && (
         <PrintPortal title="Mushak-6.3" onClose={() => setPrintDoc(null)}>
           <Mushak63
-            charges={printDoc.invoiceData?.charges?.length ? printDoc.invoiceData.charges : charges}
+            charges={
+              printDoc.invoiceData?.charges?.length
+                ? printDoc.invoiceData.charges
+                : charges
+            }
             totals={printDoc.invoiceData?.totals ?? totals}
-            res={res} company={company}
+            res={res}
+            company={company}
             invoice_no={printDoc.invoiceData?.invoice_no}
             issued_at={printDoc.invoiceData?.issued_at}
           />
         </PrintPortal>
       )}
 
+      {/* QUOTE — Quotation [P3] */}
       {printDoc?.type === 'QUOTE' && (
         <PrintPortal title="Quotation" onClose={() => setPrintDoc(null)}>
           <Quotation
-            res={res} guest={guest} terms={printDoc.terms}
-            roomRate={printDoc.roomRate} roomCount={printDoc.roomCount}
-            discountPct={printDoc.discountPct} validDays={printDoc.validDays}
-            taxConfig={taxConfig} company={company} resRooms={resRooms}
+            res={res}
+            guest={guest}
+            terms={printDoc.terms}
+            roomRate={printDoc.roomRate}
+            roomCount={printDoc.roomCount}
+            discountPct={printDoc.discountPct}
+            validDays={printDoc.validDays}
+            taxConfig={taxConfig}
+            company={company}
+            resRooms={resRooms}
           />
         </PrintPortal>
       )}
@@ -208,7 +255,7 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, i
           {canConfirm && (
             <button className="btn-primary w-full justify-center" onClick={() => {
               if (advance <= 0 && payments.length === 0) {
-                flash('Record the advance payment first (Billings & Check-Out tab) — booking confirms on advance per your workflow.')
+                flash('Record the advance payment first (Billings & Check-Out tab).')
                 return
               }
               setStatus('CONFIRMED')
@@ -225,11 +272,12 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, i
           {['CHECKED_OUT', 'SETTLED'].includes(res.status) && (
             isAdmin ? (
               <button className="btn-amber w-full justify-center" onClick={async () => {
-                const reason = window.prompt('Re-check-in will VOID the issued invoices (new ones generate at next check-out). Reason:', 'Guest stay extended')
+                const reason = window.prompt('Re-check-in will VOID the issued invoices. Reason:', 'Guest stay extended')
                 if (reason === null) return
                 await supabase.from('invoices')
                   .update({ is_void: true, void_reason: reason || 'Re-check-in', voided_by: userName, voided_at: new Date().toISOString() })
-                  .eq('reservation_id', res.id).not('is_void', 'is', true)
+                  .eq('reservation_id', res.id)
+                  .not('is_void', 'is', true)
                 await supabase.from('audit_log').insert({
                   actor: userName, action: 'RE_CHECKIN', entity: 'reservation',
                   entity_id: res.res_no, details: { reason },
@@ -244,7 +292,7 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, i
             )
           )}
           <p className="text-xs text-pine/50 pt-2">
-            Advance received: <span className="money font-semibold">{fmtBDT(advance)}</span>. Per workflow, a booking is confirmed after the guest gives an advance.
+            Advance received: <span className="money font-semibold">{fmtBDT(advance)}</span>.
           </p>
         </div>
       </div>
@@ -256,29 +304,22 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, i
 /*  QUOTATION TAB                                                       */
 /* ------------------------------------------------------------------ */
 function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, userName, resRooms = [], setPrintDoc }) {
-  const [roomRate, setRoomRate] = useState(res.room_rate || resRooms[0]?.rate || resRooms[0]?.rooms?.base_rate || 0)
+  const [roomRate, setRoomRate]   = useState(res.room_rate || resRooms[0]?.rate || resRooms[0]?.rooms?.base_rate || 0)
   const [roomCount, setRoomCount] = useState(resRooms.length || 1)
-  const [disc, setDisc] = useState(Number(res.discount_pct) || 0)
+  const [disc, setDisc]           = useState(Number(res.discount_pct) || 0)
   const [validDays, setValidDays] = useState(7)
-  const [quotes, setQuotes] = useState([])
-  const [terms, setTerms] = useState(res.terms_conditions || company?.terms_conditions || '')
+  const [quotes, setQuotes]       = useState([])
+  const [terms, setTerms]         = useState(res.terms_conditions || company?.terms_conditions || '')
   const rate = rateFor(taxConfig, 'ROOM', todayISO())
 
   useEffect(() => { setTerms(res.terms_conditions || company?.terms_conditions || '') }, [res.id, company?.terms_conditions])
 
-  const saveTerms = async () => {
-    await supabase.from('reservations').update({ terms_conditions: terms }).eq('id', res.id)
-    flash('Terms & Conditions saved to this quotation.')
-  }
-  const printQuote = () => setPrintDoc && setPrintDoc({ type: 'QUOTE', terms, roomRate, roomCount, discountPct: disc, validDays })
-
-  const saveDisc = async () => {
-    await supabase.from('reservations').update({ discount_pct: +disc || 0 }).eq('id', res.id)
-    reload()
-  }
+  const saveTerms  = async () => { await supabase.from('reservations').update({ terms_conditions: terms }).eq('id', res.id); flash('Terms & Conditions saved.') }
+  const printQuote = () => setPrintDoc?.({ type: 'QUOTE', terms, roomRate, roomCount, discountPct: disc, validDays })
+  const saveDisc   = async () => { await supabase.from('reservations').update({ discount_pct: +disc || 0 }).eq('id', res.id); reload() }
 
   const perNight = computeCharge(Number(roomRate) * Number(roomCount), disc, rate)
-  const total = +(perNight.total * nights).toFixed(2)
+  const total    = +(perNight.total * nights).toFixed(2)
 
   const loadQuotes = async () => {
     const { data } = await supabase.from('quotations').select('*').eq('reservation_id', res.id).order('created_at', { ascending: false })
@@ -306,7 +347,7 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
 
   const sendWhatsApp = () => {
     const phone = (guest?.phone || '').replace(/[^0-9]/g, '')
-    const intl = phone.startsWith('880') ? phone : phone.startsWith('0') ? '88' + phone : '880' + phone
+    const intl   = phone.startsWith('880') ? phone : phone.startsWith('0') ? '88' + phone : '880' + phone
     window.open(`https://wa.me/${intl}?text=${encodeURIComponent(message)}`, '_blank')
     record('WhatsApp')
   }
@@ -378,23 +419,17 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
     special_instructions: res.special_instructions || '',
   })
   const [newGuest, setNewGuest] = useState('')
-  const [roomSel, setRoomSel] = useState('')
+  const [roomSel, setRoomSel]   = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
-  useEffect(() => {
-    if (guest) setF((p) => ({ ...p, id_type: guest.id_type || 'NID', id_number: guest.id_number || '' }))
-  }, [guest])
+  useEffect(() => { if (guest) setF((p) => ({ ...p, id_type: guest.id_type || 'NID', id_number: guest.id_number || '' })) }, [guest])
 
   const assignRoom = async () => {
     if (locked) { flash('After check-in, only an administrator can change room assignment.'); return }
     if (!roomSel) return
     const room = rooms.find((r) => r.id === roomSel)
-    await supabase.from('reservation_rooms').insert({
-      reservation_id: res.id, room_id: room.id,
-      rate: res.room_rate || room.base_rate, from_date: res.check_in, to_date: res.check_out,
-    })
+    await supabase.from('reservation_rooms').insert({ reservation_id: res.id, room_id: room.id, rate: res.room_rate || room.base_rate, from_date: res.check_in, to_date: res.check_out })
     setRoomSel(''); await reload()
   }
-
   const removeRoom = async (rrId) => {
     if (locked) { flash('Administrator access required after check-in.'); return }
     await supabase.from('reservation_rooms').delete().eq('id', rrId); await reload()
@@ -456,10 +491,7 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
           {resRooms.map((rr) => (
             <div key={rr.id} className="text-sm border border-leaf rounded-lg px-3 py-2 space-y-2">
               <div className="flex justify-between items-center">
-                <span className="font-semibold">
-                  Room {rr.rooms?.room_no}{rr.rooms?.room_name ? ` · ${rr.rooms.room_name}` : ''}
-                  <span className="text-pine/50 font-normal"> · {rr.rooms?.room_type}</span>
-                </span>
+                <span className="font-semibold">Room {rr.rooms?.room_no}{rr.rooms?.room_name ? ` · ${rr.rooms.room_name}` : ''} <span className="text-pine/50 font-normal">· {rr.rooms?.room_type}</span></span>
                 <span className="flex items-center gap-2 money">
                   {locked ? (
                     <>{fmtBDT(rr.rate)}/night</>
@@ -528,7 +560,7 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
             </div>
           </div>
           <div className="flex gap-2 pt-1">
-            {res.status !== 'CHECKED_IN' && res.status !== 'CHECKED_OUT' && res.status !== 'SETTLED' ? (
+            {!['CHECKED_IN', 'CHECKED_OUT', 'SETTLED'].includes(res.status) ? (
               <button className="btn-primary flex-1 justify-center" onClick={doCheckIn}><LogIn size={16} /> Check in guest</button>
             ) : (
               <div className="text-sm text-forest font-semibold flex items-center gap-2">
@@ -549,73 +581,64 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
 /* ------------------------------------------------------------------ */
 /*  BILLINGS & CHECK-OUT TAB                                            */
 /* ------------------------------------------------------------------ */
-function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxConfig, invoices, company, reload, userName, setStatus, setPrintDoc, totals, paid, due, flash, isAdmin }) {
+function BillingsAndCheckOutTab({
+  res, guest, charges, payments, resRooms, taxConfig, invoices, company,
+  reload, userName, setStatus, setPrintDoc, totals, paid, due, flash, isAdmin,
+}) {
   const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status)
-  const editable = isAdmin || !['CHECKED_OUT', 'SETTLED', 'CANCELLED'].includes(res.status)
+  const editable     = isAdmin || !['CHECKED_OUT', 'SETTLED', 'CANCELLED'].includes(res.status)
 
-  const [c, setC] = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
-  const [discAmt, setDiscAmt] = useState('')
+  const [c, setC]           = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
+  const [discAmt, setDiscAmt]     = useState('')
   const [discReason, setDiscReason] = useState('')
-  const [discType, setDiscType] = useState('ROOM')
-  const [p, setP] = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
+  const [discType, setDiscType]   = useState('ROOM')
+  const [p, setP]           = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
 
-  // --- [4] Sync active invoice paid/due/status after post-checkout payments ---
-  // Uses fresh Supabase queries to avoid stale React state.
-  const syncInvoiceStatus = async () => {
-    const { data: freshPayments } = await supabase
-      .from('payments').select('amount').eq('reservation_id', res.id)
-
-    const { data: activeInv } = await supabase
-      .from('invoices').select('id, totals')
-      .eq('reservation_id', res.id).eq('is_void', false)
-      .order('created_at', { ascending: false }).limit(1).single()
-
-    if (!activeInv) return
-
-    const totalPaid = (freshPayments || []).reduce((a, p) => a + Number(p.amount), 0)
-    // Use snapshot grand_total from the invoice itself (not live folio)
-    const snapshotGrandTotal = activeInv.totals?.grand_total ?? totals.grand_total
-    const newDue = +(snapshotGrandTotal - totalPaid).toFixed(2)
-    const newStatus = newDue <= 0 ? 'PAID' : 'PARTIAL'
-
-    await supabase.from('invoices').update({ paid: totalPaid, due: newDue, status: newStatus }).eq('id', activeInv.id)
-
-    // [6] Auto-settle reservation when fully paid
-    if (newDue <= 0 && res.status === 'CHECKED_OUT') {
-      await supabase.from('reservations').update({ status: 'SETTLED' }).eq('id', res.id)
-      await reload()
-      flash('Balance cleared — reservation marked SETTLED.')
-    }
-  }
-
-  // --- Printing ---
+  // ----------------------------------------------------------------
+  // [P5] Live invoice data — used for "Preview Bill" / "Mushak Print"
+  //      invoice_no is undefined → GuestBill/Mushak63 render as DRAFT
+  // ----------------------------------------------------------------
   const printLiveInvoice = (type) => {
     setPrintDoc({
       type,
-      invoiceData: { charges, totals, paid, due, invoice_no: `DRAFT-${res.res_no}`, issued_at: new Date().toISOString() },
-    })
-  }
-  const printHistoryInvoice = (inv, type) => {
-    setPrintDoc({
-      type,
       invoiceData: {
-        // [Bug fix] Use ?.length guard so empty array [] doesn't bypass the fallback
-        charges: inv.charges?.length ? inv.charges : charges,
-        totals: inv.totals ?? totals,
-        paid: inv.paid ?? paid,
-        due: inv.due ?? due,
-        invoice_no: inv.invoice_no,
-        issued_at: inv.issued_at,
+        charges,
+        totals,
+        paid,
+        due,
+        invoice_no: undefined,   // draft — no number yet
+        issued_at:  new Date().toISOString(),
       },
     })
   }
 
-  // --- Folio ---
+  // ----------------------------------------------------------------
+  // [P6] Historical invoice print — uses DB snapshot
+  //      ?? guards keep paid=0 / due=0 from falling back to live values
+  // ----------------------------------------------------------------
+  const printHistoryInvoice = (inv, type) => {
+    setPrintDoc({
+      type,
+      invoiceData: {
+        // ?.length: empty [] (no charges stored) falls back to live charges
+        charges:    inv.charges?.length ? inv.charges : charges,
+        totals:     inv.totals  ?? totals,
+        paid:       inv.paid    ?? paid,
+        due:        inv.due     ?? due,
+        invoice_no: inv.invoice_no,
+        issued_at:  inv.issued_at,
+      },
+    })
+  }
+
+  // ----------------------------------------------------------------
+  // Folio actions
+  // ----------------------------------------------------------------
   const buildRoomRows = () => {
     const rows = []
     for (const rr of resRooms) {
       const ci = rr.from_date || res.check_in
-      const co = rr.to_date || res.check_out
+      const co = rr.to_date   || res.check_out
       for (const night of eachNight(ci, co)) {
         const rate = rateFor(taxConfig, 'ROOM', night)
         rows.push({
@@ -636,21 +659,21 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
   }
 
   const postRoomCharges = async () => {
-    if (resRooms.length === 0) { flash('Assign rooms first (Check-In tab).'); return }
-    if (charges.some((ch) => ch.charge_type === 'ROOM')) { flash('Room charges already posted — use "Repost" to replace them with current rates.'); return }
+    if (resRooms.length === 0)                             { flash('Assign rooms first (Check-In tab).'); return }
+    if (charges.some((ch) => ch.charge_type === 'ROOM'))   { flash('Room charges already posted — use "Repost" to replace them.'); return }
     const rows = buildRoomRows()
     const { error } = await supabase.from('folio_charges').insert(rows)
     if (error) flash(error.message); else { await reload(); flash(`${rows.length} room charge line(s) posted.`) }
   }
 
   const repostRoomCharges = async () => {
-    if (!editable) { flash('Room bill can only be edited before check-out (administrator override available).'); return }
+    if (!editable)             { flash('Room bill can only be edited before check-out (administrator override available).'); return }
     if (resRooms.length === 0) { flash('Assign rooms first (Check-In tab).'); return }
     const { error: de } = await supabase.from('folio_charges').delete().eq('reservation_id', res.id).eq('charge_type', 'ROOM')
     if (de) { flash(de.message); return }
     const rows = buildRoomRows()
     const { error } = await supabase.from('folio_charges').insert(rows)
-    if (error) flash(error.message); else { await reload(); flash(`Room bill reposted — ${rows.length} line(s) at current rates and ${res.discount_pct}% discount.`) }
+    if (error) flash(error.message); else { await reload(); flash(`Room bill reposted — ${rows.length} line(s).`) }
   }
 
   const addCharge = async () => {
@@ -664,13 +687,38 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
     else { setC({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() }); await reload() }
   }
 
-  const toggleStatus = async (ch) => {
-    await supabase.from('folio_charges').update({ status: ch.status === 'PAID' ? 'DUE' : 'PAID' }).eq('id', ch.id)
-    await reload()
-  }
-  const delCharge = async (chId) => { await supabase.from('folio_charges').delete().eq('id', chId); await reload() }
+  const toggleStatus = async (ch) => { await supabase.from('folio_charges').update({ status: ch.status === 'PAID' ? 'DUE' : 'PAID' }).eq('id', ch.id); await reload() }
+  const delCharge    = async (chId) => { await supabase.from('folio_charges').delete().eq('id', chId); await reload() }
 
-  // --- [5] Payments — calls syncInvoiceStatus when already checked out ---
+  // ----------------------------------------------------------------
+  // Payment actions
+  // ----------------------------------------------------------------
+  const syncInvoiceStatus = async () => {
+    // Re-query fresh payments to avoid stale React state after reload()
+    const { data: freshPayments } = await supabase
+      .from('payments').select('amount').eq('reservation_id', res.id)
+    const { data: activeInv } = await supabase
+      .from('invoices').select('id, totals')
+      .eq('reservation_id', res.id).eq('is_void', false).single()
+
+    if (!activeInv) return
+
+    const totalPaid = (freshPayments || []).reduce((a, p) => a + Number(p.amount), 0)
+    // Use the snapshot grand_total stored on the invoice, not live totals (which may differ post-void)
+    const snapGrandTotal = activeInv.totals?.grand_total ?? totals.grand_total
+    const newDue    = +(snapGrandTotal - totalPaid).toFixed(2)
+    const newStatus = newDue <= 0 ? 'PAID' : 'PARTIAL'
+
+    await supabase.from('invoices').update({ paid: totalPaid, due: newDue, status: newStatus }).eq('id', activeInv.id)
+
+    // Auto-settle when fully paid
+    if (newDue <= 0 && res.status === 'CHECKED_OUT') {
+      await supabase.from('reservations').update({ status: 'SETTLED' }).eq('id', res.id)
+      await reload()
+      flash('Balance cleared — reservation marked SETTLED.')
+    }
+  }
+
   const addPayment = async () => {
     if (!p.amount || +p.amount <= 0) return
     const { error } = await supabase.from('payments').insert({ reservation_id: res.id, ...p, amount: +p.amount })
@@ -678,16 +726,22 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
     setP({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
     await reload()
     if (isCheckedOut) await syncInvoiceStatus()
-    flash('Payment recorded.')
+    else flash('Payment recorded.')
   }
 
   const delPayment = async (pm) => {
     const { error } = await supabase.from('payments').delete().eq('id', pm.id)
     if (error) flash('Administrator access required to delete payments.')
-    else { await reload(); flash('Payment deleted.') }
+    else {
+      await reload()
+      if (isCheckedOut) await syncInvoiceStatus()
+      else flash('Payment deleted.')
+    }
   }
 
-  // --- Discount ---
+  // ----------------------------------------------------------------
+  // Discount action
+  // ----------------------------------------------------------------
   const addDiscount = async () => {
     const amt = +discAmt
     if (!amt || amt <= 0) { flash('Enter a positive discount amount.'); return }
@@ -708,42 +762,62 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
     flash(`Additional discount of ${fmtBDT(amt)} applied.`)
   }
 
-  // --- [2] Checkout with invoice snapshot + partial payment warning ---
+  // ----------------------------------------------------------------
+  // Checkout handler — saves full invoice snapshot
+  // ----------------------------------------------------------------
   const handleCheckOut = async () => {
-    // Warn if balance outstanding — let staff confirm partial checkout
     if (due > 0) {
       const ok = window.confirm(
-        `Guest has an outstanding balance of ${fmtBDT(due)}.\n\nCheck out anyway? The invoice will be marked PARTIAL and can be settled later.`
+        `Guest has an outstanding balance of ${fmtBDT(due)}.\n\nCheck out anyway? The invoice will be marked PARTIAL.`
       )
       if (!ok) return
     }
 
-    const invoiceNo = generateInvoiceNo(res.res_no)
-    const issuedAt = new Date().toISOString()
-    const invoiceStatus = due <= 0 ? 'PAID' : 'PARTIAL'
+    const invoiceNo  = generateInvoiceNo(res.res_no)
+    const issuedAt   = new Date().toISOString()
+    const invStatus  = due <= 0 ? 'PAID' : 'PARTIAL'
 
-    // [2] Save full snapshot so historical print always works
     const { error: invErr } = await supabase.from('invoices').insert({
       reservation_id: res.id,
-      invoice_no: invoiceNo,
-      issued_at: issuedAt,
-      issued_by: userName,
-      charges: charges,       // full JSONB snapshot
-      totals: totals,         // computed totals object
-      paid: paid,
-      due: due,
-      status: invoiceStatus,
-      is_void: false,
+      invoice_no:     invoiceNo,
+      issued_at:      issuedAt,
+      issued_by:      userName,
+      charges,                  // JSONB snapshot of folio_charges rows
+      totals,                   // JSONB snapshot of computed totals
+      paid,
+      due,
+      status:         invStatus,
+      is_void:        false,
     })
 
     if (invErr) { flash(`Failed to generate invoice: ${invErr.message}`); return }
 
     await setStatus('CHECKED_OUT', { checked_out_at: issuedAt })
     await reload()
-    flash(due > 0
-      ? `Checked out with ${fmtBDT(due)} outstanding. Invoice ${invoiceNo} marked PARTIAL.`
-      : `Checked out. Invoice ${invoiceNo} generated and fully paid.`
+    flash(
+      due > 0
+        ? `Checked out with ${fmtBDT(due)} outstanding. Invoice ${invoiceNo} marked PARTIAL.`
+        : `Checked out. Invoice ${invoiceNo} generated — fully paid.`
     )
+  }
+
+  // ----------------------------------------------------------------
+  // Re-check-in (admin) — voids invoices + audit log
+  // ----------------------------------------------------------------
+  const handleReCheckIn = async () => {
+    const reason = window.prompt('Re-check-in will VOID the issued invoices. Reason:', 'Guest stay extended')
+    if (reason === null) return
+    await supabase.from('invoices')
+      .update({ is_void: true, void_reason: reason || 'Re-check-in', voided_by: userName, voided_at: new Date().toISOString() })
+      .eq('reservation_id', res.id)
+      .not('is_void', 'is', true)
+    await supabase.from('audit_log').insert({
+      actor: userName, action: 'RE_CHECKIN', entity: 'reservation',
+      entity_id: res.res_no, details: { reason },
+    })
+    await setStatus('CHECKED_IN', { checked_out_at: null })
+    await reload()
+    flash('Guest re-checked-in. Previous invoices voided; folio is editable again.')
   }
 
   return (
@@ -758,31 +832,15 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             <button className="btn-ghost" onClick={() => printLiveInvoice('BILL')}><Printer size={16} /> Preview Bill</button>
-            {/* [8] Renamed from "Live Mushak" → "Mushak Print" */}
             <button className="btn-ghost" onClick={() => printLiveInvoice('MUSHAK')}><Receipt size={16} /> Mushak Print</button>
-
             <div className="h-6 w-px bg-leaf/60 mx-2 hidden sm:block" />
-
             {!isCheckedOut ? (
               <button className="btn-primary" onClick={handleCheckOut}>
                 <CheckCircle2 size={16} /> Check Out
               </button>
             ) : (
               isAdmin && (
-                <button className="btn-amber" onClick={async () => {
-                  const reason = window.prompt('Re-check-in will VOID the issued invoices. Reason:', 'Guest stay extended')
-                  if (reason === null) return
-                  await supabase.from('invoices')
-                    .update({ is_void: true, void_reason: reason || 'Re-check-in', voided_by: userName, voided_at: new Date().toISOString() })
-                    .eq('reservation_id', res.id).not('is_void', 'is', true)
-                  await supabase.from('audit_log').insert({
-                    actor: userName, action: 'RE_CHECKIN', entity: 'reservation',
-                    entity_id: res.res_no, details: { reason },
-                  })
-                  await setStatus('CHECKED_IN', { checked_out_at: null })
-                  await reload()
-                  flash('Re-checked-in. Previous invoices voided; folio is editable again.')
-                }}>
+                <button className="btn-amber" onClick={handleReCheckIn}>
                   <LogIn size={16} /> Re-check-in (Admin)
                 </button>
               )
@@ -844,7 +902,7 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
         </div>
       )}
 
-      {/* 4. Billing / Folio Table */}
+      {/* 4. Billing & Folio Table */}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Guest Total Billing History</div>
         <table className="w-full">
@@ -895,11 +953,16 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
             <div className="w-72 text-sm money space-y-1">
               <div className="flex justify-between text-pine/70"><span>Subtotal</span><span>{fmtBDT(totals.grand_total_raw ?? totals.grand_total)}</span></div>
               {!!totals.rounding && (
-                <div className="flex justify-between text-pine/70"><span>Rounding adjustment</span><span>{totals.rounding > 0 ? '+ ' : '− '}{fmtBDT(Math.abs(totals.rounding))}</span></div>
+                <div className="flex justify-between text-pine/70">
+                  <span>Rounding adjustment</span>
+                  <span>{totals.rounding > 0 ? '+ ' : '− '}{fmtBDT(Math.abs(totals.rounding))}</span>
+                </div>
               )}
               <div className="flex justify-between font-bold text-pine border-t border-leaf pt-1"><span>Grand total (payable)</span><span>{fmtBDT(totals.grand_total)}</span></div>
               <div className="flex justify-between text-forest"><span>Paid</span><span>{fmtBDT(paid)}</span></div>
-              <div className={`flex justify-between font-bold text-lg border-t border-leaf pt-1 mt-1 ${due > 0 ? 'text-red-600' : 'text-forest'}`}><span>Balance due</span><span>{fmtBDT(due)}</span></div>
+              <div className={`flex justify-between font-bold text-lg border-t border-leaf pt-1 mt-1 ${due > 0 ? 'text-red-600' : 'text-forest'}`}>
+                <span>Balance due</span><span>{fmtBDT(due)}</span>
+              </div>
             </div>
           </div>
         )}
@@ -919,7 +982,9 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
                 <td className="td money text-xs">
                   {fmtDate(pm.received_date)}
                   {isAdmin && (
-                    <button title="Delete payment (admin)" onClick={() => delPayment(pm)} className="ml-2 text-red-300 hover:text-red-600 align-middle"><Trash2 size={12} /></button>
+                    <button title="Delete payment (admin)" onClick={() => delPayment(pm)} className="ml-2 text-red-300 hover:text-red-600 align-middle">
+                      <Trash2 size={12} />
+                    </button>
                   )}
                 </td>
                 <td className="td">
@@ -947,18 +1012,17 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
             <th className="th text-right">Paid</th>
             <th className="th text-right">Due</th>
             <th className="th text-center">Status</th>
-            <th className="th text-right">Action</th>
+            <th className="th text-right">Actions</th>
           </tr></thead>
           <tbody>
             {invoices.map((inv) => (
               <tr key={inv.id} className={inv.is_void ? 'opacity-60 bg-red-50' : ''}>
-                <td className="td font-semibold">{inv.invoice_no}</td>
-                <td className="td text-xs money">{fmtDate(inv.issued_at)}</td>
-                <td className="td text-right money font-semibold">{fmtBDT(inv.totals?.grand_total || 0)}</td>
-                <td className="td text-right money text-forest">{fmtBDT(inv.paid || 0)}</td>
-                <td className={`td text-right money font-semibold ${(inv.due || 0) > 0 ? 'text-red-600' : 'text-forest'}`}>{fmtBDT(inv.due || 0)}</td>
+                <td className="td font-semibold money">{inv.invoice_no}</td>
+                <td className="td text-xs">{fmtDate(inv.issued_at)}</td>
+                <td className="td text-right money font-semibold">{fmtBDT(inv.totals?.grand_total ?? 0)}</td>
+                <td className="td text-right money">{fmtBDT(inv.paid ?? 0)}</td>
+                <td className={`td text-right money font-semibold ${(inv.due ?? 0) > 0 ? 'text-red-600' : 'text-forest'}`}>{fmtBDT(inv.due ?? 0)}</td>
                 <td className="td text-center">
-                  {/* [9] Three-state chip: VOID / PARTIAL / PAID */}
                   {inv.is_void
                     ? <span className="status-chip bg-red-100 text-red-600">VOID</span>
                     : inv.status === 'PARTIAL'
@@ -967,7 +1031,7 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
                   }
                 </td>
                 <td className="td text-right">
-                  <button className="btn-ghost !py-1 !px-2 text-xs mr-2" onClick={() => printHistoryInvoice(inv, 'BILL')}><Printer size={13} /> Bill</button>
+                  <button className="btn-ghost !py-1 !px-2 text-xs mr-1" onClick={() => printHistoryInvoice(inv, 'BILL')}><Printer size={13} /> Bill</button>
                   <button className="btn-ghost !py-1 !px-2 text-xs" onClick={() => printHistoryInvoice(inv, 'MUSHAK')}><Receipt size={13} /> Mushak</button>
                 </td>
               </tr>
@@ -978,23 +1042,22 @@ function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxCo
           </tbody>
         </table>
       </div>
-
     </div>
   )
 }
 
 /* ------------------------------------------------------------------ */
-/*  PARTNER ACCOUNTS TAB                                                */
+/*  PARTNERS TAB                                                        */
 /* ------------------------------------------------------------------ */
 function PartnerAccounts({ res, reload, flash, userName }) {
-  const agency = res.agencies
+  const agency      = res.agencies
   const shareholder = res.shareholders
 
-  // [7] Replaced document.getElementById anti-pattern with React controlled state
+  // [6] Controlled state — replaces document.getElementById anti-pattern
   const [redeemAmt, setRedeemAmt] = useState('')
 
   const addAgencyDue = async () => {
-    const amt = prompt('Enter amount to add to Agency Due:')
+    const amt = window.prompt('Enter amount to add to Agency Due:')
     if (!amt || isNaN(Number(amt))) return
     const { error } = await supabase.from('agencies')
       .update({ due_balance: (agency?.due_balance || 0) + Number(amt) })
@@ -1005,17 +1068,17 @@ function PartnerAccounts({ res, reload, flash, userName }) {
 
   const redeemShareholderBalance = async () => {
     const amount = Number(redeemAmt)
-    if (!amount || amount <= 0) { flash('Please enter a valid amount to redeem.'); return }
-    if ((shareholder?.free_stay_balance || 0) < amount) { flash('Insufficient shareholder balance.'); return }
+    if (!amount || amount <= 0)                              { flash('Please enter a valid amount to redeem.'); return }
+    if ((shareholder?.free_stay_balance || 0) < amount)     { flash('Insufficient shareholder balance.'); return }
 
     const { error: chErr } = await supabase.from('folio_charges').insert({
       reservation_id: res.id,
-      charge_type: 'SHAREHOLDER_REDEEM',
-      description: `Redeemed ${fmtBDT(amount)} by ${shareholder?.name}`,
-      total: -amount,
-      status: 'PAID',
-      charge_date: todayISO(),
-      created_by: userName || 'System',
+      charge_type:    'SHAREHOLDER_REDEEM',
+      description:    `Redeemed ${fmtBDT(amount)} by ${shareholder?.name}`,
+      total:          -amount,
+      status:         'PAID',
+      charge_date:    todayISO(),
+      created_by:     userName || 'System',
     })
     if (chErr) { flash('Error recording redemption charge.'); return }
 
@@ -1035,7 +1098,6 @@ function PartnerAccounts({ res, reload, flash, userName }) {
         <p className="text-sm text-pine/60 mb-4">Current Due: {fmtBDT(agency?.due_balance || 0)}</p>
         <button onClick={addAgencyDue} className="btn-primary w-full" disabled={!agency}>Add Due</button>
       </div>
-
       <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Shareholder Redemption</h3>
         <p className="text-lg font-bold">{shareholder?.name || 'No Shareholder Assigned'}</p>
@@ -1043,7 +1105,6 @@ function PartnerAccounts({ res, reload, flash, userName }) {
           Redeemable Balance: <span className="font-bold">{fmtBDT(shareholder?.free_stay_balance || 0)}</span>
         </p>
         <div className="space-y-3">
-          {/* [7] Controlled input — no more document.getElementById */}
           <input
             type="number"
             className="input w-full"
@@ -1054,7 +1115,7 @@ function PartnerAccounts({ res, reload, flash, userName }) {
           />
           <button
             onClick={redeemShareholderBalance}
-            disabled={!shareholder || shareholder.free_stay_balance <= 0}
+            disabled={!shareholder || (shareholder?.free_stay_balance || 0) <= 0}
             className="btn-amber w-full"
           >
             Redeem for Room
