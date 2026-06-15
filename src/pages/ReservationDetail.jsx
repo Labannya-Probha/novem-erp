@@ -685,131 +685,53 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
 }
 
 /* ---------------- INVOICES & CHECK-OUT (req. 9) ---------------- */
-function InvoicesTab({ res, guest, charges, totals, paid, due, invoices, company, reload, userName, setStatus, setPrintDoc, flash, isAdmin }) {
-  const canCheckout = res.status === 'CHECKED_IN'
-  const activeInvoices = invoices.filter((i) => !i.is_void)
-  const hasInvoices = activeInvoices.length > 0
+function InvoicesTab({ res, charges, totals, paid, due, company, reload, setStatus, setPrintDoc }) {
+  const canCheckout = res.status === 'CHECKED_IN';
 
-  const voidInvoice = async (inv) => {
-    const reason = window.prompt(`Void ${inv.invoice_no}? The invoice stays on record (NBR serial unbroken) but is excluded from the VAT register. Reason:`)
-    if (reason === null) return
-    if (!reason.trim()) { flash('A reason is required to void an invoice.'); return }
-    const { error } = await supabase.from('invoices')
-      .update({ is_void: true, void_reason: reason, voided_by: userName, voided_at: new Date().toISOString() })
-      .eq('id', inv.id)
-    if (error) { flash(error.message); return }
-    await supabase.from('audit_log').insert({ actor: userName, action: 'VOID_INVOICE', entity: 'invoice', entity_id: inv.invoice_no, details: { reason } })
-    await reload()
-    flash(`${inv.invoice_no} voided.`)
-  }
-
-  const dueBlocked = canCheckout && due > 0 && !isAdmin
-
-  const generateInvoices = async () => {
-    if (charges.length === 0) { flash('No charges on the folio — post room charges first.'); return }
-    if (canCheckout && due > 0 && !isAdmin) { flash(`Check-out blocked — balance due ${fmtBDT(due)}. Collect full payment first (administrator can override).`); return }
-    if (hasInvoices) {
-      if (!isAdmin) { flash('Invoices already issued — regenerating requires administrator access.'); return }
-      const reason = window.prompt('Regenerating will VOID the previous invoices (Mushak serials stay gap-free for NBR). Reason:', 'Bill corrected — regenerated')
-      if (reason === null) return
-      const { error: de } = await supabase.from('invoices')
-        .update({ is_void: true, void_reason: reason || 'Regenerated', voided_by: userName, voided_at: new Date().toISOString() })
-        .eq('reservation_id', res.id).not('is_void', 'is', true)
-      if (de) { flash(de.message); return }
-      await supabase.from('audit_log').insert({ actor: userName, action: 'VOID_INVOICE', entity: 'reservation', entity_id: res.res_no, details: { reason, cause: 'regenerate' } })
-    }
-    // Make the rounding real on the folio so the DB balance matches the rounded payable
-    // (keeps checkout-due enforcement exact regardless of rounding mode). Idempotent: stale
-    // ROUNDING lines are cleared and recomputed each time.
-    await supabase.from('folio_charges').delete().eq('reservation_id', res.id).eq('charge_type', 'ROUNDING')
-    const mode = company?.rounding_mode || 'NEAREST_1'
-    const { data: chNow } = await supabase.from('folio_charges').select('*').eq('reservation_id', res.id).order('charge_date')
-    const rr = applyRounding(sumCharges(chNow || []), mode)
-    let allCharges = chNow || []
-    if (rr.rounding !== 0) {
-      const { data: rline } = await supabase.from('folio_charges').insert({
-        reservation_id: res.id, charge_date: todayISO(), charge_type: 'ROUNDING', status: 'PAID',
-        description: 'Rounding adjustment', base_amount: 0, discount: 0, service_charge: 0, sd: 0, vat: 0, total: rr.rounding, created_by: userName,
-      }).select().single()
-      if (rline) allCharges = [...allCharges, rline]
-    }
-    const finalTotals = applyRounding(sumCharges(allCharges), mode)
-    const t = { ...finalTotals, rounding: rr.rounding, grand_total_raw: rr.grand_total_raw, paid, due: +(finalTotals.grand_total - paid).toFixed(2) }
-    const snapshot = allCharges.map((c) => ({
-      charge_date: c.charge_date, charge_type: c.charge_type, description: c.description,
-      base_amount: +c.base_amount, discount: +c.discount, service_charge: +c.service_charge,
-      sd: +c.sd, vat: +c.vat, total: +c.total, status: c.status,
-    }))
-    const buyer = {
-      buyer_name: res.reservation_name || guest?.full_name, buyer_address: guest?.address || '', buyer_bin: '',
-    }
-    const base = { reservation_id: res.id, totals: t, line_snapshot: snapshot, created_by: userName, ...buyer }
-    const { error: e1 } = await supabase.from('invoices').insert({ ...base, invoice_type: 'GUEST_BILL' })
-    const { error: e2 } = await supabase.from('invoices').insert({ ...base, invoice_type: 'MUSHAK_63' })
-    if (e1 || e2) { flash((e1 || e2).message); return }
-    if (due <= 0) await supabase.from('folio_charges').update({ status: 'PAID' }).eq('reservation_id', res.id)
-    await setStatus(due <= 0 ? 'SETTLED' : 'CHECKED_OUT', { checked_out_at: new Date().toISOString() })
-    await reload()
-    flash('Checked out — Guest Bill and Mushak-6.3 generated. The 6.3 is now in your VAT sales register.')
-  }
-
-  const downloadExcel = (inv) => {
-    const lines = inv.line_snapshot || []
-    const t = inv.totals || {}
-    const rows = [
-      [company?.name || 'Novem Eco Resort'], [company?.address || ''],
-      [`BIN: ${company?.bin || '—'}`], [],
-      [inv.invoice_type === 'MUSHAK_63' ? 'Mushak-6.3 — Tax Invoice' : 'Guest Bill'],
-      [`Invoice No: ${inv.invoice_no}`, `Date: ${fmtDate(inv.issued_at)}`],
-      [`Guest: ${inv.buyer_name || ''}`, `Reservation: ${res.res_no}`], [],
-      ['Date', 'Type', 'Description', 'Base', 'Discount', 'Service Charge', 'SD', 'VAT', 'Total', 'Status'],
-      ...lines.map((l) => [l.charge_date, l.charge_type, l.description, l.base_amount, l.discount, l.service_charge, l.sd, l.vat, l.total, l.status]),
-      [],
-      ['', '', 'TOTALS', t.base, t.discount, t.service_charge, t.sd, t.vat, t.grand_total, ''],
-      ['', '', 'Paid', '', '', '', '', '', t.paid, ''],
-      ['', '', 'Due', '', '', '', '', '', t.due, ''],
-    ]
-    exportXLSX(`${inv.invoice_no}.xlsx`, [{ name: inv.invoice_type === 'MUSHAK_63' ? 'Mushak 6.3' : 'Guest Bill', rows }])
-  }
+  // লাইভ ডাটা প্রিন্ট ফাংশন
+  const printLiveInvoice = (type) => {
+    setPrintDoc({ 
+      type: type, 
+      // এখন আর 'invoices' টেবিলের ডাটা নয়, সরাসরি folio-র লাইভ ভেরিয়েবলগুলো পাঠানো হচ্ছে
+      invoice: { 
+        totals, 
+        charges, 
+        paid, 
+        due, 
+        issued_at: new Date().toISOString(),
+        invoice_no: `INV-${res.res_no}` 
+      } 
+    });
+  };
 
   return (
     <div className="space-y-4">
-      <div className="card p-5 flex items-center justify-between flex-wrap gap-3">
+      <div className="card p-5 flex items-center justify-between">
         <div>
-          <h3 className="font-display font-semibold text-pine">Check-out & invoice generation</h3>
-          <p className="text-sm text-pine/60">Generates both documents from the folio: the Guest Bill and the NBR Mushak-6.3 tax invoice (auto-entered into the 6.2 sales register).</p>
+          <h3 className="font-display font-semibold text-pine">Guest Billing (Live)</h3>
+          <p className="text-sm text-pine/60">System updates directly from Folio charges.</p>
         </div>
-        <button className={due > 0 && canCheckout && isAdmin ? 'btn-amber' : 'btn-primary'} onClick={generateInvoices} disabled={dueBlocked || (!canCheckout && hasInvoices && !isAdmin)}>
-          <CheckCircle2 size={16} /> {canCheckout
-            ? (due > 0 ? (isAdmin ? 'Check out with due (admin override)' : 'Check-out blocked — due pending') : 'Check out & generate invoices')
-            : (hasInvoices ? 'Regenerate invoices (admin — replaces previous)' : 'Generate invoices')}
-        </button>
+        <div className="flex gap-2">
+          <button className="btn-ghost" onClick={() => printLiveInvoice('BILL')}>
+            <Printer size={16} /> Guest Bill
+          </button>
+          <button className="btn-primary" onClick={() => printLiveInvoice('MUSHAK')}>
+            <Receipt size={16} /> Mushak 6.3
+          </button>
+          {canCheckout && (
+            <button className="btn-amber" onClick={async () => { await setStatus('CHECKED_OUT'); await reload(); }}>
+              Check Out
+            </button>
+          )}
+        </div>
       </div>
-      {due > 0 && canCheckout && !isAdmin && <div className="px-4 py-3 rounded-lg bg-red-50 text-red-600 text-sm font-medium money">Check-out is blocked while a balance of {fmtBDT(due)} remains. Record the payment in Folio & Payments, or ask an administrator to override.</div>}
-      {due > 0 && (!canCheckout || isAdmin) && <div className="px-4 py-3 rounded-lg bg-amber/10 text-amber text-sm font-medium money">Balance due {fmtBDT(due)}. When the due is paid later (Folio & Payments), the Paid/Due figures on both invoices update automatically and the reservation auto-settles to SETTLED.</div>}
-
-      <div className="card overflow-hidden">
-        <table className="w-full">
-          <thead><tr><th className="th">Invoice No.</th><th className="th">Type</th><th className="th">Issued</th><th className="th text-right">Grand total</th><th className="th text-right">Actions</th></tr></thead>
-          <tbody>
-            {invoices.map((inv) => (
-              <tr key={inv.id} className={inv.is_void ? 'opacity-60' : ''}>
-                <td className="td money font-semibold">{inv.invoice_no}{inv.is_void && <span className="status-chip bg-red-100 text-red-600 ml-2" title={`${inv.void_reason || ''} — ${inv.voided_by || ''}`}>VOID</span>}</td>
-                <td className="td text-sm">{inv.invoice_type === 'MUSHAK_63' ? 'Mushak-6.3 (NBR)' : 'Guest Bill'}</td>
-                <td className="td money text-xs">{fmtDate(inv.issued_at)}</td>
-                <td className="td money text-right">{fmtBDT(inv.totals?.grand_total)}</td>
-                <td className="td text-right">
-                  <div className="flex justify-end gap-2">
-                    <button className="btn-ghost !py-1" onClick={() => setPrintDoc({ type: inv.invoice_type === 'MUSHAK_63' ? 'MUSHAK' : 'BILL', invoice: inv })}><Printer size={14} /> Print / PDF</button>
-                    <button className="btn-ghost !py-1" onClick={() => downloadExcel(inv)}><FileDown size={14} /> Excel</button>
-                    {isAdmin && !inv.is_void && <button className="btn-ghost !py-1 text-red-600" title="Void invoice (admin)" onClick={() => voidInvoice(inv)}><Ban size={14} /> Void</button>}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {invoices.length === 0 && <tr><td className="td text-pine/50" colSpan={5}>No invoices generated yet.</td></tr>}
-          </tbody>
-        </table>
+      
+      {/* ব্যালেন্স কার্ড */}
+      <div className="card p-5 text-sm money">
+        <div className="flex justify-between font-bold text-lg">
+          <span>Balance Due</span>
+          <span className={due > 0 ? 'text-red-600' : 'text-forest'}>{fmtBDT(due)}</span>
+        </div>
       </div>
     </div>
   )
