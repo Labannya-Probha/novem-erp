@@ -103,7 +103,26 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       {tab === 'Invoices' && <InvoicesTab res={res} charges={charges} totals={totals} paid={paid} due={due} invoices={invoices} company={company} reload={loadAll} userName={userName} setStatus={setStatus} setPrintDoc={setPrintDoc} flash={flash} isAdmin={isAdmin} />}
       {tab === 'Partners' && <PartnerAccounts res={res} reload={loadAll} flash={flash} />}
       
+      {/* Print Modals */}
       {printDoc?.type === 'REG' && <PrintPortal title="Registration Card" onClose={() => setPrintDoc(null)}><RegistrationCard res={res} guest={guest} resGuests={resGuests} resRooms={resRooms} payments={payments} company={company} /></PrintPortal>}
+      
+      {printDoc?.type === 'BILL' && (
+        <PrintPortal title="Guest Bill" onClose={() => setPrintDoc(null)}>
+          <GuestBill 
+            charges={printDoc.invoiceData?.charges || charges} 
+            totals={printDoc.invoiceData?.totals || totals} 
+            paid={printDoc.invoiceData?.paid !== undefined ? printDoc.invoiceData.paid : paid} 
+            due={printDoc.invoiceData?.due !== undefined ? printDoc.invoiceData.due : due} 
+            res={res} guest={guest} company={company} invoice_no={printDoc.invoiceData?.invoice_no} 
+          />
+        </PrintPortal>
+      )}
+      
+      {printDoc?.type === 'MUSHAK' && ( <PrintPortal title="Mushak-6.3" onClose={() => setPrintDoc(null)}> <Mushak63 charges={printDoc.invoiceData?.charges || charges} totals={printDoc.invoiceData?.totals || totals} res={res} company={company} invoice_no={printDoc.invoiceData?.invoice_no} />
+        </PrintPortal>
+      )}
+      
+      {printDoc?.type === 'QUOTE' && <PrintPortal title="Quotation" onClose={() => setPrintDoc(null)}><Quotation res={res} guest={guest} terms={printDoc.terms} roomRate={printDoc.roomRate} roomCount={printDoc.roomCount} discountPct={printDoc.discountPct} validDays={printDoc.validDays} taxConfig={taxConfig} company={company} resRooms={resRooms} /></PrintPortal>}
       {printDoc?.type === 'BILL' && <PrintPortal title="Guest Bill" onClose={() => setPrintDoc(null)}><GuestBill charges={charges} totals={totals} paid={paid} due={due} res={res} guest={guest} company={company} /></PrintPortal>}
       {printDoc?.type === 'MUSHAK' && <PrintPortal title="Mushak-6.3" onClose={() => setPrintDoc(null)}><Mushak63 charges={charges} totals={totals} res={res} company={company} /></PrintPortal>}
       {printDoc?.type === 'QUOTE' && <PrintPortal title="Quotation" onClose={() => setPrintDoc(null)}><Quotation res={res} guest={guest} terms={printDoc.terms} roomRate={printDoc.roomRate} roomCount={printDoc.roomCount} discountPct={printDoc.discountPct} validDays={printDoc.validDays} taxConfig={taxConfig} company={company} resRooms={resRooms} /></PrintPortal>}
@@ -753,17 +772,19 @@ function PartnerAccounts({ res, reload, flash }) {
 function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reload, userName, setStatus, setPrintDoc, flash, isAdmin }) {
   const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status);
   
+  // Live Bill Print
   const printLiveInvoice = (type) => {
     setPrintDoc({ 
-      type, 
-      invoice: { 
-        totals, 
-        charges, 
-        paid, 
-        due, 
-        issued_at: new Date().toISOString(), 
-        invoice_no: `INV-${res.res_no}` 
-      } 
+      type: type, 
+      invoiceData: { charges, totals, paid, due, invoice_no: `INV-${res.res_no}`, issued_at: new Date().toISOString() } 
+    });
+  };
+
+  // History Bill Print
+  const printHistoryInvoice = (inv, type) => {
+    setPrintDoc({ 
+      type: type, 
+      invoiceData: { charges: inv.charges, totals: inv.totals, paid: inv.paid, due: inv.due, invoice_no: inv.invoice_no, issued_at: inv.issued_at } 
     });
   };
 
@@ -776,10 +797,10 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
         </div>
         <div className="flex gap-2">
           <button className="btn-ghost" onClick={() => printLiveInvoice('BILL')}>
-            <Printer size={16} /> Guest Bill
+            <Printer size={16} /> Print Live Bill
           </button>
           <button className="btn-primary" onClick={() => printLiveInvoice('MUSHAK')}>
-            <Receipt size={16} /> Mushak 6.3
+            <Receipt size={16} /> Print Live Mushak
           </button>
           
           {!isCheckedOut ? (
@@ -820,6 +841,7 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
               <th className="th">Issued Date</th>
               <th className="th text-right">Grand Total</th>
               <th className="th text-center">Status</th>
+              <th className="th text-right">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -831,12 +853,14 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
                 <td className="td text-center">
                   {inv.is_void ? <span className="status-chip bg-red-100 text-red-600">VOID</span> : <span className="status-chip bg-green-100 text-green-700">ACTIVE</span>}
                 </td>
+                <td className="td text-right">
+                  <button className="btn-ghost !py-1 !px-2 text-xs mr-2" onClick={() => printHistoryInvoice(inv, 'BILL')}><Printer size={13} /> Bill</button>
+                  <button className="btn-ghost !py-1 !px-2 text-xs" onClick={() => printHistoryInvoice(inv, 'MUSHAK')}><Receipt size={13} /> Mushak</button>
+                </td>
               </tr>
             ))}
             {invoices.length === 0 && (
-              <tr>
-                <td className="td text-pine/50 text-center" colSpan={4}>No historical invoices found.</td>
-              </tr>
+              <tr><td className="td text-pine/50 text-center" colSpan={5}>No historical invoices found.</td></tr>
             )}
           </tbody>
         </table>
