@@ -22,7 +22,6 @@ body {
   @apply bg-paper text-ink font-body antialiased;
 }
 
-/* ---------- PRINT: official documents only, strict black on white ---------- */
 #print-root { display: none; }
 @media print {
   #root { display: none !important; }
@@ -34,7 +33,7 @@ body {
     font-family: 'IBM Plex Sans', 'SolaimanLipi', sans-serif;
     color: #000;
     font-size: 11px;
-    width: 186mm !important;      /* A4 210mm − 2×12mm margin */
+    width: 186mm !important;
     max-width: 186mm !important;
     margin: 0 auto !important;
     display: flex !important;
@@ -43,7 +42,10 @@ body {
   }
   .print-doc > div,
   .print-doc > table { max-width: 100% !important; width: 100% !important; }
-  .print-doc > div:first-child { flex: 1 !important; }
+  
+  /* সংশোধন: সব চাইল্ডকে ফ্লেক্সিবল করা হয়েছে যাতে ফুটার নিচে যায় */
+  .print-doc > * { flex-grow: 0; }
+  .print-doc > *:not(.footer-spacer):not(::after) { flex-grow: 1; }
 
   .print-doc * { box-sizing: border-box; }
   .print-doc table { width: 100% !important; border-collapse: collapse; table-layout: fixed; }
@@ -54,7 +56,7 @@ body {
 
   .no-print { display: none !important; }
 
-  .print-doc::after {
+  .print-doc::after, .epos-receipt::after {
     content: "Powered by Aura Stay";
     display: block;
     text-align: center;
@@ -63,6 +65,7 @@ body {
     border-top: 1px solid #ccc;
     padding-top: 5px;
     color: #666;
+    width: 100%;
   }
 }
 
@@ -97,7 +100,6 @@ td {
   border-bottom: 1px solid #e2e8f0;
 }
 
-/* ---------- EPOS THERMAL PRINTER SETTINGS (80mm) ---------- */
 @media print {
   @page { size: 80mm auto; margin: 0; }
   
@@ -112,7 +114,10 @@ td {
     min-height: 100vh !important;
   }
   
-  .epos-receipt > div:first-child { flex: 1 !important; }
+  /* সংশোধন: ইপোস রিসিট চাইল্ড কন্ট্রোল */
+  .epos-receipt > * { flex-grow: 0; }
+  .epos-receipt > *:not(.footer-spacer):not(::after) { flex-grow: 1; }
+  
   .epos-receipt table { border: none !important; }
   .epos-receipt td { border: none !important; padding: 2px 0 !important; }
 
