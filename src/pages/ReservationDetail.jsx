@@ -15,7 +15,8 @@ import {
   Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, BadgePercent,
 } from 'lucide-react'
 
-const TABS = ['Overview', 'Quotation', 'Check-In', 'Folio & Payments', 'Invoices', 'Partners']
+// Updated TABS array (Merged Invoices and Folio & Payments)
+const TABS = ['Overview', 'Quotation', 'Check-In', 'Billings & Check-Out', 'Partners']
 
 export default function ReservationDetail({ id, back, userName, isAdmin }) {
   const [res, setRes] = useState(null)
@@ -46,7 +47,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
         supabase.from('rooms').select('*').eq('is_active', true).order('room_no'),
         supabase.from('folio_charges').select('*').eq('reservation_id', id).order('charge_date'),
         supabase.from('payments').select('*').eq('reservation_id', id).order('received_date'),
-        supabase.from('invoices').select('*').eq('reservation_id', id).order('created_at'),
+        supabase.from('invoices').select('*').eq('reservation_id', id).order('created_at', { ascending: false }),
         supabase.from('tax_config').select('*'),
         supabase.from('company_settings').select('*').eq('id', 1).single(),
       ])
@@ -99,10 +100,10 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       {tab === 'Overview' && <Overview res={res} guest={guest} resRooms={resRooms} setStatus={setStatus} payments={payments} advance={paid} flash={flash} isAdmin={isAdmin} userName={userName} />}
       {tab === 'Quotation' && <QuotationTab res={res} guest={guest} nights={nights} taxConfig={taxConfig} company={company} reload={loadAll} flash={flash} userName={userName} resRooms={resRooms} setPrintDoc={setPrintDoc} />}
       {tab === 'Check-In' && <CheckInTab res={res} guest={guest} resGuests={resGuests} resRooms={resRooms} rooms={rooms} reload={loadAll} setStatus={setStatus} userName={userName} openCard={() => setPrintDoc({ type: 'REG' })} payments={payments} flash={flash} isAdmin={isAdmin} />}
-      {tab === 'Folio & Payments' && <FolioTab res={res} charges={charges} payments={payments} resRooms={resRooms} taxConfig={taxConfig} reload={loadAll} userName={userName} totals={totals} paid={paid} due={due} flash={flash} isAdmin={isAdmin} />}
-      {tab === 'Invoices' && <InvoicesTab res={res} charges={charges} totals={totals} paid={paid} due={due} invoices={invoices} company={company} reload={loadAll} userName={userName} setStatus={setStatus} setPrintDoc={setPrintDoc} flash={flash} isAdmin={isAdmin} />}
+      {tab === 'Billings & Check-Out' && <BillingsAndCheckOutTab res={res} guest={guest} charges={charges} payments={payments} resRooms={resRooms} taxConfig={taxConfig} invoices={invoices} company={company} reload={loadAll} userName={userName} setStatus={setStatus} setPrintDoc={setPrintDoc} totals={totals} paid={paid} due={due} flash={flash} isAdmin={isAdmin} />}
       {tab === 'Partners' && <PartnerAccounts res={res} reload={loadAll} flash={flash} />}
       
+      {/* ---------------- PRINT PORTALS ---------------- */}
       {printDoc?.type === 'REG' && <PrintPortal title="Registration Card" onClose={() => setPrintDoc(null)}><RegistrationCard res={res} guest={guest} resGuests={resGuests} resRooms={resRooms} payments={payments} company={company} /></PrintPortal>}
       
       {printDoc?.type === 'BILL' && (
@@ -112,7 +113,9 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
             totals={printDoc.invoiceData?.totals || totals} 
             paid={printDoc.invoiceData?.paid !== undefined ? printDoc.invoiceData.paid : paid} 
             due={printDoc.invoiceData?.due !== undefined ? printDoc.invoiceData.due : due} 
-            res={res} guest={guest} company={company} invoice_no={printDoc.invoiceData?.invoice_no} 
+            res={res} guest={guest} company={company} 
+            invoice_no={printDoc.invoiceData?.invoice_no} 
+            issued_at={printDoc.invoiceData?.issued_at}
           />
         </PrintPortal>
       )}
@@ -122,7 +125,9 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
           <Mushak63 
             charges={printDoc.invoiceData?.charges || charges} 
             totals={printDoc.invoiceData?.totals || totals} 
-            res={res} company={company} invoice_no={printDoc.invoiceData?.invoice_no} 
+            res={res} company={company} 
+            invoice_no={printDoc.invoiceData?.invoice_no} 
+            issued_at={printDoc.invoiceData?.issued_at}
           />
         </PrintPortal>
       )}
@@ -157,7 +162,7 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, i
         <div className="space-y-2">
           {canConfirm && (
             <button className="btn-primary w-full justify-center" onClick={() => {
-              if (advance <= 0 && payments.length === 0) { flash('Record the advance payment first (Folio & Payments tab) — booking confirms on advance per your workflow.'); return }
+              if (advance <= 0 && payments.length === 0) { flash('Record the advance payment first (Billings & Check-Out tab) — booking confirms on advance per your workflow.'); return }
               setStatus('CONFIRMED'); flash('Booking confirmed.')
             }}>
               <CheckCircle2 size={16} /> Confirm booking
@@ -445,14 +450,33 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
   )
 }
 
-function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userName, totals, paid, due, flash, isAdmin }) {
-  const editable = isAdmin || ['QUERY', 'QUOTED', 'CONFIRMED'].includes(res.status)
+/* ---------------- BILLINGS & CHECK-OUT (Merged Tab) ---------------- */
+function BillingsAndCheckOutTab({ res, guest, charges, payments, resRooms, taxConfig, invoices, company, reload, userName, setStatus, setPrintDoc, totals, paid, due, flash, isAdmin }) {
+  const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status)
+  const editable = isAdmin || !['CHECKED_OUT', 'SETTLED', 'CANCELLED'].includes(res.status)
+  
   const [c, setC] = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
   const [discAmt, setDiscAmt] = useState('')
   const [discReason, setDiscReason] = useState('')
   const [discType, setDiscType] = useState('ROOM')
   const [p, setP] = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
 
+  // --- Printing Functions ---
+  const printLiveInvoice = (type) => {
+    setPrintDoc({ 
+      type: type, 
+      invoiceData: { charges, totals, paid, due, invoice_no: `DRAFT-${res.res_no}`, issued_at: new Date().toISOString() } 
+    });
+  };
+
+  const printHistoryInvoice = (inv, type) => {
+    setPrintDoc({ 
+      type: type, 
+      invoiceData: { charges: inv.charges, totals: inv.totals, paid: inv.paid, due: inv.due, invoice_no: inv.invoice_no, issued_at: inv.issued_at } 
+    });
+  };
+
+  // --- Folio Actions ---
   const buildRoomRows = () => {
     const rows = []
     for (const rr of resRooms) {
@@ -491,12 +515,6 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
     if (error) flash(error.message); else { await reload(); flash(`Room bill reposted — ${rows.length} line(s) at current rates and ${res.discount_pct}% discount.`) }
   }
 
-  const delPayment = async (pm) => {
-    const { error } = await supabase.from('payments').delete().eq('id', pm.id)
-    if (error) flash('Administrator access required to delete payments.')
-    else { await reload(); flash('Payment deleted — invoice Paid/Due re-synced automatically.') }
-  }
-
   const addCharge = async () => {
     if (!c.description || !c.base_amount) return
     const rate = rateFor(taxConfig, c.charge_type, c.charge_date)
@@ -508,6 +526,14 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
     else { setC({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() }); await reload() }
   }
 
+  const toggleStatus = async (ch) => {
+    await supabase.from('folio_charges').update({ status: ch.status === 'PAID' ? 'DUE' : 'PAID' }).eq('id', ch.id)
+    await reload()
+  }
+  
+  const delCharge = async (chId) => { await supabase.from('folio_charges').delete().eq('id', chId); await reload() }
+
+  // --- Payment Actions ---
   const addPayment = async () => {
     if (!p.amount || +p.amount <= 0) return
     const { error } = await supabase.from('payments').insert({ reservation_id: res.id, ...p, amount: +p.amount })
@@ -515,12 +541,13 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
     else { setP({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName }); await reload(); flash('Payment recorded — class set automatically.') }
   }
 
-  const toggleStatus = async (ch) => {
-    await supabase.from('folio_charges').update({ status: ch.status === 'PAID' ? 'DUE' : 'PAID' }).eq('id', ch.id)
-    await reload()
+  const delPayment = async (pm) => {
+    const { error } = await supabase.from('payments').delete().eq('id', pm.id)
+    if (error) flash('Administrator access required to delete payments.')
+    else { await reload(); flash('Payment deleted — invoice Paid/Due re-synced automatically.') }
   }
-  const delCharge = async (chId) => { await supabase.from('folio_charges').delete().eq('id', chId); await reload() }
 
+  // --- Discount Actions ---
   const addDiscount = async () => {
     const amt = +discAmt
     if (!amt || amt <= 0) { flash('Enter a positive discount amount.'); return }
@@ -537,59 +564,99 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="card p-4 lg:col-span-2">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-display font-semibold text-pine">Add charge</h3>
-            <div className="flex gap-2">
-              <button className="btn-ghost" onClick={postRoomCharges}><BedDouble size={15} /> Post room charges ({nightsBetween(res.check_in, res.check_out)} nights)</button>
-              {charges.some((ch) => ch.charge_type === 'ROOM') && editable && (
-                <button className="btn-amber !py-2" onClick={repostRoomCharges} title="Replace ROOM lines with current rates & discount">Repost</button>
-              )}
-            </div>
+    <div className="space-y-6">
+      
+      {/* 1. Header & Check-out Actions */}
+      <div className="card p-5 border-l-4 border-l-pine">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 className="font-display font-semibold text-pine text-lg">Guest Billing & Check-out</h3>
+            <p className="text-sm text-pine/60 mt-1">Preview live bill before check-out or manage historical invoices.</p>
           </div>
-          <div className="grid grid-cols-6 gap-2">
-            <select className="input" value={c.charge_type} onChange={(e) => setC({ ...c, charge_type: e.target.value })}>
-              {['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
-            </select>
-            <input className="input col-span-2" placeholder="Description" value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
-            <input type="number" className="input money" placeholder="Base ৳" value={c.base_amount} onChange={(e) => setC({ ...c, base_amount: e.target.value })} />
-            <input type="number" min="0" max="100" className="input money" placeholder="Disc %" value={c.discount_pct} onChange={(e) => setC({ ...c, discount_pct: e.target.value })} />
-            <button className="btn-primary justify-center" onClick={addCharge}><Plus size={15} /> Add</button>
+          
+          <div className="flex flex-wrap gap-2 items-center">
+            <button className="btn-ghost" onClick={() => printLiveInvoice('BILL')}><Printer size={16} /> Preview Bill</button>
+            <button className="btn-ghost" onClick={() => printLiveInvoice('MUSHAK')}><Receipt size={16} /> Live Mushak</button>
+            
+            <div className="h-6 w-px bg-leaf/60 mx-2 hidden sm:block"></div>
+
+            {!isCheckedOut ? (
+              <button className="btn-primary" onClick={async () => { 
+                await setStatus('CHECKED_OUT', { checked_out_at: new Date().toISOString() }); 
+                await reload(); 
+                flash('Checked out successfully. A new invoice has been automatically generated.');
+              }}>
+                <CheckCircle2 size={16} /> Check Out
+              </button>
+            ) : (
+              isAdmin && (
+                <button className="btn-amber" onClick={async () => {
+                  await setStatus('CHECKED_IN', { checked_out_at: null });
+                  await reload();
+                  flash('Re-checked-in successfully.');
+                }}>
+                  <LogIn size={16} /> Re-check-in (Admin)
+                </button>
+              )
+            )}
           </div>
-          <p className="text-xs text-pine/50 mt-2">SC, SD & VAT are computed automatically from the Settings rates for the charge type. Restaurant orders for room guests post here as <b>RESTAURANT — Due</b> when not paid instantly.</p>
-        </div>
-        <div className="card p-4">
-          <h3 className="font-display font-semibold text-pine mb-3">Record payment</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <input type="number" className="input money" placeholder="Amount ৳" value={p.amount} onChange={(e) => setP({ ...p, amount: e.target.value })} />
-            <select className="input" value={p.method} onChange={(e) => setP({ ...p, method: e.target.value })}>
-              {['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER'].map((m) => <option key={m}>{m}</option>)}
-            </select>
-            <input type="date" className="input" value={p.received_date} onChange={(e) => setP({ ...p, received_date: e.target.value })} />
-            <input className="input" placeholder="Reference" value={p.reference} onChange={(e) => setP({ ...p, reference: e.target.value })} />
-          </div>
-          <button className="btn-primary w-full justify-center mt-2" onClick={addPayment}><Receipt size={15} /> Save payment</button>
-          <p className="text-xs text-pine/50 mt-2">Before {fmtDate(res.check_in)} → <b>ADVANCE</b>; from check-in day → <b>REGULAR</b>. Set automatically.</p>
         </div>
       </div>
 
-      {isAdmin && (
-        <div className="card p-4 border-amber/40">
+      {/* 2. Add Charges and Payments Panel */}
+      {editable && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="card p-4 lg:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-display font-semibold text-pine">Add charge</h3>
+              <div className="flex gap-2">
+                <button className="btn-ghost" onClick={postRoomCharges}><BedDouble size={15} /> Post room charges ({nightsBetween(res.check_in, res.check_out)} nights)</button>
+                {charges.some((ch) => ch.charge_type === 'ROOM') && (
+                  <button className="btn-amber !py-2" onClick={repostRoomCharges} title="Replace ROOM lines with current rates & discount">Repost</button>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              <select className="input" value={c.charge_type} onChange={(e) => setC({ ...c, charge_type: e.target.value })}>
+                {['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
+              </select>
+              <input className="input col-span-2" placeholder="Description" value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
+              <input type="number" className="input money" placeholder="Base ৳" value={c.base_amount} onChange={(e) => setC({ ...c, base_amount: e.target.value })} />
+              <input type="number" min="0" max="100" className="input money" placeholder="Disc %" value={c.discount_pct} onChange={(e) => setC({ ...c, discount_pct: e.target.value })} />
+              <button className="btn-primary justify-center" onClick={addCharge}><Plus size={15} /> Add</button>
+            </div>
+          </div>
+          <div className="card p-4">
+            <h3 className="font-display font-semibold text-pine mb-3">Record payment</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" className="input money" placeholder="Amount ৳" value={p.amount} onChange={(e) => setP({ ...p, amount: e.target.value })} />
+              <select className="input" value={p.method} onChange={(e) => setP({ ...p, method: e.target.value })}>
+                {['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER'].map((m) => <option key={m}>{m}</option>)}
+              </select>
+              <input type="date" className="input" value={p.received_date} onChange={(e) => setP({ ...p, received_date: e.target.value })} />
+              <input className="input" placeholder="Reference" value={p.reference} onChange={(e) => setP({ ...p, reference: e.target.value })} />
+            </div>
+            <button className="btn-primary w-full justify-center mt-2" onClick={addPayment}><Receipt size={15} /> Save payment</button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Admin Discount Options */}
+      {isAdmin && editable && (
+        <div className="card p-4 border-amber/40 bg-amber/5">
           <h3 className="font-display font-semibold text-pine flex items-center gap-2 mb-3"><BadgePercent size={16} className="text-amber" /> Additional discount (admin)</h3>
           <div className="grid grid-cols-6 gap-2">
             <input type="number" min="0" className="input money" placeholder="Discount ৳" value={discAmt} onChange={(e) => setDiscAmt(e.target.value)} />
             <select className="input" value={discType} onChange={(e) => setDiscType(e.target.value)} title="Tax category the discount applies against">
               {['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
             </select>
-            <input className="input col-span-2" placeholder="Reason (loyal guest, goodwill, complaint…)" value={discReason} onChange={(e) => setDiscReason(e.target.value)} />
+            <input className="input col-span-2" placeholder="Reason (loyal guest, goodwill...)" value={discReason} onChange={(e) => setDiscReason(e.target.value)} />
             <button className="btn-amber justify-center col-span-2" onClick={addDiscount}><BadgePercent size={15} /> Apply discount</button>
           </div>
-          <p className="text-xs text-pine/50 mt-2">Posts a discount line that proportionally reduces service charge, SD & VAT at the selected category's tax rate, lowers the balance due, and is logged in the audit trail. Remove it like any other line if entered by mistake.</p>
         </div>
       )}
 
+      {/* 4. Billing & Folio Summary Table */}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Guest Total Billing History</div>
         <table className="w-full">
@@ -617,7 +684,7 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
                 <td className="td">{editable && <button onClick={() => delCharge(ch.id)} className="text-red-300 hover:text-red-600"><Trash2 size={13} /></button>}</td>
               </tr>
             ))}
-            {charges.length === 0 && <tr><td className="td text-pine/50" colSpan={11}>No charges yet — post room charges or add a line.</td></tr>}
+            {charges.length === 0 && <tr><td className="td text-pine/50" colSpan={11}>No charges yet.</td></tr>}
           </tbody>
           {charges.length > 0 && (
             <tfoot><tr className="bg-leaf/40 font-bold money">
@@ -639,14 +706,15 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
               {!!totals.rounding && <div className="flex justify-between text-pine/70"><span>Rounding adjustment</span><span>{totals.rounding > 0 ? '+ ' : '− '}{fmtBDT(Math.abs(totals.rounding))}</span></div>}
               <div className="flex justify-between font-bold text-pine border-t border-leaf pt-1"><span>Grand total (payable)</span><span>{fmtBDT(totals.grand_total)}</span></div>
               <div className="flex justify-between text-forest"><span>Paid</span><span>{fmtBDT(paid)}</span></div>
-              <div className={`flex justify-between font-bold ${due > 0 ? 'text-red-600' : 'text-forest'}`}><span>Balance due</span><span>{fmtBDT(due)}</span></div>
+              <div className={`flex justify-between font-bold text-lg border-t border-leaf pt-1 mt-1 ${due > 0 ? 'text-red-600' : 'text-forest'}`}><span>Balance due</span><span>{fmtBDT(due)}</span></div>
             </div>
           </div>
         )}
       </div>
 
+      {/* 5. Payments History */}
       <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Payments</div>
+        <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Payments History</div>
         <table className="w-full">
           <thead><tr><th className="th">Date</th><th className="th">Class</th><th className="th">Method</th><th className="th">Reference</th><th className="th">Received by</th><th className="th text-right">Amount</th></tr></thead>
           <tbody>
@@ -662,12 +730,44 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
             ))}
             {payments.length === 0 && <tr><td className="td text-pine/50" colSpan={6}>No payments recorded.</td></tr>}
           </tbody>
-          <tfoot><tr className="bg-leaf/40 font-bold money">
-            <td className="td" colSpan={5}>Paid {fmtBDT(paid)} · Balance due</td>
-            <td className={`td text-right ${due > 0 ? 'text-red-600' : 'text-forest'}`}>{fmtBDT(due)}</td>
-          </tr></tfoot>
         </table>
       </div>
+
+      {/* 6. Historical Invoices List */}
+      <div className="card overflow-hidden">
+        <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Historical Invoices</div>
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className="th">Invoice No.</th>
+              <th className="th">Issued Date</th>
+              <th className="th text-right">Grand Total</th>
+              <th className="th text-center">Status</th>
+              <th className="th text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((inv) => (
+              <tr key={inv.id} className={inv.is_void ? 'opacity-60 bg-red-50' : ''}>
+                <td className="td font-semibold">{inv.invoice_no}</td>
+                <td className="td text-xs">{fmtDate(inv.issued_at)}</td>
+                <td className="td text-right font-semibold">{fmtBDT(inv.totals?.grand_total || 0)}</td>
+                <td className="td text-center">
+                  {inv.is_void ? <span className="status-chip bg-red-100 text-red-600">VOID</span> : <span className="status-chip bg-green-100 text-green-700">ACTIVE</span>}
+                </td>
+                <td className="td text-right">
+                  <button className="btn-ghost !py-1 !px-2 text-xs mr-2" onClick={() => printHistoryInvoice(inv, 'BILL')}><Printer size={13} /> Bill</button>
+                  <button className="btn-ghost !py-1 !px-2 text-xs" onClick={() => printHistoryInvoice(inv, 'MUSHAK')}><Receipt size={13} /> Mushak</button>
+                </td>
+              </tr>
+            ))}
+            {invoices.length === 0 && (
+              <tr><td className="td text-pine/50 text-center" colSpan={5}>No historical invoices found.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
     </div>
   )
 }
@@ -764,106 +864,6 @@ function PartnerAccounts({ res, reload, flash }) {
             Redeem for Room
           </button>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reload, userName, setStatus, setPrintDoc, flash, isAdmin }) {
-  const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status);
-  
-  const printLiveInvoice = (type) => {
-    setPrintDoc({ 
-      type: type, 
-      invoiceData: { charges, totals, paid, due, invoice_no: `DRAFT-${res.res_no}`, issued_at: new Date().toISOString() } 
-    });
-  };
-
-  const printHistoryInvoice = (inv, type) => {
-    setPrintDoc({ 
-      type: type, 
-      invoiceData: { charges: inv.charges, totals: inv.totals, paid: inv.paid, due: inv.due, invoice_no: inv.invoice_no, issued_at: inv.issued_at } 
-    });
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="card p-5 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="font-display font-semibold text-pine">Guest Billing & Check-out</h3>
-          <p className="text-sm text-pine/60">Preview live bill before check-out.</p>
-        </div>
-        <div className="flex gap-2">
-          <button className="btn-ghost" onClick={() => printLiveInvoice('BILL')}>
-            <Printer size={16} /> Preview Bill
-          </button>
-          <button className="btn-primary" onClick={() => printLiveInvoice('MUSHAK')}>
-            <Receipt size={16} /> Live Mushak
-          </button>
-          
-          {!isCheckedOut ? (
-            <button className="btn-amber" onClick={async () => { 
-              await setStatus('CHECKED_OUT', { checked_out_at: new Date().toISOString() }); 
-              await reload(); 
-              flash('Checked out successfully.');
-            }}>
-              <CheckCircle2 size={16} /> Check Out
-            </button>
-          ) : (
-            isAdmin && (
-              <button className="btn-primary" onClick={async () => {
-                await setStatus('CHECKED_IN', { checked_out_at: null });
-                await reload();
-                flash('Re-checked-in successfully.');
-              }}>
-                <LogIn size={16} /> Re-check-in
-              </button>
-            )
-          )}
-        </div>
-      </div>
-      
-      <div className="card p-5 text-sm money">
-        <div className="flex justify-between font-bold text-lg border-t pt-2">
-          <span>Balance Payable</span>
-          <span className={due > 0 ? 'text-red-600' : 'text-forest'}>{fmtBDT(due)}</span>
-        </div>
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Historical Invoices</div>
-        <table className="w-full">
-          <thead>
-            <tr>
-              <th className="th">Invoice No.</th>
-              <th className="th">Issued Date</th>
-              <th className="th text-right">Grand Total</th>
-              <th className="th text-center">Status</th>
-              <th className="th text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((inv) => (
-              <tr key={inv.id} className={inv.is_void ? 'opacity-60 bg-red-50' : ''}>
-                <td className="td font-semibold">{inv.invoice_no}</td>
-                <td className="td text-xs">{fmtDate(inv.issued_at)}</td>
-                <td className="td text-right">{fmtBDT(inv.totals?.grand_total || 0)}</td>
-                <td className="td text-center">
-                  {inv.is_void ? <span className="status-chip bg-red-100 text-red-600">VOID</span> : <span className="status-chip bg-green-100 text-green-700">ACTIVE</span>}
-                </td>
-                <td className="td text-right">
-                  <button className="btn-ghost !py-1 !px-2 text-xs mr-2" onClick={() => printHistoryInvoice(inv, 'BILL')}><Printer size={13} /> Bill</button>
-                  <button className="btn-ghost !py-1 !px-2 text-xs" onClick={() => printHistoryInvoice(inv, 'MUSHAK')}><Receipt size={13} /> Mushak</button>
-                </td>
-              </tr>
-            ))}
-            {invoices.length === 0 && (
-              <tr>
-                <td className="td text-pine/50 text-center" colSpan={5}>No historical invoices found.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
       </div>
     </div>
   )
