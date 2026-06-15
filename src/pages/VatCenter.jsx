@@ -5,6 +5,18 @@ import { FileSpreadsheet, Plus, FileDown, Printer, Trash2, Pencil } from 'lucide
 import PrintPortal from '../components/PrintPortal.jsx'
 import VdsCertificate from '../components/print/VdsCertificate.jsx'
 import ChallanForm from './ChallanForm'
+
+export default function VatCenter() {
+  return (
+    <div className="p-8 max-w-5xl mx-auto">
+      <h1 className="text-3xl font-bold text-slate-900 mb-8">VAT Center</h1>
+      
+      <div className="space-y-6">
+        <ChallanForm />
+      </div>
+    </div>
+  )
+}
 const TABS = ['Sales 6.2', 'Purchase 6.1', 'VDS 6.6', 'Monthly 9.1', 'Over-threshold 6.10']
 const monthBounds = (ym) => { const [y, m] = ym.split('-').map(Number); const start = `${ym}-01`; const end = new Date(y, m, 0); return { start, end: `${ym}-${String(end.getDate()).padStart(2, '0')}` } }
 const thisMonth = () => todayISO().slice(0, 7)
