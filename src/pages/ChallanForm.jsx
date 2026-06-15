@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fmtBDT } from '../../lib/helpers'
+import { fmtBDT } from '../lib/helpers'
 
 export default function ChallanForm({ res }) {
   const [challan, setChallan] = useState({ no: '', date: '', amount: '', status: 'Pending' })
