@@ -37,9 +37,13 @@ body {
     width: 186mm !important;      /* A4 210mm − 2×12mm margin */
     max-width: 186mm !important;
     margin: 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 270mm !important;
   }
   .print-doc > div,
   .print-doc > table { max-width: 100% !important; width: 100% !important; }
+  .print-doc > div:first-child { flex: 1 !important; }
 
   .print-doc * { box-sizing: border-box; }
   .print-doc table { width: 100% !important; border-collapse: collapse; table-layout: fixed; }
@@ -50,13 +54,12 @@ body {
 
   .no-print { display: none !important; }
 
-  /* Footer for all print docs */
-  .print-doc::after, .epos-receipt::after {
+  .print-doc::after {
     content: "Powered by Aura Stay";
     display: block;
     text-align: center;
     font-size: 9px;
-    margin-top: 20px;
+    margin-top: auto !important;
     border-top: 1px solid #ccc;
     padding-top: 5px;
     color: #666;
@@ -104,8 +107,23 @@ td {
     color: #000 !important;
     padding: 0 !important;
     margin: 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100vh !important;
   }
   
+  .epos-receipt > div:first-child { flex: 1 !important; }
   .epos-receipt table { border: none !important; }
   .epos-receipt td { border: none !important; padding: 2px 0 !important; }
+
+  .epos-receipt::after {
+    content: "Powered by Aura Stay";
+    display: block;
+    text-align: center;
+    font-size: 9px;
+    margin-top: auto !important;
+    border-top: 1px solid #ccc;
+    padding-top: 5px;
+    color: #666;
+  }
 }
