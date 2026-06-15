@@ -112,61 +112,6 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
   )
 }
 
-/* ---------------- INVOICES & CHECK-OUT ---------------- */
-function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reload, userName, setStatus, setPrintDoc, flash, isAdmin }) {
-  const canCheckout = res.status === 'CHECKED_IN';
-  
-  // Live Invoice Printing: Folio থেকে সরাসরি ডাটা নিয়ে প্রিন্ট হবে
-  const printLiveInvoice = (type) => {
-    setPrintDoc({ 
-      type: type, 
-      invoice: { 
-        totals, 
-        charges, 
-        paid, 
-        due, 
-        issued_at: new Date().toISOString(),
-        invoice_no: `INV-${res.res_no}` 
-      } 
-    });
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="card p-5 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="font-display font-semibold text-pine">Guest Billing</h3>
-          <p className="text-sm text-pine/60">Live billing: updates automatically from Folio.</p>
-        </div>
-        <div className="flex gap-2">
-          <button className="btn-ghost" onClick={() => printLiveInvoice('BILL')}>
-            <Printer size={16} /> Guest Bill
-          </button>
-          <button className="btn-primary" onClick={() => printLiveInvoice('MUSHAK')}>
-            <Receipt size={16} /> Mushak 6.3
-          </button>
-          {canCheckout && (
-            <button className="btn-amber" onClick={async () => { 
-              await setStatus('CHECKED_OUT', { checked_out_at: new Date().toISOString() }); 
-              await reload(); 
-              flash('Check-out status updated.');
-            }}>
-              <CheckCircle2 size={16} /> Check Out
-            </button>
-          )}
-        </div>
-      </div>
-      
-      <div className="card p-5 text-sm money">
-        <div className="flex justify-between font-bold text-lg border-t pt-2">
-          <span>Balance Payable</span>
-          <span className={due > 0 ? 'text-red-600' : 'text-forest'}>{fmtBDT(due)}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /* ---------------- OVERVIEW ---------------- */
 function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, isAdmin, userName }) {
   const canConfirm = ['QUERY', 'QUOTED'].includes(res.status)
@@ -719,7 +664,6 @@ function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userNam
 function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reload, userName, setStatus, setPrintDoc, flash, isAdmin }) {
   const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status);
   
-  // Live Invoice Printing: Folio থেকে সরাসরি ডাটা নিয়ে প্রিন্ট হবে
   const printLiveInvoice = (type) => {
     setPrintDoc({ 
       type: type, 
@@ -734,18 +678,12 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
     });
   };
 
-  const reCheckIn = async () => {
-    await setStatus('CHECKED_IN', { checked_out_at: null });
-    await reload();
-    flash('Re-checked-in successfully.');
-  };
-
   return (
     <div className="space-y-4">
       <div className="card p-5 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h3 className="font-display font-semibold text-pine">Check-out & Guest Billing</h3>
-          <p className="text-sm text-pine/60">Live billing: updates instantly from Folio.</p>
+          <h3 className="font-display font-semibold text-pine">Guest Billing</h3>
+          <p className="text-sm text-pine/60">Live billing: updates automatically from Folio.</p>
         </div>
         <div className="flex gap-2">
           <button className="btn-ghost" onClick={() => printLiveInvoice('BILL')}>
@@ -754,18 +692,21 @@ function InvoicesTab({ res, charges, totals, paid, due, invoices, company, reloa
           <button className="btn-primary" onClick={() => printLiveInvoice('MUSHAK')}>
             <Receipt size={16} /> Mushak 6.3
           </button>
-          
           {!isCheckedOut ? (
             <button className="btn-amber" onClick={async () => { 
               await setStatus('CHECKED_OUT', { checked_out_at: new Date().toISOString() }); 
               await reload(); 
-              flash('Checked out.');
+              flash('Checked out successfully.');
             }}>
               <CheckCircle2 size={16} /> Check Out
             </button>
           ) : (
             isAdmin && (
-              <button className="btn-primary" onClick={reCheckIn}>
+              <button className="btn-primary" onClick={async () => {
+                await setStatus('CHECKED_IN', { checked_out_at: null });
+                await reload();
+                flash('Re-checked-in successfully.');
+              }}>
                 <LogIn size={16} /> Re-check-in
               </button>
             )
