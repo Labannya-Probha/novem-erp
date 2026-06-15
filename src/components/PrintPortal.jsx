@@ -1,11 +1,9 @@
 import { createPortal } from 'react-dom'
 import { X, Printer } from 'lucide-react'
 
-// Renders an official document into #print-root (print target) + a screen preview modal
 export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
   return (
     <>
-      {/* Print styling — A4 and Thermal support */}
       <style>{`
         @page { size: ${type === 'thermal' ? '80mm auto' : 'A4'}; margin: ${type === 'thermal' ? '0' : '12mm'}; }
         @media print {
@@ -16,16 +14,23 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
           .no-print { display: none !important; }
           
           #print-root .print-doc, #print-root .epos-receipt {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: ${type === 'thermal' ? 'auto' : '100vh'} !important;
             width: ${type === 'thermal' ? '72mm' : '186mm'} !important; 
             max-width: ${type === 'thermal' ? '72mm' : '186mm'} !important;
             margin: 0 auto !important; font-size: ${type === 'thermal' ? '11px' : '11px'}; color: #000 !important;
           }
+
+          #print-root .print-doc > div:first-child, 
+          #print-root .epos-receipt > div:first-child {
+            flex: 1 !important;
+          }
           
-          /* Add Powered by footer */
           #print-root .print-doc::after, #print-root .epos-receipt::after {
             content: "Powered by Aura Stay";
             display: block; text-align: center; font-size: 9px;
-            margin-top: 20px; border-top: 1px solid #ccc;
+            margin-top: auto !important; border-top: 1px solid #ccc;
             padding-top: 5px; color: #666;
           }
 
