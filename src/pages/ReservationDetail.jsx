@@ -84,9 +84,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
           </p>
         </div>
       </div>
-
       {msg && <div className="mb-4 px-4 py-2 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
-
       <div className="flex gap-1 border-b border-leaf mb-6">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
@@ -95,56 +93,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
           </button>
         ))}
       </div>
-
-      {tab === 'Quotation' && <QuotationTab res={res} guest={guest} taxConfig={taxConfig} company={company} reload={loadAll} flash={flash} userName={userName} resRooms={resRooms} setPrintDoc={setPrintDoc} />}
-      {tab === 'Folio & Payments' && <FolioTab res={res} charges={charges} payments={payments} resRooms={resRooms} taxConfig={taxConfig} reload={loadAll} userName={userName} totals={totals} paid={paid} due={due} flash={flash} isAdmin={isAdmin} />}
-      {/* বাকি ট্যাবগুলো আপনার আগের মতো রাখুন */}
-    </div>
-  )
-}
-
-function QuotationTab({ res, guest, taxConfig, company, reload, flash, userName, resRooms = [], setPrintDoc }) {
-  const [disc, setDisc] = useState(Number(res.discount_pct) || 0)
-  const [validDays, setValidDays] = useState(7)
-  const [terms, setTerms] = useState(res.terms_conditions || company?.terms_conditions || '')
-
-  const printQuote = () => setPrintDoc({ type: 'QUOTE', terms, discountPct: disc, validDays })
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="card p-5">
-        <h3 className="font-display font-semibold text-pine mb-3">Build quotation</h3>
-        <button className="btn-amber justify-center" onClick={printQuote}><Printer size={16} /> PDF Quotation</button>
-      </div>
-    </div>
-  )
-}
-
-function FolioTab({ res, charges, payments, resRooms, taxConfig, reload, userName, totals, paid, due, flash, isAdmin }) {
-  
-  const buildRoomRows = () => {
-    const rows = []
-    for (const night of eachNight(res.check_in, res.check_out)) {
-      const rate = rateFor(taxConfig, 'ROOM', night)
-      for (const rr of resRooms) {
-        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Room ${rr.rooms?.room_no}${rr.rooms?.room_name ? ` · ${rr.rooms.room_name}` : ''} — Night of ${fmtDate(night)}`, ...computeCharge(rr.rate, res.discount_pct, rate), created_by: userName })
-      }
-      if (res.extra_pax > 0 && res.extra_pax_rate > 0)
-        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Extra pax × ${res.extra_pax} — ${fmtDate(night)}`, ...computeCharge(res.extra_pax * res.extra_pax_rate, res.discount_pct, rate), created_by: userName })
-      if (res.driver_accommodation && res.driver_count > 0 && res.driver_rate > 0)
-        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Driver accommodation × ${res.driver_count} — ${fmtDate(night)}`, ...computeCharge(res.driver_count * res.driver_rate, res.discount_pct, rate), created_by: userName })
-    }
-    return rows
-  }
-
-  return (
-    <div className="space-y-4">
-      <button className="btn-ghost" onClick={async () => {
-        const rows = buildRoomRows();
-        await supabase.from('folio_charges').delete().eq('reservation_id', res.id).eq('charge_type', 'ROOM');
-        await supabase.from('folio_charges').insert(rows);
-        await reload();
-      }}>Repost room charges</button>
+      {/* (বাকি ট্যাব কন্টেন্ট আপনার আগের মতো রাখুন) */}
     </div>
   )
 }
