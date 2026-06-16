@@ -1,6 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-
-// Novem ERP — Supabase project (pre-filled). Env vars override if set in Vercel.
 const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL || 'https://gwllsoembqacolzfrquu.supabase.co'
 const SUPABASE_ANON_KEY =
