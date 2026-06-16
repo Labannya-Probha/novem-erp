@@ -6,10 +6,10 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
   useEffect(() => {
     const style = document.createElement('style')
     style.id = '__print-portal-page-style__'
-    // A4-এর ক্ষেত্রে bottom margin 15mm রাখা হয়েছে যেন ফুটারের জন্য পর্যাপ্ত জায়গা থাকে
     style.innerHTML = `
       @page {
         size: ${type === 'thermal' ? '80mm auto' : 'A4'};
+        /* A4-এর জন্য মার্জিন রাখা হলো, থার্মালের জন্য 0 */
         margin: ${type === 'thermal' ? '0' : '10mm 10mm 15mm 10mm'};
       }
     `
@@ -24,13 +24,19 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
     <>
       <style>{`
         @media print {
-          html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+          /* "Fit to page" নিশ্চিত করতে এক্সট্রা মার্জিন ও প্যাডিং জিরো করা হলো এবং horizontal overflow বন্ধ করা হলো */
+          html, body { 
+            width: 100% !important;
+            margin: 0 !important; 
+            padding: 0 !important; 
+            background: #fff !important; 
+            overflow-x: hidden !important; 
+          }
+          
           body * { visibility: hidden !important; }
 
-          /* শুধুমাত্র আমাদের প্রিন্ট ওভারলে এবং তার ভেতরের জিনিস দৃশ্যমান থাকবে */
           #print-modal-overlay, #print-modal-overlay * { visibility: visible !important; }
 
-          /* মাল্টি-পেজ A4 প্রিন্টের জন্য ওভারলে-কে ন্যাচারাল ফ্লো-তে আনা হলো */
           #print-modal-overlay {
             position: absolute !important;
             left: 0 !important;
@@ -40,10 +46,10 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
             background: transparent !important;
             display: block !important;
             padding: 0 !important;
+            margin: 0 !important;
             overflow: visible !important;
           }
 
-          /* ডিফল্ট উইন্ডো শ্যাডো ও প্যাডিং রিমুভ করা হলো */
           #print-modal-overlay > div {
             box-shadow: none !important;
             margin: 0 !important;
@@ -55,21 +61,37 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
 
           .no-print { display: none !important; }
 
-          /* ফ্লেক্সবক্সের বদলে ব্লক লেআউট, যেন A4 পেজে ঠিকমতো পেজ ব্রেক হয় */
+          /* Content Fit to Page Logic */
           #print-root {
             display: block !important;
             width: 100% !important;
+            /* A4 এর প্রিন্টেবল এরিয়া (190mm) এবং থার্মালের (72mm) লিমিট সেট করে দেওয়া হলো যেন বাইরে না যায় */
+            max-width: ${type === 'thermal' ? '72mm' : '190mm'} !important; 
             margin: 0 auto !important;
             padding: 0 !important;
             font-size: ${type === 'thermal' ? '10px' : '11px'};
             color: #000 !important;
+            box-sizing: border-box !important;
           }
 
-          /* টেবিল যেন পেজের মাঝখানে না ভেঙে যায় */
-          table { width: 100% !important; border-collapse: collapse; }
-          tr, td, th, img, svg { page-break-inside: avoid; break-inside: avoid; }
+          /* ভিতরের সমস্ত কন্টেন্ট যেন 100% এর বেশি জায়গা না নেয় */
+          #print-root * {
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+          }
 
-          /* ফুটার লজিক: A4-এর জন্য ফিক্সড (প্রতি পেজের নিচে), থার্মালের জন্য শেষে (relative) */
+          table { 
+            width: 100% !important; 
+            max-width: 100% !important; 
+            border-collapse: collapse; 
+          }
+          
+          tr, td, th, img, svg { 
+            page-break-inside: avoid; 
+            break-inside: avoid; 
+          }
+
+          /* Footer */
           #print-footer {
             display: block !important;
             position: ${type === 'thermal' ? 'relative' : 'fixed'} !important;
@@ -88,7 +110,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
         }
       `}</style>
 
-      {/* Wrapper ID যোগ করা হয়েছে CSS টার্গেট করার জন্য */}
+      {/* Wrapper ID */}
       <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center overflow-auto p-6">
         <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-4 relative">
 
@@ -113,8 +135,8 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
             {children}
           </div>
 
-          {/* Dedicated Print Footer - স্ক্রিনে লুকানো থাকবে, শুধু প্রিন্টে দেখাবে */}
-          <div id="print-footer" className="hidden">
+          {/* Dedicated Print Footer */}
+          <div id="print-footer" className="hidden print:block">
             Powered by Aura Stay
           </div>
 
