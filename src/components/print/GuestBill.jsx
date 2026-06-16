@@ -23,9 +23,9 @@ export default function GuestBill({
   const tPaid = paid ?? t.paid ?? 0
   const tDue = due ?? t.due ?? 0
 
-  const cell = { borderBottom: '1px solid #ccc', padding: '5px 6px', fontSize: 11 }
-  const num = { ...cell, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
-  const hcell = { borderBottom: '2px solid #2E7D32', padding: '6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'left' }
+  const cell = { borderBottom: '0.5px solid #000', padding: '5px 6px', fontSize: 11, fontFamily: 'Inter, sans-serif' };
+  const num = { ...cell, textAlign: 'right', fontFamily: 'Inter, sans-serif' };
+  const hcell = { borderBottom: '1px solid #000', padding: '6px', fontSize: 10, textTransform: 'uppercase', fontFamily: 'Inter, sans-serif' };
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative' }}>
