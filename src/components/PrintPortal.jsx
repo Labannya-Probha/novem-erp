@@ -33,7 +33,6 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
           font-size: 11px !important;
           line-height: 1.4 !important;
           color: #111 !important;
-          /* শ্যাডো রিমুভ করা হয়েছে */
           box-shadow: none !important;
         }
 
@@ -58,7 +57,6 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
   }, [type])
 
   const handleExportPDF = () => {
-    // সরাসরি PDF হিসেবে ডাউনলোড প্রম্পট করার জন্য ব্রাউজার নেটিভ প্রিন্ট উইন্ডো ব্যবহার
     window.print();
   }
 
@@ -66,12 +64,12 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
 
   return createPortal(
     <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto p-6">
-      {/* এখানেও শ্যাডো সরিয়ে ফ্ল্যাট বর্ডার দেওয়া হয়েছে */}
+      {/* বর্ডার ও শ্যাডো রিমুভ করা হয়েছে */}
       <div className="bg-white max-w-3xl w-full my-4 relative overflow-hidden border border-gray-300">
         
         {/* Toolbar */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-300 sticky top-0 bg-white z-10 no-print">
-          <h3 className="font-semibold text-gray-800">{title}</h3>
+          <h3 className="font-semibold text-gray-800 font-sans">{title}</h3>
           <div className="flex gap-2">
             <button className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700" onClick={handleExportPDF}>
               <Download size={14} /> Export PDF
@@ -91,7 +89,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
         </div>
 
         {/* Footer */}
-        <div id="print-footer" className="hidden print:block">
+        <div id="print-footer" className="hidden print:block text-gray-500">
           Powered by Aura Stay
         </div>
 
