@@ -173,11 +173,12 @@ function TrialBalance() {
 
   useEffect(() => {
     const loadTB = async () => {
-      // Query lines directly and join with chart of accounts
+      // 1. Fetch all journal lines joined with account details
       const { data } = await supabase
         .from('journal_lines')
         .select('debit, credit, chart_of_accounts(code, name, type)');
       
+      // 2. Aggregate totals by Account Code
       const summary = (data || []).reduce((acc, l) => {
         const accInfo = l.chart_of_accounts;
         if (!accInfo) return acc;
@@ -197,7 +198,14 @@ function TrialBalance() {
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Trial Balance</div>
       <table className="w-full">
-        <thead><tr><th className="th">Code</th><th className="th">Account</th><th className="th text-right">Debit</th><th className="th text-right">Credit</th></tr></thead>
+        <thead>
+          <tr>
+            <th className="th">Code</th>
+            <th className="th">Account</th>
+            <th className="th text-right">Debit</th>
+            <th className="th text-right">Credit</th>
+          </tr>
+        </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.code}>
@@ -208,11 +216,18 @@ function TrialBalance() {
             </tr>
           ))}
         </tbody>
-        <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={2}>TOTAL</td><td className="td text-right">{tot.d.toFixed(2)}</td><td className="td text-right">{tot.c.toFixed(2)}</td></tr></tfoot>
+        <tfoot>
+          <tr className="bg-leaf/40 font-bold money">
+            <td className="td" colSpan={2}>TOTAL</td>
+            <td className="td text-right">{tot.d.toFixed(2)}</td>
+            <td className="td text-right">{tot.c.toFixed(2)}</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
 }
+
 /* ---------------- CHART OF ACCOUNTS ---------------- */
 function CoaTab({ accounts, reload, flash, isAdmin }) {
   const [f, setF] = useState({ code: '', name: '', type: 'EXPENSE' })
