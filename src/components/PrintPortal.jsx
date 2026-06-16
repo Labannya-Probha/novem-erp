@@ -78,11 +78,11 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
         owns the id while it is mounted.
       */}
 
-      {/* Overlay / modal wrapper — hidden during print via .no-print */}
-      <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center overflow-auto p-6 no-print">
+      {/* Overlay / modal wrapper — REMOVED .no-print to prevent parent from hiding the #print-root */}
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center overflow-auto p-6">
         <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-4">
 
-          {/* Toolbar — hidden during print */}
+          {/* Toolbar — hidden during print via .no-print */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-leaf sticky top-0 bg-white rounded-t-xl z-10 no-print">
             <h3 className="font-display font-semibold text-pine">{title}</h3>
             <div className="flex gap-2">
