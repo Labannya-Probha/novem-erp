@@ -444,39 +444,43 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
 
       <div className="card overflow-hidden">
         <table className="w-full">
-          <thead><tr>
-            <th className="th">Order</th><th className="th">Time</th><th className="th">Type / Table</th>
-            <th className="th">Guest / Room</th><th className="th text-right">Total</th><th className="th">Status</th><th className="th text-right">Actions</th>
-          </tr></thead>
+          <thead>
+            <tr>
+              <th className="th">Order</th>
+              <th className="th">Time</th>
+              <th className="th">Total</th>
+              <th className="th">Status</th>
+              <th className="th text-right">Actions</th>
+            </tr>
+          </thead>
           <tbody>
             {rows.map((o) => (
               <tr key={o.id} className="hover:bg-leaf/20">
-                <td className="td money font-semibold">{o.order_no}</td>
-                <td className="td money text-xs">{fmtDate(o.created_at)}</td>
-                <td className="td text-xs">{o.order_type.replace('_', ' ')}{o.table_no ? ` · T${o.table_no}` : ''}</td>
-                <td className="td text-sm">{o.guest_name || '—'}{o.room_no ? <span className="text-xs text-pine/50"> · Rm {o.room_no}</span> : ''}</td>
-                <td className="td money text-right font-semibold">{Number(o.total).toFixed(2)}</td>
-                <td className="td"><span className={`status-chip ${chip[o.status]}`}>{o.status.replace(/_/g, ' ')}</span></td>
-                <td className="td">
-                  <div className="flex justify-end gap-1.5">
-                    {o.status === 'OPEN' && <button className="btn-ghost !py-1 !px-2 text-xs" onClick={() => resumeOrder(o)}>Resume</button>}
-                    <button className="btn-ghost !py-1 !px-2" title="Bill" onClick={() => printReceipt(o)}><Receipt size={13} /></button>
-                    <button className="btn-ghost !py-1 !px-2" title="KOT" onClick={() => printKot(o)}><ChefHat size={13} /></button>
-                    {o.invoice_id && <button className="btn-ghost !py-1 !px-2" title="Mushak-6.3" onClick={() => printMushak(o)}><Printer size={13} /></button>}
-                    {o.status === 'OPEN' && <button className="btn-ghost !py-1 !px-2 text-red-500" title="Cancel" onClick={() => cancel(o)}><XCircle size={13} /></button>}
-                    {isAdmin && ['SETTLED', 'CHARGED_TO_ROOM'].includes(o.status) && <button className="btn-ghost !py-1 !px-2 text-red-500 text-xs" title="Void & reverse (admin)" onClick={() => voidOrder(o)}>Void</button>}
+                <td className="td font-semibold">{o.order_no}</td>
+                <td className="td">{fmtDate(o.created_at)}</td>
+                <td className="td money">{Number(o.total).toFixed(2)}</td>
+                <td className="td">{o.status}</td>
+                <td className="td text-right">
+                  <div className="flex justify-end gap-2">
+                    {/* প্রিন্ট বাটন */}
+                    <button className="btn-ghost !py-1 !px-2" onClick={() => printReceipt(o)}><Printer size={14} /></button>
+                    
+                    {/* এডিট বাটন: শুধুমাত্র ম্যানেজার ও অ্যাডমিনের জন্য */}
+                    {canEdit(o) && (
+                      <button className="btn-ghost !py-1 !px-2 text-forest" onClick={() => resumeOrder(o)}>
+                        Edit
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td className="td text-pine/50" colSpan={7}>No orders in this view yet.</td></tr>}
           </tbody>
         </table>
       </div>
     </div>
   )
 }
-
 /* ================= MENU MANAGER ================= */
 function MenuManager({ cats, items, reload, isAdmin }) {
   const [nc, setNc] = useState('')
