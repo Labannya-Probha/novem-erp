@@ -1,16 +1,35 @@
 import { fmtBDT, fmtDate, takaInWords, nightsBetween } from '../../lib/helpers'
 
-export default function GuestBill({ invoice, res, guest, company }) {
-  if (!invoice) return <div style={{ padding: 24, textAlign: 'center', color: '#b91c1c' }}>No guest bill to display. Check the guest out from the Folio &amp; Payments tab first, then print the bill.</div>
-  const lines = (invoice.line_snapshot || []).filter((l) => l.charge_type !== 'ROUNDING')
-  const t = invoice.totals || {}
+export default function GuestBill({ 
+  invoice, res, guest, company,
+  charges, totals, paid, due, invoice_no, issued_at, is_void, buyer_name, buyer_address 
+}) {
+  const activeLines = invoice?.line_snapshot || charges || []
+  
+  if (!invoice && activeLines.length === 0) {
+    return <div style={{ padding: 24, textAlign: 'center', color: '#b91c1c' }}>No guest bill to display. Check the guest out from the Folio &amp; Payments tab first, then print the bill.</div>
+  }
+
+  const lines = activeLines.filter((l) => l.charge_type !== 'ROUNDING')
+  const t = invoice?.totals || totals || {}
+  
+  const isVoid = invoice?.is_void || is_void
+  const invNo = invoice?.invoice_no || invoice_no || '—'
+  const issuedDate = invoice?.issued_at || issued_at || new Date()
+  
+  const bName = invoice?.buyer_name || buyer_name || guest?.full_name
+  const bAddress = invoice?.buyer_address || buyer_address || guest?.address || '—'
+  
+  const tPaid = paid ?? t.paid ?? 0
+  const tDue = due ?? t.due ?? 0
+
   const cell = { borderBottom: '1px solid #ccc', padding: '5px 6px', fontSize: 11 }
   const num = { ...cell, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
   const hcell = { borderBottom: '2px solid #2E7D32', padding: '6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'left' }
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative' }}>
-      {invoice.is_void && <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>VOID</div>}
+      {isVoid && <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>VOID</div>}
       <table style={{ width: '100%' }}>
         <tbody>
           <tr>
@@ -29,8 +48,8 @@ export default function GuestBill({ invoice, res, guest, company }) {
             <td style={{ textAlign: 'right', verticalAlign: 'top' }}>
               <div style={{ display: 'inline-block', background: '#2E7D32', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 700, fontSize: 14, letterSpacing: 1 }}>GUEST BILL</div>
               <div style={{ fontSize: 11, marginTop: 8, fontFamily: '"IBM Plex Mono", monospace' }}>
-                <div><b>Invoice No:</b> {invoice.invoice_no}</div>
-                <div><b>Date:</b> {fmtDate(invoice.issued_at)}</div>
+                <div><b>Invoice No:</b> {invNo}</div>
+                <div><b>Date:</b> {fmtDate(issuedDate)}</div>
               </div>
             </td>
           </tr>
@@ -41,8 +60,8 @@ export default function GuestBill({ invoice, res, guest, company }) {
         <tbody>
           <tr>
             <td style={{ padding: '6px 10px' }}>
-              <b>Guest:</b> {invoice.buyer_name || guest?.full_name}<br />
-              <b>Address:</b> {invoice.buyer_address || guest?.address || '—'}
+              <b>Guest:</b> {bName}<br />
+              <b>Address:</b> {bAddress}
             </td>
             <td style={{ padding: '6px 10px', textAlign: 'right' }}>
               <b>Reservation:</b> {res?.res_no}<br />
@@ -95,15 +114,15 @@ export default function GuestBill({ invoice, res, guest, company }) {
             <td style={{ padding: '6px', borderTop: '2px solid #2E7D32', fontWeight: 700 }}>GRAND TOTAL</td>
             <td style={{ padding: '6px', borderTop: '2px solid #2E7D32', fontWeight: 700, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }}>{fmtBDT(t.grand_total)}</td>
           </tr>
-          <TR k="Paid" v={fmtBDT(t.paid)} />
+          <TR k="Paid" v={fmtBDT(tPaid)} />
           <tr>
-            <td style={{ padding: '4px 6px', fontWeight: 700, color: (t.due || 0) > 0 ? '#b91c1c' : '#2E7D32' }}>{(t.due || 0) > 0 ? 'BALANCE DUE' : 'FULLY SETTLED'}</td>
-            <td style={{ padding: '4px 6px', fontWeight: 700, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace', color: (t.due || 0) > 0 ? '#b91c1c' : '#2E7D32' }}>{fmtBDT(t.due)}</td>
+            <td style={{ padding: '4px 6px', fontWeight: 700, color: tDue > 0 ? '#b91c1c' : '#2E7D32' }}>{tDue > 0 ? 'BALANCE DUE' : 'FULLY SETTLED'}</td>
+            <td style={{ padding: '4px 6px', fontWeight: 700, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace', color: tDue > 0 ? '#b91c1c' : '#2E7D32' }}>{fmtBDT(tDue)}</td>
           </tr>
         </tbody>
       </table>
 
-      <div style={{ fontSize: 10, marginTop: 8 }}><b>In words:</b> {takaInWords(t.grand_total)}</div>
+      <div style={{ fontSize: 10, marginTop: 8 }}><b>In words:</b> {takaInWords(t.grand_total || 0)}</div>
 
       <table style={{ width: '100%', marginTop: 56, fontSize: 11 }}>
         <tbody>
