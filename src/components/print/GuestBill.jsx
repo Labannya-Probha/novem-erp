@@ -23,25 +23,25 @@ export default function GuestBill({
   const tPaid = paid ?? t.paid ?? 0
   const tDue = due ?? t.due ?? 0
 
-  // প্রফেশনাল স্টাইল কনফিগ: Inter ফন্ট, বর্ডারমুক্ত এবং স্পেসিং
-  const fontStyle = { fontFamily: 'Inter, sans-serif' };
-  const cell = { borderBottom: '1px solid #e5e7eb', padding: '10px 6px', fontSize: 11, ...fontStyle };
+  // স্টাইল আপডেট: বর্ডার রিমুভ ও ইন্টার ফন্ট
+  const font = { fontFamily: 'Inter, sans-serif' };
+  const cell = { borderBottom: '0.5px solid #ddd', padding: '10px 6px', fontSize: 11, ...font };
   const num = { ...cell, textAlign: 'right' };
-  const hcell = { borderBottom: '1px solid #111', padding: '10px 6px', fontSize: 10, textTransform: 'uppercase', fontWeight: 600, color: '#666', ...fontStyle };
+  const hcell = { borderBottom: '1px solid #000', padding: '10px 6px', fontSize: 10, textTransform: 'uppercase', fontWeight: 700, ...font };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative', ...fontStyle }}>
+    <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative', ...font }}>
       {isVoid && <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>VOID</div>}
       
-      {/* হেডার: কোম্পানি ডিটেইলস রাইটে এবং লেআউট ক্লিন */}
-      <table style={{ width: '100%', marginBottom: '40px' }}>
+      {/* নতুন হেডার লেআউট */}
+      <table style={{ width: '100%', marginBottom: 30 }}>
         <tbody>
           <tr>
             <td style={{ verticalAlign: 'top' }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#000' }}>{company?.name || 'Novem Eco Resort'}</div>
-              <div style={{ fontSize: 10, color: '#666', marginTop: 4 }}>{company?.address}</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{company?.name || 'Novem Eco Resort'}</div>
+              <div style={{ fontSize: 11, color: '#555' }}>{company?.address}</div>
             </td>
-            <td style={{ textAlign: 'right', verticalAlign: 'top', fontSize: 10, color: '#666' }}>
+            <td style={{ textAlign: 'right', verticalAlign: 'top', fontSize: 11 }}>
               <div>{company?.phone}</div>
               <div>{company?.email}</div>
               {company?.bin && <div>BIN: {company.bin}</div>}
@@ -51,27 +51,26 @@ export default function GuestBill({
       </table>
 
       {/* Guest Bill Title Centered */}
-      <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 700, marginBottom: '25px', textTransform: 'uppercase', letterSpacing: '1px' }}>Guest Bill</div>
+      <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 700, marginBottom: 20, textTransform: 'uppercase' }}>Guest Bill</div>
 
-      {/* Guest Details & Invoice Info */}
-      <table style={{ width: '100%', marginBottom: '30px', fontSize: 11 }}>
+      {/* Guest Details */}
+      <table style={{ width: '100%', marginBottom: 20, fontSize: 11 }}>
         <tbody>
           <tr>
             <td style={{ verticalAlign: 'top' }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>GUEST DETAILS</div>
-              <div style={{ color: '#333' }}>{bName}</div>
-              <div style={{ color: '#666' }}>{bAddress}</div>
+              <b>Guest:</b> {bName}<br />
+              <span style={{ color: '#555' }}>{bAddress}</span>
             </td>
             <td style={{ textAlign: 'right', verticalAlign: 'top' }}>
-              <div style={{ marginBottom: 4 }}><b>Invoice No:</b> {invNo}</div>
-              <div><b>Date:</b> {fmtDate(issuedDate)}</div>
+              <b>Invoice:</b> {invNo}<br />
+              <b>Date:</b> {fmtDate(issuedDate)}
             </td>
           </tr>
         </tbody>
       </table>
 
-      {/* Line Items Table (বর্ডার মুক্ত ও পরিষ্কার) */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
+      {/* Lines Table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20 }}>
         <thead>
           <tr>
             <th style={hcell}>Date</th><th style={hcell}>Description</th>
@@ -89,14 +88,14 @@ export default function GuestBill({
         </tbody>
       </table>
 
-      {/* Totals Section */}
+      {/* Totals Table */}
       <table style={{ width: '100%', maxWidth: '300px', marginLeft: 'auto', fontSize: 11 }}>
         <tbody>
           <TR k="Subtotal" v={fmtBDT(t.base)} />
           <TR k="VAT" v={fmtBDT(t.vat)} />
           <tr>
-            <td style={{ padding: '8px 6px', fontWeight: 700, borderTop: '1px solid #111' }}>GRAND TOTAL</td>
-            <td style={{ padding: '8px 6px', fontWeight: 700, textAlign: 'right', borderTop: '1px solid #111' }}>{fmtBDT(t.grand_total)}</td>
+            <td style={{ padding: '8px 6px', fontWeight: 700, borderTop: '1px solid #000' }}>GRAND TOTAL</td>
+            <td style={{ padding: '8px 6px', fontWeight: 700, textAlign: 'right', borderTop: '1px solid #000' }}>{fmtBDT(t.grand_total)}</td>
           </tr>
           <TR k="Paid" v={fmtBDT(tPaid)} />
           <tr>
@@ -106,9 +105,8 @@ export default function GuestBill({
         </tbody>
       </table>
 
-      <div style={{ fontSize: 10, marginTop: 20, color: '#666' }}><b>In words:</b> {takaInWords(t.grand_total || 0)}</div>
+      <div style={{ fontSize: 10, marginTop: 20 }}><b>In words:</b> {takaInWords(t.grand_total || 0)}</div>
 
-      {/* Signature Section */}
       <table style={{ width: '100%', marginTop: 60, fontSize: 11 }}>
         <tbody>
           <tr>
@@ -118,7 +116,6 @@ export default function GuestBill({
           </tr>
         </tbody>
       </table>
-      
       <div style={{ textAlign: 'center', fontSize: 10, marginTop: 30, color: '#666', fontStyle: 'italic' }}>{company?.invoice_footer}</div>
     </div>
   )
