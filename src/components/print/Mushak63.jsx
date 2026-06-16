@@ -1,12 +1,27 @@
 import { fmtBDT, fmtDate, takaInWords } from '../../lib/helpers'
 
 // NBR-prescribed Mushak-6.3 (কর চালানপত্র) layout — strict black on white
-export default function Mushak63({ invoice, res, company, refNo }) {
-  if (!invoice) return <div style={{ padding: 24, textAlign: 'center', color: '#b91c1c' }}>No tax invoice to display. Check the guest out from the Folio &amp; Payments tab first, then print the Mushak-6.3.</div>
-  const lines = (invoice.line_snapshot || []).filter((l) => l.charge_type !== 'ROUNDING')
-  const t = invoice.totals || {}
-  const issued = new Date(invoice.issued_at)
+export default function Mushak63({ 
+  invoice, res, company, refNo, 
+  charges, totals, invoice_no, issued_at, buyer_name, buyer_address, buyer_bin, is_void, created_by 
+}) {
+  const activeLines = invoice?.line_snapshot || charges || []
+  
+  if (!invoice && activeLines.length === 0) {
+    return <div style={{ padding: 24, textAlign: 'center', color: '#b91c1c' }}>No tax invoice to display. Check the guest out from the Folio &amp; Payments tab first, then print the Mushak-6.3.</div>
+  }
+
+  const lines = activeLines.filter((l) => l.charge_type !== 'ROUNDING')
+  const t = invoice?.totals || totals || {}
+  const issued = new Date(invoice?.issued_at || issued_at || new Date())
   const issueTime = issued.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Dhaka' })
+
+  const invNo = invoice?.invoice_no || invoice_no || '—'
+  const isVoid = invoice?.is_void || is_void
+  const bName = invoice?.buyer_name || buyer_name || '—'
+  const bAddress = invoice?.buyer_address || buyer_address || '—'
+  const bBin = invoice?.buyer_bin || buyer_bin || '—'
+  const creator = invoice?.created_by || created_by || '________________'
 
   const b = { border: '1px solid #000', padding: '4px 6px', fontSize: 10.5, verticalAlign: 'top' }
   const bc = { ...b, textAlign: 'center' }
@@ -17,7 +32,7 @@ export default function Mushak63({ invoice, res, company, refNo }) {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#000', position: 'relative' }}>
-      {invoice.is_void && <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>VOID / বাতিল</div>}
+      {isVoid && <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>VOID / বাতিল</div>}
       <table style={{ width: '100%' }}>
         <tbody>
           <tr>
@@ -47,13 +62,13 @@ export default function Mushak63({ invoice, res, company, refNo }) {
           </tr>
           <tr>
             <td style={b}>
-              <b>ক্রেতার নাম</b> (Buyer's name): {invoice.buyer_name || '—'}<br />
-              <b>ক্রেতার ঠিকানা</b> (Buyer's address): {invoice.buyer_address || '—'}<br />
-              <b>ক্রেতার বিআইএন</b> (Buyer's BIN, if any): {invoice.buyer_bin || '—'}
+              <b>ক্রেতার নাম</b> (Buyer's name): {bName}<br />
+              <b>ক্রেতার ঠিকানা</b> (Buyer's address): {bAddress}<br />
+              <b>ক্রেতার বিআইএন</b> (Buyer's BIN, if any): {bBin}
             </td>
             <td style={b}>
-              <b>চালানপত্র নম্বর</b> (Invoice No.): <span style={{ fontFamily: '"IBM Plex Mono", monospace', fontWeight: 700 }}>{invoice.invoice_no}</span><br />
-              <b>ইস্যুর তারিখ</b> (Date of issue): {fmtDate(invoice.issued_at)}<br />
+              <b>চালানপত্র নম্বর</b> (Invoice No.): <span style={{ fontFamily: '"IBM Plex Mono", monospace', fontWeight: 700 }}>{invNo}</span><br />
+              <b>ইস্যুর তারিখ</b> (Date of issue): {fmtDate(issued)}<br />
               <b>ইস্যুর সময়</b> (Time of issue): {issueTime}
             </td>
           </tr>
@@ -114,14 +129,14 @@ export default function Mushak63({ invoice, res, company, refNo }) {
       )}
 
       <div style={{ fontSize: 10.5, marginTop: 6 }}>
-        <b>কথায় (In words):</b> {takaInWords(t.grand_total)}
+        <b>কথায় (In words):</b> {takaInWords(t.grand_total || 0)}
       </div>
 
       <table style={{ width: '100%', marginTop: 40, fontSize: 10.5 }}>
         <tbody>
           <tr>
             <td style={{ width: '55%' }}>
-              <b>প্রতিষ্ঠান কর্তৃপক্ষের দায়িত্বপ্রাপ্ত ব্যক্তির নাম</b> (Name of responsible person): {invoice.created_by || '________________'}<br />
+              <b>প্রতিষ্ঠান কর্তৃপক্ষের দায়িত্বপ্রাপ্ত ব্যক্তির নাম</b> (Name of responsible person): {creator}<br />
               <b>পদবি</b> (Designation): ________________
             </td>
             <td style={{ width: '45%', textAlign: 'right', verticalAlign: 'bottom' }}>
