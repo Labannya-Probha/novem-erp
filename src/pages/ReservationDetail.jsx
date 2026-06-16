@@ -778,18 +778,18 @@ function BillingsAndCheckOutTab({
     const invStatus  = due <= 0 ? 'PAID' : 'PARTIAL'
 
     const { error: invErr } = await supabase.from('invoices').insert({
-      reservation_id: res.id,
-      invoice_no:     invoiceNo,
-      issued_at:      issuedAt,
-      issued_by:      userName,
-      invoice_type:   'SALES',
-      charges,                  // JSONB snapshot of folio_charges rows
-      totals,                   // JSONB snapshot of computed totals
-      paid,
-      due,
-      status:         invStatus,
-      is_void:        false,
-    })
+  reservation_id: res.id,
+  invoice_no:     invoiceNo,
+  issued_at:      issuedAt,
+  issued_by:      userName,
+  invoice_type:   'GUEST_BILL', // এখানে 'SALES' এর বদলে 'GUEST_BILL' দিন
+  charges,
+  totals,
+  paid,
+  due,
+  status:         invStatus,
+  is_void:        false,
+})
 
     if (invErr) { flash(`Failed to generate invoice: ${invErr.message}`); return }
 
