@@ -1,9 +1,19 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Printer } from 'lucide-react'
 
 export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
-  // Inject @page into <head> and clean up on unmount
+  const [portalNode, setPortalNode] = useState(null)
+
+  // Inject @page into <head>, create portal node, and clean up on unmount
   useEffect(() => {
+    // ১. React-এর মেইন রুটের বাইরে বডিতে একটি নতুন কন্টেইনার তৈরি করা হলো
+    const node = document.createElement('div')
+    node.id = 'print-portal-container'
+    document.body.appendChild(node)
+    setPortalNode(node)
+
+    // ২. পেজ সাইজ এবং মেইন অ্যাপ হাইড করার গ্লোবাল স্টাইল
     const style = document.createElement('style')
     style.id = '__print-portal-page-style__'
     style.innerHTML = `
@@ -12,15 +22,25 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
         /* A4-এর জন্য মার্জিন রাখা হলো, থার্মালের জন্য 0 */
         margin: ${type === 'thermal' ? '0' : '10mm 10mm 15mm 10mm'};
       }
+      @media print {
+        /* ম্যাজিক: মেইন অ্যাপটিকে সম্পূর্ণ হাইড (display: none) করা হলো যেন এটি কোনো এক্সট্রা পেজ না নেয় */
+        body > div:not(#print-portal-container) {
+          display: none !important;
+        }
+      }
     `
     document.head.appendChild(style)
+
     return () => {
       const el = document.getElementById('__print-portal-page-style__')
       if (el) el.remove()
+      if (node.parentNode) node.parentNode.removeChild(node)
     }
   }, [type])
 
-  return (
+  if (!portalNode) return null
+
+  return createPortal(
     <>
       <style>{`
         @media print {
@@ -71,13 +91,13 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
             /* A4 এর প্রিন্টেবল এরিয়া (190mm) এবং থার্মালের (72mm) লিমিট */
             max-width: ${type === 'thermal' ? '72mm' : '190mm'} !important; 
             margin: 0 auto !important;
-            padding: 0 !important; /* প্রিন্টের সময় প্যাডিং জিরো করা হলো যেন এক্সট্রা জায়গা না নেয় */
+            padding: 0 !important; /* প্রিন্টের সময় প্যাডিং জিরো করা হলো যেন এক্সট্রা জায়গা না নেয় */
             font-size: ${type === 'thermal' ? '10px' : '11px'};
             color: #000 !important;
             box-sizing: border-box !important;
           }
 
-          /* ভিতরের সমস্ত কন্টেন্ট যেন 100% এর বেশি জায়গা না নেয় */
+          /* ভিতরের সমস্ত কন্টেন্ট যেন 100% এর বেশি জায়গা না নেয় */
           #print-root * {
             max-width: 100% !important;
             box-sizing: border-box !important;
@@ -94,7 +114,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
             break-inside: avoid; 
           }
 
-          /* Footer: page-break-after avoid করা হয়েছে এক্সট্রা পেজ ঠেকানোর জন্য */
+          /* Footer: page-break-after avoid করা হয়েছে এক্সট্রা পেজ ঠেকানোর জন্য */
           #print-footer {
             display: block !important;
             position: ${type === 'thermal' ? 'relative' : 'fixed'} !important;
@@ -116,7 +136,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
       `}</style>
 
       {/* Wrapper ID */}
-      <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center overflow-auto p-6">
+      <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto p-6">
         <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-4 relative">
 
           {/* Toolbar — hidden during print */}
@@ -147,6 +167,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
 
         </div>
       </div>
-    </>
+    </>,
+    portalNode
   )
 }
