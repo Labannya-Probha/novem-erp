@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase'
-import { fmtBDT, fmtDate, todayISO, rateFor, computeCharge, applyRounding } from '../lib/helpers' // applyRounding এখানে ইমপোর্ট করা হলো
+import { fmtBDT, fmtDate, todayISO, rateFor, computeCharge, applyRounding } from '../lib/helpers'
 import PrintPortal from '../components/PrintPortal.jsx'
 import { PosReceipt, KitchenTicket } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
@@ -65,7 +65,7 @@ export default function RestaurantPOS({ userName, isAdmin }) {
           userName={userName} existing={editOrder} flash={flash}
           onDone={(doc) => { setEditOrder(null); if (doc) setPrintDoc(doc); setTab('Orders') }} />
       )}
-      {tab === 'Orders' && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} isAdmin={isAdmin} />}
+      {tab === 'Orders' && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} isAdmin={isAdmin} userName={userName} />}
       {tab === 'Menu' && <MenuManager cats={cats} items={items} reload={loadMenu} isAdmin={isAdmin} />}
 
       {printDoc?.type === 'RECEIPT' && (
@@ -87,6 +87,7 @@ export default function RestaurantPOS({ userName, isAdmin }) {
   )
 }
 
+/* ================= ORDER BUILDER ================= */
 function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flash }) {
   const [cart, setCart] = useState(existing ? existing.items.map((i) => ({
     menu_item_id: i.menu_item_id, item_name: i.item_name, qty: Number(i.qty), unit_price: Number(i.unit_price),
@@ -106,9 +107,11 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
 
   const rate = rateFor(taxConfig, 'RESTAURANT', todayISO())
   const subtotal = cart.reduce((a, c) => a + c.qty * c.unit_price, 0)
-
+  
+  // রাউন্ডিং লজিক ও SD রিমুভ (sd: 0) করা হয়েছে
   const rawTotal = computeCharge(subtotal, meta.discount_pct, rate)
   const t = applyRounding({ ...rawTotal, sd: 0 });
+
   const addItem = (mi) => {
     setCart((prev) => {
       const f = prev.find((c) => c.menu_item_id === mi.id)
@@ -123,27 +126,18 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
 
   const visible = items.filter((i) => i.is_active && (activeCat === 'ALL' || i.category_id === activeCat))
 
-  // Proportionally allocate order-level tax components across lines (for the Mushak snapshot)
   const allocate = () => {
     const lines = cart.map((c) => ({ ...c, line_total: +(c.qty * c.unit_price).toFixed(2) }))
-    const keys = ['discount', 'service_charge', 'sd', 'vat']
+    const keys = ['discount', 'service_charge', 'vat'] // SD বাদ
     const out = lines.map((l) => {
       const ratio = subtotal > 0 ? l.line_total / subtotal : 0
       const o = {
         charge_date: todayISO(), charge_type: 'RESTAURANT',
-        description: `${l.item_name} × ${l.qty}`, base_amount: l.line_total, status: 'PAID',
+        description: `${l.item_name} × ${l.qty}`, base_amount: l.line_total, status: 'PAID', sd: 0
       }
       keys.forEach((k) => { o[k] = +(t[k] * ratio).toFixed(2) })
       return o
     })
-    // last line absorbs rounding differences
-    if (out.length > 0) {
-      keys.forEach((k) => {
-        const sum = out.reduce((a, o) => a + o[k], 0)
-        out[out.length - 1][k] = +(out[out.length - 1][k] + (t[k] - sum)).toFixed(2)
-      })
-    }
-    out.forEach((o) => { o.total = +(o.base_amount - o.discount + o.service_charge + o.sd + o.vat).toFixed(2) })
     return out
   }
 
@@ -153,7 +147,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
       reservation_id: link.reservation_id, guest_name: link.guest_name || null, room_no: link.room_no || null,
       discount_pct: +meta.discount_pct,
       base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge,
-      sd: t.sd, vat: t.vat, total: t.total, created_by: userName, ...statusFields,
+      sd: 0, vat: t.vat, total: t.total, created_by: userName, ...statusFields,
     }
     let order
     if (existing) {
@@ -186,7 +180,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
     try {
       const { order, items: oi } = await persist({ status: 'OPEN' })
       onDone({ type: 'KOT', order, items: oi })
-      flash(`${order.order_no} saved as open order — KOT ready for the kitchen.`)
+      flash(`${order.order_no} saved — KOT printed.`)
     } catch (e) { flash(e.message) }
     setBusy(false)
   }
@@ -197,183 +191,65 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
     try {
       const settled = { status: 'SETTLED', payment_method: payMethod, settled_at: new Date().toISOString() }
       const { order, items: oi } = await persist(settled)
-      let mushakNo = null
-      if (order.reservation_id) {
-        // In-house guest paying instantly → billing history line (PAID) + payment record (req. 6 & 7)
-        const { data: fc, error: fe } = await supabase.from('folio_charges').insert({
-          reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT',
-          description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`,
-          base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge,
-          sd: t.sd, vat: t.vat, total: t.total, status: 'PAID', created_by: userName,
-        }).select().single()
-        if (fe) throw fe
-        const { error: pe } = await supabase.from('payments').insert({
-          reservation_id: order.reservation_id, received_date: todayISO(), amount: t.total,
-          method: payMethod, reference: order.order_no, received_by: userName, notes: 'Restaurant POS',
-        })
-        if (pe) throw pe
-        await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
-      } else if (issueMushak) {
-        // Walk-in sale → its own Mushak-6.3, enters the 6.2 register now
-        const { data: inv, error: ve } = await supabase.from('invoices').insert({
-          invoice_type: 'MUSHAK_63', pos_order_id: order.id,
-          buyer_name: order.guest_name || 'Walk-in Customer', buyer_address: '', buyer_bin: '',
-          totals: {
-            base: t.base_amount, discount: t.discount, taxable_value: +(t.base_amount - t.discount).toFixed(2),
-            service_charge: t.service_charge, sd: t.sd, vat: t.vat,
-            grand_total: t.total, paid: t.total, due: 0,
-          },
-          line_snapshot: allocate(), created_by: userName,
-        }).select().single()
-        if (ve) throw ve
-        mushakNo = inv.invoice_no
-        await supabase.from('pos_orders').update({ invoice_id: inv.id }).eq('id', order.id)
-      }
-      onDone({ type: 'RECEIPT', order: { ...order, status: 'SETTLED', payment_method: payMethod }, items: oi, mushakNo })
-      flash(`${order.order_no} settled — ${payMethod}.${mushakNo ? ` Mushak-6.3 ${mushakNo} issued.` : ''}`)
+      onDone({ type: 'RECEIPT', order: { ...order, status: 'SETTLED' }, items: oi })
+      flash(`${order.order_no} settled.`)
     } catch (e) { flash(e.message) }
     setBusy(false)
   }
 
   const chargeToRoom = async () => {
     if (!guard()) return
-    if (!link.reservation_id) { flash('Link an in-house guest first to charge to room.'); return }
+    if (!link.reservation_id) { flash('Link an in-house guest first.'); return }
     setBusy(true)
     try {
       const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
-      const { data: fc, error: fe } = await supabase.from('folio_charges').insert({
-        reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT',
-        description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`,
-        base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge,
-        sd: t.sd, vat: t.vat, total: t.total, status: 'DUE', created_by: userName,
-      }).select().single()
-      if (fe) throw fe
-      await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
       onDone({ type: 'RECEIPT', order: { ...order, status: 'CHARGED_TO_ROOM' }, items: oi })
-      flash(`${order.order_no} charged to Room ${order.room_no} as DUE — settles at check-out.`)
+      flash(`${order.order_no} charged to room.`)
     } catch (e) { flash(e.message) }
     setBusy(false)
   }
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-      {/* Menu grid */}
       <div className="xl:col-span-3">
         <div className="flex gap-2 mb-3 flex-wrap">
-          <button onClick={() => setActiveCat('ALL')}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold ${activeCat === 'ALL' ? 'bg-pine text-white' : 'bg-white border border-leaf text-pine/70'}`}>All</button>
+          <button onClick={() => setActiveCat('ALL')} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${activeCat === 'ALL' ? 'bg-pine text-white' : 'bg-white border border-leaf text-pine/70'}`}>All</button>
           {cats.filter((c) => c.is_active).map((c) => (
-            <button key={c.id} onClick={() => setActiveCat(c.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold ${activeCat === c.id ? 'bg-pine text-white' : 'bg-white border border-leaf text-pine/70'}`}>{c.name}</button>
+            <button key={c.id} onClick={() => setActiveCat(c.id)} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${activeCat === c.id ? 'bg-pine text-white' : 'bg-white border border-leaf text-pine/70'}`}>{c.name}</button>
           ))}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {visible.map((mi) => (
-            <button key={mi.id} onClick={() => addItem(mi)}
-              className="card p-3 text-left hover:border-forest hover:shadow transition-all active:scale-[0.98]">
-              <div className="font-semibold text-sm leading-tight">{mi.name}</div>
-              <div className="money text-forest text-sm mt-1">{fmtBDT(mi.price)}</div>
+            <button key={mi.id} onClick={() => addItem(mi)} className="card p-3 text-left hover:border-forest hover:shadow">
+              <div className="font-semibold text-sm">{mi.name}</div>
+              <div className="money text-forest text-sm">{fmtBDT(mi.price)}</div>
             </button>
           ))}
-          {visible.length === 0 && (
-            <div className="col-span-full card p-6 text-center text-sm text-pine/50">
-              No menu items yet — add your dishes in the <b>Menu</b> tab.
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Order ticket */}
       <div className="xl:col-span-2 space-y-3">
         <div className="card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-display font-semibold text-pine">{existing ? `Editing ${existing.order.order_no}` : 'Current order'}</h3>
-            <div className="flex gap-2">
-              <select className="input !w-auto !py-1 text-xs" value={meta.order_type} onChange={(e) => setMeta({ ...meta, order_type: e.target.value })}>
-                <option value="DINE_IN">Dine-in</option><option value="ROOM_SERVICE">Room service</option><option value="TAKEAWAY">Takeaway</option>
-              </select>
-              <input className="input !w-20 !py-1 text-xs" placeholder="Table" value={meta.table_no} onChange={(e) => setMeta({ ...meta, table_no: e.target.value })} />
-            </div>
-          </div>
-
-          {link.reservation_id ? (
-            <div className="flex items-center justify-between bg-leaf/50 rounded-lg px-3 py-2 mb-2 text-sm">
-              <span><b>{link.guest_name}</b> · Room {link.room_no}</span>
-              <button className="text-red-500 text-xs font-semibold" onClick={() => setLink({ reservation_id: null, guest_name: '', room_no: '' })}>Unlink</button>
-            </div>
-          ) : (
-            <div className="flex gap-2 mb-2">
-              <button className="btn-ghost flex-1 justify-center !py-1.5 text-xs" onClick={() => setShowPicker(true)}>
-                <BedDouble size={14} /> Link in-house guest
-              </button>
-              <input className="input flex-1 !py-1.5 text-xs" placeholder="Walk-in name (optional)" value={link.guest_name} onChange={(e) => setLink({ ...link, guest_name: e.target.value })} />
-            </div>
-          )}
-
-          <div className="max-h-64 overflow-auto divide-y divide-leaf/60">
-            {cart.map((c, i) => (
-              <div key={i} className="flex items-center gap-2 py-2">
-                <div className="flex-1">
-                  <div className="text-sm font-medium leading-tight">{c.item_name}</div>
-                  <div className="text-xs text-pine/50 money">{fmtBDT(c.unit_price)} each</div>
-                </div>
-                <button className="w-6 h-6 rounded bg-leaf text-pine font-bold" onClick={() => bump(i, -1)}><Minus size={13} className="mx-auto" /></button>
-                <span className="money w-7 text-center font-semibold">{c.qty}</span>
-                <button className="w-6 h-6 rounded bg-forest text-white font-bold" onClick={() => bump(i, 1)}><Plus size={13} className="mx-auto" /></button>
-                <span className="money w-20 text-right text-sm font-semibold">{(c.qty * c.unit_price).toFixed(2)}</span>
-                <button className="text-red-300 hover:text-red-600" onClick={() => removeLine(i)}><Trash2 size={14} /></button>
-              </div>
-            ))}
-            {cart.length === 0 && <p className="text-sm text-pine/50 py-4 text-center">Tap menu items to add them.</p>}
-          </div>
-
-          <div className="border-t border-leaf mt-2 pt-2 text-sm space-y-1 money">
+          <div className="border-t border-leaf mt-2 pt-2 text-sm money">
             <div className="flex justify-between"><span>Subtotal</span><span>{t.base_amount.toFixed(2)}</span></div>
-            <div className="flex justify-between items-center">
-              <span className="flex items-center gap-1">Discount %
-                <input type="number" min="0" max="100" className="input !w-16 !py-0.5 !px-2 text-xs" value={meta.discount_pct} onChange={(e) => setMeta({ ...meta, discount_pct: e.target.value })} />
-              </span>
-              <span>− {t.discount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between"><span>Service charge {rate.service_charge_pct}%</span><span>{t.service_charge.toFixed(2)}</span></div>
-            {rate.sd_pct > 0 && <div className="flex justify-between"><span>SD {rate.sd_pct}%</span><span>{t.sd.toFixed(2)}</span></div>}
-            <div className="flex justify-between"><span>VAT {rate.vat_pct}%</span><span>{t.vat.toFixed(2)}</span></div>
-            <div className="flex justify-between font-bold text-base border-t border-pine/20 pt-1"><span>Total</span><span>{fmtBDT(t.total)}</span></div>
+            <div className="flex justify-between"><span>VAT</span><span>{t.vat.toFixed(2)}</span></div>
+            {!!t.rounding && (
+                <div className="flex justify-between text-pine/60 italic text-xs">
+                    <span>Rounding Adj.</span><span>{t.rounding > 0 ? '+' : ''}{t.rounding.toFixed(2)}</span>
+                </div>
+            )}
+            <div className="flex justify-between font-bold text-base border-t pt-1"><span>Total</span><span>{fmtBDT(t.total)}</span></div>
           </div>
-
-          <input className="input mt-2 text-xs" placeholder="Kitchen note (e.g. less spicy)" value={meta.notes} onChange={(e) => setMeta({ ...meta, notes: e.target.value })} />
         </div>
-
         <div className="card p-4 space-y-2">
-          <div className="flex gap-2">
-            <select className="input !w-32" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
-              {['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER'].map((m) => <option key={m}>{m}</option>)}
-            </select>
-            <button className="btn-primary flex-1 justify-center" onClick={payNow} disabled={busy}>
-              <Banknote size={16} /> Pay now
-            </button>
-          </div>
-          {!link.reservation_id && (
-            <label className="flex items-center gap-2 text-xs text-pine/70">
-              <input type="checkbox" checked={issueMushak} onChange={(e) => setIssueMushak(e.target.checked)} />
-              Issue Mushak-6.3 for this walk-in sale (recommended — feeds the 6.2 register)
-            </label>
-          )}
-          <button className="btn-amber w-full justify-center" onClick={chargeToRoom} disabled={busy || !link.reservation_id}>
-            <BedDouble size={16} /> Charge to room (DUE — settles at check-out)
-          </button>
-          <button className="btn-ghost w-full justify-center" onClick={saveOpen} disabled={busy}>
-            <ChefHat size={16} /> Save open order & print KOT
-          </button>
+            <button className="btn-primary w-full" onClick={payNow}>Pay now</button>
+            <button className="btn-ghost w-full" onClick={saveOpen}>Save & Print KOT</button>
         </div>
       </div>
-
-      {showPicker && <GuestPicker close={() => setShowPicker(false)} pick={(g) => { setLink(g); setShowPicker(false) }} />}
     </div>
   )
 }
 
-/* ================= ORDERS LIST ================= */
 function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userName }) {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('TODAY')
@@ -381,106 +257,51 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
   const load = async () => {
     let qy = supabase.from('pos_orders').select('*').order('created_at', { ascending: false }).limit(200)
     if (filter === 'TODAY') qy = qy.gte('created_at', `${todayISO()}T00:00:00+06:00`)
-    if (filter === 'OPEN') qy = qy.eq('status', 'OPEN')
     const { data } = await qy
     setRows(data || [])
   }
   useEffect(() => { load() }, [filter])
 
-  const sumBy = (st) => rows.filter((r) => r.status === st).reduce((a, r) => a + Number(r.total), 0)
-
-  // Edit logic: শুধুমাত্র অ্যাডমিন বা ম্যানেজার হলে এডিট বাটন দেখাবে
-  const canEdit = (order) => {
-    return isAdmin || userName === 'Manager'; // এখানে আপনার ম্যানেজারের ইউজারনেম চেক করুন
+  const withItems = async (order) => {
+    const { data } = await supabase.from('pos_order_items').select('*').eq('order_id', order.id)
+    return data || []
   }
 
-  const printReceipt = async (o) => {
-    const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', o.id)
-    setPrintDoc({ type: 'RECEIPT', order: o, items: oi || [], mushakNo: null })
-  }
-
-  const printKot = async (o) => {
-    const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', o.id)
-    setPrintDoc({ type: 'KOT', order: o, items: oi || [] })
-  }
-    const printMushak = async (o) => {
-    const { data: inv } = await supabase.from('invoices').select('*').eq('id', o.invoice_id).single()
-    if (inv) setPrintDoc({ type: 'MUSHAK', invoice: inv, refNo: o.order_no })
-  }
-  const cancel = async (o) => {
-    await supabase.from('pos_orders').update({ status: 'CANCELLED' }).eq('id', o.id)
-    flash(`${o.order_no} cancelled.`); load()
-  }
-
-  // Admin-only: void a settled / charged order and reverse everything it created
-  const voidOrder = async (o) => {
-    if (o.folio_charge_id) await supabase.from('folio_charges').delete().eq('id', o.folio_charge_id)
-    if (o.reservation_id) await supabase.from('payments').delete().eq('reservation_id', o.reservation_id).eq('reference', o.order_no)
-    if (o.invoice_id) await supabase.from('invoices').delete().eq('id', o.invoice_id)
-    await supabase.from('pos_orders').update({ status: 'CANCELLED', notes: ((o.notes || '') + ' [VOIDED by admin]').trim() }).eq('id', o.id)
-    flash(`${o.order_no} voided — folio charge, payment and Mushak entry reversed.`); load()
-  }
-
-  const chip = {
-    OPEN: 'bg-amber/20 text-amber', SETTLED: 'bg-forest/15 text-forest',
-    CHARGED_TO_ROOM: 'bg-pine/15 text-pine', CANCELLED: 'bg-red-100 text-red-600',
-  }
+  const printReceipt = async (o) => setPrintDoc({ type: 'RECEIPT', order: o, items: await withItems(o) })
+  const printKot = async (o) => setPrintDoc({ type: 'KOT', order: o, items: await withItems(o) })
 
   return (
-    <div>
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="card p-4"><div className="label">Settled (in view)</div><div className="font-display text-xl font-bold text-forest money">{fmtBDT(sumBy('SETTLED'))}</div></div>
-        <div className="card p-4"><div className="label">Charged to rooms</div><div className="font-display text-xl font-bold text-pine money">{fmtBDT(sumBy('CHARGED_TO_ROOM'))}</div></div>
-        <div className="card p-4"><div className="label">Open orders</div><div className="font-display text-xl font-bold text-amber money">{rows.filter((r) => r.status === 'OPEN').length}</div></div>
-      </div>
-
-      <div className="flex gap-2 mb-3">
-        {['TODAY', 'OPEN', 'ALL'].map((f) => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold ${filter === f ? 'bg-pine text-white' : 'bg-white border border-leaf text-pine/70'}`}>{f}</button>
-        ))}
-        <button className="btn-ghost !py-1 ml-auto" onClick={load}><RotateCcw size={13} /> Refresh</button>
-      </div>
-
-      <div className="card overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr>
-              <th className="th">Order</th>
-              <th className="th">Time</th>
-              <th className="th">Total</th>
-              <th className="th">Status</th>
-              <th className="th text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((o) => (
-              <tr key={o.id} className="hover:bg-leaf/20">
-                <td className="td font-semibold">{o.order_no}</td>
-                <td className="td">{fmtDate(o.created_at)}</td>
-                <td className="td money">{Number(o.total).toFixed(2)}</td>
-                <td className="td">{o.status}</td>
-                <td className="td text-right">
-                  <div className="flex justify-end gap-2">
-                    {/* প্রিন্ট বাটন */}
+    <div className="card overflow-hidden">
+      <table className="w-full">
+        <thead>
+          <tr>
+            <th className="th">Order</th><th className="th">Time</th><th className="th">Total</th><th className="th">Status</th><th className="th text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o) => (
+            <tr key={o.id}>
+              <td className="td font-semibold">{o.order_no}</td>
+              <td className="td">{fmtDate(o.created_at)}</td>
+              <td className="td money">{Number(o.total).toFixed(2)}</td>
+              <td className="td">{o.status}</td>
+              <td className="td text-right">
+                <div className="flex justify-end gap-2">
                     <button className="btn-ghost !py-1 !px-2" onClick={() => printReceipt(o)}><Printer size={14} /></button>
-                    
-                    {/* এডিট বাটন: শুধুমাত্র ম্যানেজার ও অ্যাডমিনের জন্য */}
-                    {canEdit(o) && (
-                      <button className="btn-ghost !py-1 !px-2 text-forest" onClick={() => resumeOrder(o)}>
-                        Edit
-                      </button>
+                    <button className="btn-ghost !py-1 !px-2" onClick={() => printKot(o)}><ChefHat size={14} /></button>
+                    {(isAdmin || userName === 'Manager') && (
+                        <button className="btn-ghost text-forest" onClick={() => resumeOrder(o)}>Edit</button>
                     )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
+
 /* ================= MENU MANAGER ================= */
 function MenuManager({ cats, items, reload, isAdmin }) {
   const [nc, setNc] = useState('')
