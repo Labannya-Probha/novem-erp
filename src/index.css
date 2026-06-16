@@ -43,6 +43,9 @@
     @apply block text-pine/70 mb-1.5;
     font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
   }
+  /* In multi-column form rows, a label that wraps to 2 lines must not push its
+     input below the others. Reserve 2 lines of height so every input aligns. */
+  .grid .label, .flex .label { min-height: 2.4em; }
 
   /* ---------- FORM CONTROLS — all share the SAME height (38px) ---------- */
   .input, .btn-primary, .btn-ghost, .btn-amber {
@@ -137,53 +140,15 @@
   table { border-collapse: collapse; width: 100%; }
 }
 
-/* ============================= PRINT (A4 documents) ============================= */
-#print-root { display: none; }
+/* =======================================================================
+   PRINT
+   NOTE: PrintPortal.jsx owns ALL print CSS (it injects @page and a
+   @media print block that hides everything except #print-root while it
+   is mounted). We deliberately do NOT define #print-root / #root /
+   .print-doc / .epos-receipt print rules here, because doing so fights
+   PrintPortal and blanks out the preview & the printout.
+   Only keep a tiny safety net for the .no-print helper.
+   ======================================================================= */
 @media print {
-  #root { display: none !important; }
-  #print-root { display: block !important; }
-  html, body {
-    background: #fff !important; background-image: none !important;
-    color: #000 !important; margin: 0 !important; padding: 0 !important;
-  }
-  @page { size: A4; margin: 12mm; }
-
-  .print-doc {
-    font-family: 'IBM Plex Sans', 'SolaimanLipi', sans-serif;
-    color: #000;
-    font-size: 11px;
-    width: 186mm !important;
-    max-width: 186mm !important;
-    margin: 0 auto !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 270mm !important;
-  }
-  .print-doc > div,
-  .print-doc > table { max-width: 100% !important; width: 100% !important; }
-  .print-doc > * { flex-grow: 0; }
-  .print-doc > *:not(.footer-spacer):not(::after) { flex-grow: 1; }
-  .print-doc * { box-sizing: border-box; }
-  .print-doc table { width: 100% !important; border-collapse: collapse; table-layout: fixed; }
-  .print-doc td, .print-doc th { word-wrap: break-word; overflow-wrap: break-word; }
-  .print-doc img { max-width: 100%; height: auto; }
-  .print-doc tr, .print-doc thead, .print-doc svg { page-break-inside: avoid; }
   .no-print { display: none !important; }
-
-  .print-doc::after, .epos-receipt::after {
-    content: "Powered by Aura Stay";
-    display: block; text-align: center; font-size: 9px;
-    margin-top: auto !important; border-top: 1px solid #ccc; padding-top: 5px; color: #666; width: 100%;
-  }
-
-  @page :first { size: 80mm auto; margin: 0; }
-  .epos-receipt {
-    width: 72mm !important; font-family: 'monospace' !important; color: #000 !important;
-    padding: 0 !important; margin: 0 auto !important;
-    display: flex !important; flex-direction: column !important; min-height: 100vh !important;
-  }
-  .epos-receipt > * { flex-grow: 0; }
-  .epos-receipt > *:not(.footer-spacer):not(::after) { flex-grow: 1; }
-  .epos-receipt table { border: none !important; }
-  .epos-receipt td { border: none !important; padding: 2px 0 !important; }
 }
