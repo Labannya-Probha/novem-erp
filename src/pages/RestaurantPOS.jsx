@@ -69,8 +69,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
   const [meta, setMeta] = useState(existing ? { order_type: existing.order.order_type, table_no: existing.order.table_no || '', discount_pct: Number(existing.order.discount_pct), notes: existing.order.notes || '' } : { order_type: 'DINE_IN', table_no: '', discount_pct: 0, notes: '' })
   const [link, setLink] = useState(existing ? { reservation_id: existing.order.reservation_id, guest_name: existing.order.guest_name || '', room_no: existing.order.room_no || '' } : { reservation_id: null, guest_name: '', room_no: '' })
   const [activeCat, setActiveCat] = useState('ALL')
-  const [payMethod, setPayMethod] = useState('CASH')
-  const [issueMushak, setIssueMushak] = useState(true)
+  const [payments, setPayments] = useState([{ method: 'CASH', amount: '' }])
   const [showPicker, setShowPicker] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -144,27 +143,30 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
     setBusy(false)
   }
 
+  const generateKOT = () => {
+    if (!guard()) return
+    setPrintDoc({ type: 'KOT', order: { order_no: 'TEMP-' + Date.now(), table_no: meta.table_no, order_type: meta.order_type, guest_name: link.guest_name }, items: cart })
+  }
+
   const payNow = async () => {
     if (!guard()) return
+    const totalPaid = payments.reduce((a, p) => a + (Number(p.amount) || 0), 0)
+    if (totalPaid < t.total) { flash(`Total payment (${fmtBDT(totalPaid)}) less than bill (${fmtBDT(t.total)})`); return }
+    if (totalPaid > t.total) { flash(`Change: ${fmtBDT(totalPaid - t.total)}`); return }
     setBusy(true)
     try {
-      const settled = { status: 'SETTLED', payment_method: payMethod, settled_at: new Date().toISOString() }
+      const settled = { status: 'SETTLED', payment_method: payments.map(p => `${p.method}:${p.amount}`).join('; '), settled_at: new Date().toISOString() }
       const { order, items: oi } = await persist(settled)
       let mushakNo = null
       if (order.reservation_id) {
         const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT', description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge, sd: t.sd, vat: t.vat, total: t.total, status: 'PAID', created_by: userName }).select().single()
         if (fe) throw fe
-        const { error: pe } = await supabase.from('payments').insert({ reservation_id: order.reservation_id, received_date: todayISO(), amount: t.total, method: payMethod, reference: order.order_no, received_by: userName, notes: 'Restaurant POS' })
+        const { error: pe } = await supabase.from('payments').insert({ reservation_id: order.reservation_id, received_date: todayISO(), amount: t.total, method: payments.map(p => p.method).join(', '), reference: order.order_no, received_by: userName, notes: 'Restaurant POS' })
         if (pe) throw pe
         await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
-      } else if (issueMushak) {
-        const { data: inv, error: ve } = await supabase.from('invoices').insert({ invoice_type: 'MUSHAK_63', pos_order_id: order.id, buyer_name: order.guest_name || 'Walk-in Customer', buyer_address: '', buyer_bin: '', totals: { base: t.base_amount, discount: t.discount, taxable_value: +(t.base_amount - t.discount).toFixed(2), service_charge: t.service_charge, sd: t.sd, vat: t.vat, grand_total: t.total, paid: t.total, due: 0 }, line_snapshot: allocate(), created_by: userName }).select().single()
-        if (ve) throw ve
-        mushakNo = inv.invoice_no
-        await supabase.from('pos_orders').update({ invoice_id: inv.id }).eq('id', order.id)
       }
-      onDone({ type: 'RECEIPT', order: { ...order, status: 'SETTLED', payment_method: payMethod }, items: oi, mushakNo })
-      flash(`${order.order_no} settled — ${payMethod}.${mushakNo ? ` Mushak-6.3 ${mushakNo} issued.` : ''}`)
+      onDone({ type: 'RECEIPT', order: { ...order, status: 'SETTLED', payment_method: payments.map(p => p.method).join(', ') }, items: oi, mushakNo })
+      flash(`${order.order_no} settled — ${payments.map(p => `${p.method}:${fmtBDT(p.amount)}`).join(', ')}`)
     } catch (e) { flash(e.message) }
     setBusy(false)
   }
@@ -253,15 +255,21 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
           <input className="input mt-2 text-xs" placeholder="Kitchen note (e.g. less spicy)" value={meta.notes} onChange={(e) => setMeta({ ...meta, notes: e.target.value })} />
         </div>
         <div className="card p-4 space-y-2">
-          <div className="flex gap-2">
-            <select className="input !w-32" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
-              {['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER'].map((m) => <option key={m}>{m}</option>)}
-            </select>
-            <button className="btn-primary flex-1 justify-center" onClick={payNow} disabled={busy}><Banknote size={16} /> Pay now</button>
-          </div>
-          {!link.reservation_id && (<label className="flex items-center gap-2 text-xs text-pine/70"><input type="checkbox" checked={issueMushak} onChange={(e) => setIssueMushak(e.target.checked)} />Issue Mushak-6.3 for this walk-in sale (recommended — feeds the 6.2 register)</label>)}
-          <button className="btn-amber w-full justify-center" onClick={chargeToRoom} disabled={busy || !link.reservation_id}><BedDouble size={16} /> Charge to room (DUE — settles at check-out)</button>
-          <button className="btn-ghost w-full justify-center" onClick={saveOpen} disabled={busy}><ChefHat size={16} /> Save open order & print KOT</button>
+          <div className="text-xs font-semibold text-pine mb-2">💳 Multiple Payment</div>
+          {payments.map((p, i) => (
+            <div key={i} className="flex gap-2">
+              <select className="input !w-24 !py-1 text-xs" value={p.method} onChange={(e) => { const np = [...payments]; np[i].method = e.target.value; setPayments(np) }}>
+                {['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER'].map((m) => <option key={m}>{m}</option>)}
+              </select>
+              <input type="number" className="input flex-1 !py-1 text-xs money" placeholder="Amount" value={p.amount} onChange={(e) => { const np = [...payments]; np[i].amount = e.target.value; setPayments(np) }} />
+              <button className="text-red-500 text-xs" onClick={() => setPayments(payments.filter((_, j) => j !== i))}><Trash2 size={14} /></button>
+            </div>
+          ))}
+          <button className="btn-ghost !py-1 text-xs w-full" onClick={() => setPayments([...payments, { method: 'CASH', amount: '' }])}><Plus size={13} /> Add Payment</button>
+          <div className="text-xs font-semibold text-forest">Total Paid: {fmtBDT(payments.reduce((a, p) => a + (Number(p.amount) || 0), 0))}</div>
+          <button className="btn-primary w-full justify-center" onClick={payNow} disabled={busy}><Banknote size={16} /> Pay now</button>
+          <button className="btn-amber w-full justify-center" onClick={chargeToRoom} disabled={busy || !link.reservation_id}><BedDouble size={16} /> Charge to room</button>
+          <button className="btn-ghost w-full justify-center" onClick={generateKOT} disabled={busy}><ChefHat size={16} /> Generate KOT</button>
         </div>
       </div>
       {showPicker && <GuestPicker close={() => setShowPicker(false)} pick={(g) => { setLink(g); setShowPicker(false) }} />}
@@ -283,7 +291,7 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
   useEffect(() => { load() }, [filter])
 
   const sumBy = (st) => rows.filter((r) => r.status === st).reduce((a, r) => a + Number(r.total), 0)
-  const canEdit = (order) => { return isAdmin || userName === 'Manager' }
+  const canEdit = (order) => { return (isAdmin || userName === 'Manager') ? true : order.status !== 'SETTLED' }
   const printReceipt = async (o) => {
     const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', o.id)
     setPrintDoc({ type: 'RECEIPT', order: o, items: oi || [], mushakNo: null })
@@ -344,7 +352,7 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
                     <button className="btn-ghost !py-1 !px-2 text-forest" onClick={() => printReceipt(o)} title="Print receipt"><Receipt size={14} /></button>
                     {(o.status === 'OPEN' || o.status === 'CHARGED_TO_ROOM') && (<button className="btn-ghost !py-1 !px-2 text-amber" onClick={() => printKot(o)} title="Print KOT"><ChefHat size={14} /></button>)}
                     {o.invoice_id && (<button className="btn-ghost !py-1 !px-2 text-pine" onClick={() => printMushak(o)} title="Print Mushak-6.3"><FileText size={14} /></button>)}
-                    {canEdit(o) && o.status !== 'SETTLED' && (<button className="btn-ghost !py-1 !px-2 text-forest" onClick={() => resumeOrder(o)} title="Edit order">Edit</button>)}
+                    {canEdit(o) && (<button className="btn-ghost !py-1 !px-2 text-forest" onClick={() => resumeOrder(o)} title="Edit order">Edit</button>)}
                     {isAdmin && o.status === 'SETTLED' && (<button className="btn-ghost !py-1 !px-2 text-red-500" onClick={() => voidOrder(o)} title="Void order"><XCircle size={14} /></button>)}
                   </div>
                 </td>
@@ -449,10 +457,7 @@ function DayClose({ flash, isAdmin, userName }) {
   }
 
   const closeDay = async () => {
-    if (!isAdmin) {
-      flash('Only administrators can close the day.')
-      return
-    }
+    if (!isAdmin) { flash('Only administrators can close the day.'); return }
     setBusy(true)
     try {
       const closeData = { close_date: day, closed_by: userName, closed_at: new Date().toISOString() }
@@ -465,9 +470,7 @@ function DayClose({ flash, isAdmin, userName }) {
       flash(`Day closed for ${day} — Restaurant ৳${restTotal.toFixed(2)} + Reservation ৳${resTotal.toFixed(2)}`)
       setShowConfirm(false)
       load()
-    } catch (e) {
-      flash(e.message)
-    }
+    } catch (e) { flash(e.message) }
     setBusy(false)
   }
 
