@@ -1,12 +1,5 @@
 import { fmtBDT, fmtDate, nightsBetween } from '../../lib/helpers'
 
-/* ════════════════════════════════════════════════════════════════════
-   NOVEM ECO RESORT — GUEST BILL  (compact / A4-fitted)
-   • SD removed everywhere · auto invoice_no (locked) · 8-section layout
-   • Tightened vertical rhythm so header → signatures → footer all sit on
-     ONE A4 page · footer carries "Powered by Aura Stay"
-   ════════════════════════════════════════════════════════════════════ */
-
 /* ---------- Amount-in-words (Bangladeshi / Indian numbering) ---------- */
 const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
   'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
