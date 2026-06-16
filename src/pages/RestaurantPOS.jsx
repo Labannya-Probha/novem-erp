@@ -10,6 +10,19 @@ import { Plus, Minus, Trash2, Printer, ChefHat, Banknote, BedDouble, Search, Sav
 const TABS = ['New Order', 'Orders', 'Menu', 'Day Close']
 const PAYMENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
 
+// Cash rounding logic: >= 0.50 round up, < 0.50 round down
+const applyCashRounding = (amount) => {
+  const decimal = amount % 1
+  if (decimal === 0) return { rounded: amount, rounding: 0 }
+  if (decimal >= 0.50) {
+    const rounded = Math.ceil(amount)
+    return { rounded, rounding: rounded - amount }
+  } else {
+    const rounded = Math.floor(amount)
+    return { rounded, rounding: rounded - amount }
+  }
+}
+
 export default function RestaurantPOS({ userName, isAdmin }) {
   const [tab, setTab] = useState('New Order')
   const [taxConfig, setTaxConfig] = useState([])
@@ -67,7 +80,7 @@ export default function RestaurantPOS({ userName, isAdmin }) {
 
 function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPrintDoc, onDone }) {
   const [cart, setCart] = useState(existing ? existing.items.map((i) => ({ menu_item_id: i.menu_item_id, item_name: i.item_name, qty: Number(i.qty), unit_price: Number(i.unit_price) })) : [])
-  const [meta, setMeta] = useState(existing ? { order_type: existing.order.order_type, table_no: existing.order.table_no || '', discount_type: 'PERCENT', discount_value: Number(existing.order.discount_pct) || 0, notes: existing.order.notes || '' } : { order_type: 'DINE_IN', table_no: '', discount_type: 'PERCENT', discount_value: 0, notes: '' })
+  const [meta, setMeta] = useState(existing ? { order_type: existing.order.order_type, table_no: existing.order.table_no || '', discount_type: 'PERCENT', discount_value: 0, notes: existing.order.notes || '' } : { order_type: 'DINE_IN', table_no: '', discount_type: 'PERCENT', discount_value: 0, notes: '' })
   const [link, setLink] = useState(existing ? { reservation_id: existing.order.reservation_id, guest_name: existing.order.guest_name || '', room_no: existing.order.room_no || '' } : { reservation_id: null, guest_name: '', room_no: '' })
   const [activeCat, setActiveCat] = useState('ALL')
   const [payments, setPayments] = useState(PAYMENT_METHODS.reduce((acc, m) => ({ ...acc, [m]: '' }), {}))
@@ -81,15 +94,18 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   let discountAmount = 0
   let discountPct = 0
   if (meta.discount_type === 'PERCENT') {
-    discountPct = meta.discount_value
+    discountPct = Number(meta.discount_value) || 0
     discountAmount = (subtotal * discountPct) / 100
   } else {
-    discountAmount = meta.discount_value
+    discountAmount = Number(meta.discount_value) || 0
     discountPct = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0
   }
 
+  // Calculate totals with proper rounding
   const rawTotal = computeCharge(subtotal, discountPct, rate)
-  const t = { ...applyRounding({ ...rawTotal, sd: 0 }), discount: discountAmount }
+  const subtotalAfterTax = rawTotal.base_amount - rawTotal.discount + rawTotal.service_charge + rawTotal.sd + rawTotal.vat
+  const { rounded: finalTotal, rounding: roundingAmount } = applyCashRounding(subtotalAfterTax)
+  const t = { base_amount: rawTotal.base_amount, discount: discountAmount, service_charge: rawTotal.service_charge, sd: rawTotal.sd, vat: rawTotal.vat, total: finalTotal, rounding: roundingAmount }
 
   const addItem = (mi) => {
     setCart((prev) => {
@@ -251,18 +267,18 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
             <div className="flex justify-between"><span>Subtotal</span><span>{t.base_amount.toFixed(2)}</span></div>
             <div className="flex justify-between items-center gap-2">
               <span className="flex items-center gap-1">
-                <select className="input !w-16 !py-0.5 !px-1.5 text-xs" value={meta.discount_type} onChange={(e) => setMeta({ ...meta, discount_type: e.target.value })}>
+                <select className="input !w-20 !py-0.5 !px-1.5 text-xs" value={meta.discount_type} onChange={(e) => setMeta({ ...meta, discount_type: e.target.value, discount_value: 0 })}>
                   <option value="PERCENT">Discount %</option>
                   <option value="FIXED">Fixed ৳</option>
                 </select>
               </span>
-              <input type="number" min="0" className="input !w-16 !py-0.5 !px-2 text-xs" value={meta.discount_value} onChange={(e) => setMeta({ ...meta, discount_value: e.target.value })} />
+              <input type="number" min="0" step={meta.discount_type === 'PERCENT' ? '1' : '0.01'} className="input !w-20 !py-0.5 !px-2 text-xs" value={meta.discount_value} onChange={(e) => setMeta({ ...meta, discount_value: Number(e.target.value) || 0 })} />
               <span>− {discountAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between"><span>Service charge {rate.service_charge_pct}%</span><span>{t.service_charge.toFixed(2)}</span></div>
             {rate.sd_pct > 0 && <div className="flex justify-between"><span>SD {rate.sd_pct}%</span><span>{t.sd.toFixed(2)}</span></div>}
             <div className="flex justify-between"><span>VAT {rate.vat_pct}%</span><span>{t.vat.toFixed(2)}</span></div>
-            {t.rounding !== undefined && t.rounding !== 0 && (<div className="flex justify-between text-xs text-pine/60"><span>Cash rounding</span><span>{t.rounding > 0 ? '+' : ''}{t.rounding.toFixed(2)}</span></div>)}
+            {t.rounding !== undefined && t.rounding !== 0 && (<div className="flex justify-between text-xs text-pine/60"><span>Cash rounding {t.rounding > 0 ? '(+)' : '(−)'}</span><span>{t.rounding > 0 ? '+' : ''}{t.rounding.toFixed(2)}</span></div>)}
             <div className="flex justify-between font-bold text-base border-t border-pine/20 pt-1"><span>Total</span><span>{fmtBDT(t.total)}</span></div>
           </div>
           <input className="input mt-2 text-xs" placeholder="Kitchen note (e.g. less spicy)" value={meta.notes} onChange={(e) => setMeta({ ...meta, notes: e.target.value })} />
