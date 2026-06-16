@@ -130,6 +130,14 @@ export default function App() {
       </aside>
 
       <main className="flex-1 ml-60 p-6 lg:p-8 max-w-[1400px]">
+        {company?.maintenance_mode && (
+          <div className="no-print" style={{position:'sticky',top:0,zIndex:50,background:'#b91c1c',
+               color:'#fff',textAlign:'center',padding:'6px',fontWeight:600,fontSize:13,
+               margin:'-24px -24px 16px'}}>
+            ⚠ Maintenance mode — posting & edits are locked while accounts reconcile.
+          </div>
+        )}
+        
         {page === 'dashboard' && <Dashboard openReservation={openReservation} userName={userName} />}
         {page === 'reservations' && <Reservations openReservation={openReservation} userName={userName} />}
         {page === 'calendar' && can(role, 'calendar') && <BookingCalendar openReservation={openReservation} />}
