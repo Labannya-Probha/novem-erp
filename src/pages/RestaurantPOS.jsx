@@ -8,6 +8,7 @@ import GuestPicker from '../components/GuestPicker.jsx'
 import { Plus, Minus, Trash2, Printer, ChefHat, Banknote, BedDouble, Search, Save, XCircle, RotateCcw, Receipt, Clock, FileText } from 'lucide-react'
 
 const TABS = ['New Order', 'Orders', 'Menu', 'Day Close']
+const PAYMENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
 
 export default function RestaurantPOS({ userName, isAdmin }) {
   const [tab, setTab] = useState('New Order')
@@ -53,7 +54,7 @@ export default function RestaurantPOS({ userName, isAdmin }) {
           </button>
         ))}
       </div>
-      {tab === 'New Order' && <OrderBuilder key={editOrder?.order?.id || 'new'} cats={cats} items={items} taxConfig={taxConfig} userName={userName} existing={editOrder} flash={flash} onDone={(doc) => { setEditOrder(null); if (doc) setPrintDoc(doc); setTab('Orders') }} />}
+      {tab === 'New Order' && <OrderBuilder key={editOrder?.order?.id || 'new'} cats={cats} items={items} taxConfig={taxConfig} userName={userName} existing={editOrder} flash={flash} setPrintDoc={setPrintDoc} onDone={(doc) => { setEditOrder(null); if (doc) setPrintDoc(doc); setTab('Orders') }} />}
       {tab === 'Orders' && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} isAdmin={isAdmin} userName={userName} />}
       {tab === 'Menu' && <MenuManager cats={cats} items={items} reload={loadMenu} isAdmin={isAdmin} />}
       {tab === 'Day Close' && <DayClose flash={flash} isAdmin={isAdmin} userName={userName} />}
@@ -64,19 +65,31 @@ export default function RestaurantPOS({ userName, isAdmin }) {
   )
 }
 
-function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flash }) {
+function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPrintDoc, onDone }) {
   const [cart, setCart] = useState(existing ? existing.items.map((i) => ({ menu_item_id: i.menu_item_id, item_name: i.item_name, qty: Number(i.qty), unit_price: Number(i.unit_price) })) : [])
-  const [meta, setMeta] = useState(existing ? { order_type: existing.order.order_type, table_no: existing.order.table_no || '', discount_pct: Number(existing.order.discount_pct), notes: existing.order.notes || '' } : { order_type: 'DINE_IN', table_no: '', discount_pct: 0, notes: '' })
+  const [meta, setMeta] = useState(existing ? { order_type: existing.order.order_type, table_no: existing.order.table_no || '', discount_type: 'PERCENT', discount_value: Number(existing.order.discount_pct) || 0, notes: existing.order.notes || '' } : { order_type: 'DINE_IN', table_no: '', discount_type: 'PERCENT', discount_value: 0, notes: '' })
   const [link, setLink] = useState(existing ? { reservation_id: existing.order.reservation_id, guest_name: existing.order.guest_name || '', room_no: existing.order.room_no || '' } : { reservation_id: null, guest_name: '', room_no: '' })
   const [activeCat, setActiveCat] = useState('ALL')
-  const [payments, setPayments] = useState([{ method: 'CASH', amount: '' }])
+  const [payments, setPayments] = useState(PAYMENT_METHODS.reduce((acc, m) => ({ ...acc, [m]: '' }), {}))
   const [showPicker, setShowPicker] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const rate = rateFor(taxConfig, 'RESTAURANT', todayISO())
   const subtotal = cart.reduce((a, c) => a + c.qty * c.unit_price, 0)
-  const rawTotal = computeCharge(subtotal, meta.discount_pct, rate)
-  const t = applyRounding({ ...rawTotal, sd: 0 });
+  
+  // Calculate discount based on type
+  let discountAmount = 0
+  let discountPct = 0
+  if (meta.discount_type === 'PERCENT') {
+    discountPct = meta.discount_value
+    discountAmount = (subtotal * discountPct) / 100
+  } else {
+    discountAmount = meta.discount_value
+    discountPct = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0
+  }
+
+  const rawTotal = computeCharge(subtotal, discountPct, rate)
+  const t = { ...applyRounding({ ...rawTotal, sd: 0 }), discount: discountAmount }
 
   const addItem = (mi) => {
     setCart((prev) => {
@@ -109,7 +122,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
   }
 
   const persist = async (statusFields) => {
-    const payload = { order_type: meta.order_type, table_no: meta.table_no || null, notes: meta.notes || null, reservation_id: link.reservation_id, guest_name: link.guest_name || null, room_no: link.room_no || null, discount_pct: +meta.discount_pct, base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge, sd: t.sd, vat: t.vat, total: t.total, created_by: userName, ...statusFields }
+    const payload = { order_type: meta.order_type, table_no: meta.table_no || null, notes: meta.notes || null, reservation_id: link.reservation_id, guest_name: link.guest_name || null, room_no: link.room_no || null, discount_pct: discountPct, base_amount: t.base_amount, discount: discountAmount, service_charge: t.service_charge, sd: t.sd, vat: t.vat, total: t.total, created_by: userName, ...statusFields }
     let order
     if (existing) {
       const { data, error } = await supabase.from('pos_orders').update(payload).eq('id', existing.order.id).select().single()
@@ -132,17 +145,6 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
     return true
   }
 
-  const saveOpen = async () => {
-    if (!guard()) return
-    setBusy(true)
-    try {
-      const { order, items: oi } = await persist({ status: 'OPEN' })
-      onDone({ type: 'KOT', order, items: oi })
-      flash(`${order.order_no} saved as open order — KOT ready for the kitchen.`)
-    } catch (e) { flash(e.message) }
-    setBusy(false)
-  }
-
   const generateKOT = () => {
     if (!guard()) return
     setPrintDoc({ type: 'KOT', order: { order_no: 'TEMP-' + Date.now(), table_no: meta.table_no, order_type: meta.order_type, guest_name: link.guest_name }, items: cart })
@@ -150,23 +152,25 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
 
   const payNow = async () => {
     if (!guard()) return
-    const totalPaid = payments.reduce((a, p) => a + (Number(p.amount) || 0), 0)
+    const paidMethods = Object.entries(payments).filter(([m, a]) => Number(a) > 0)
+    if (paidMethods.length === 0) { flash('Add at least one payment method.'); return }
+    const totalPaid = paidMethods.reduce((a, [m, amt]) => a + Number(amt), 0)
     if (totalPaid < t.total) { flash(`Total payment (${fmtBDT(totalPaid)}) less than bill (${fmtBDT(t.total)})`); return }
     if (totalPaid > t.total) { flash(`Change: ${fmtBDT(totalPaid - t.total)}`); return }
     setBusy(true)
     try {
-      const settled = { status: 'SETTLED', payment_method: payments.map(p => `${p.method}:${p.amount}`).join('; '), settled_at: new Date().toISOString() }
+      const settled = { status: 'SETTLED', payment_method: paidMethods.map(([m, a]) => `${m}:${a}`).join('; '), settled_at: new Date().toISOString() }
       const { order, items: oi } = await persist(settled)
       let mushakNo = null
       if (order.reservation_id) {
-        const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT', description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge, sd: t.sd, vat: t.vat, total: t.total, status: 'PAID', created_by: userName }).select().single()
+        const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT', description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, base_amount: t.base_amount, discount: discountAmount, service_charge: t.service_charge, sd: t.sd, vat: t.vat, total: t.total, status: 'PAID', created_by: userName }).select().single()
         if (fe) throw fe
-        const { error: pe } = await supabase.from('payments').insert({ reservation_id: order.reservation_id, received_date: todayISO(), amount: t.total, method: payments.map(p => p.method).join(', '), reference: order.order_no, received_by: userName, notes: 'Restaurant POS' })
+        const { error: pe } = await supabase.from('payments').insert({ reservation_id: order.reservation_id, received_date: todayISO(), amount: t.total, method: paidMethods.map(([m]) => m).join(', '), reference: order.order_no, received_by: userName, notes: 'Restaurant POS' })
         if (pe) throw pe
         await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
       }
-      onDone({ type: 'RECEIPT', order: { ...order, status: 'SETTLED', payment_method: payments.map(p => p.method).join(', ') }, items: oi, mushakNo })
-      flash(`${order.order_no} settled — ${payments.map(p => `${p.method}:${fmtBDT(p.amount)}`).join(', ')}`)
+      onDone({ type: 'RECEIPT', order: { ...order, status: 'SETTLED', payment_method: paidMethods.map(([m]) => m).join(', ') }, items: oi, mushakNo })
+      flash(`${order.order_no} settled — ${paidMethods.map(([m, a]) => `${m}:${fmtBDT(a)}`).join(', ')}`)
     } catch (e) { flash(e.message) }
     setBusy(false)
   }
@@ -177,7 +181,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
     setBusy(true)
     try {
       const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
-      const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT', description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge, sd: t.sd, vat: t.vat, total: t.total, status: 'DUE', created_by: userName }).select().single()
+      const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT', description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, base_amount: t.base_amount, discount: discountAmount, service_charge: t.service_charge, sd: t.sd, vat: t.vat, total: t.total, status: 'DUE', created_by: userName }).select().single()
       if (fe) throw fe
       await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
       onDone({ type: 'RECEIPT', order: { ...order, status: 'CHARGED_TO_ROOM' }, items: oi })
@@ -245,7 +249,16 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
           </div>
           <div className="border-t border-leaf mt-2 pt-2 text-sm space-y-1 money">
             <div className="flex justify-between"><span>Subtotal</span><span>{t.base_amount.toFixed(2)}</span></div>
-            <div className="flex justify-between items-center"><span className="flex items-center gap-1">Discount %<input type="number" min="0" max="100" className="input !w-16 !py-0.5 !px-2 text-xs" value={meta.discount_pct} onChange={(e) => setMeta({ ...meta, discount_pct: e.target.value })} /></span><span>− {t.discount.toFixed(2)}</span></div>
+            <div className="flex justify-between items-center gap-2">
+              <span className="flex items-center gap-1">
+                <select className="input !w-16 !py-0.5 !px-1.5 text-xs" value={meta.discount_type} onChange={(e) => setMeta({ ...meta, discount_type: e.target.value })}>
+                  <option value="PERCENT">Discount %</option>
+                  <option value="FIXED">Fixed ৳</option>
+                </select>
+              </span>
+              <input type="number" min="0" className="input !w-16 !py-0.5 !px-2 text-xs" value={meta.discount_value} onChange={(e) => setMeta({ ...meta, discount_value: e.target.value })} />
+              <span>− {discountAmount.toFixed(2)}</span>
+            </div>
             <div className="flex justify-between"><span>Service charge {rate.service_charge_pct}%</span><span>{t.service_charge.toFixed(2)}</span></div>
             {rate.sd_pct > 0 && <div className="flex justify-between"><span>SD {rate.sd_pct}%</span><span>{t.sd.toFixed(2)}</span></div>}
             <div className="flex justify-between"><span>VAT {rate.vat_pct}%</span><span>{t.vat.toFixed(2)}</span></div>
@@ -255,18 +268,18 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
           <input className="input mt-2 text-xs" placeholder="Kitchen note (e.g. less spicy)" value={meta.notes} onChange={(e) => setMeta({ ...meta, notes: e.target.value })} />
         </div>
         <div className="card p-4 space-y-2">
-          <div className="text-xs font-semibold text-pine mb-2">💳 Multiple Payment</div>
-          {payments.map((p, i) => (
-            <div key={i} className="flex gap-2">
-              <select className="input !w-24 !py-1 text-xs" value={p.method} onChange={(e) => { const np = [...payments]; np[i].method = e.target.value; setPayments(np) }}>
-                {['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER'].map((m) => <option key={m}>{m}</option>)}
-              </select>
-              <input type="number" className="input flex-1 !py-1 text-xs money" placeholder="Amount" value={p.amount} onChange={(e) => { const np = [...payments]; np[i].amount = e.target.value; setPayments(np) }} />
-              <button className="text-red-500 text-xs" onClick={() => setPayments(payments.filter((_, j) => j !== i))}><Trash2 size={14} /></button>
-            </div>
-          ))}
-          <button className="btn-ghost !py-1 text-xs w-full" onClick={() => setPayments([...payments, { method: 'CASH', amount: '' }])}><Plus size={13} /> Add Payment</button>
-          <div className="text-xs font-semibold text-forest">Total Paid: {fmtBDT(payments.reduce((a, p) => a + (Number(p.amount) || 0), 0))}</div>
+          <div className="text-xs font-semibold text-pine mb-3">💳 Payments</div>
+          <div className="space-y-2 max-h-48 overflow-auto">
+            {PAYMENT_METHODS.map((method) => (
+              <div key={method} className="flex gap-2 items-center">
+                <label className="text-xs font-medium w-20">{method}</label>
+                <input type="number" className="input flex-1 !py-1.5 text-xs money" placeholder="0.00" value={payments[method]} onChange={(e) => setPayments({ ...payments, [method]: e.target.value })} />
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-leaf pt-2 text-xs font-semibold text-forest">
+            Total Paid: {fmtBDT(Object.values(payments).reduce((a, v) => a + (Number(v) || 0), 0))}
+          </div>
           <button className="btn-primary w-full justify-center" onClick={payNow} disabled={busy}><Banknote size={16} /> Pay now</button>
           <button className="btn-amber w-full justify-center" onClick={chargeToRoom} disabled={busy || !link.reservation_id}><BedDouble size={16} /> Charge to room</button>
           <button className="btn-ghost w-full justify-center" onClick={generateKOT} disabled={busy}><ChefHat size={16} /> Generate KOT</button>
