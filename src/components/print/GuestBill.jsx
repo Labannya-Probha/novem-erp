@@ -99,8 +99,8 @@ export default function GuestBill({
    <table style={{ width: '100%', marginTop: 20, borderCollapse: 'collapse' }}>
     <thead>
      <tr>
-      <th style={}>Date</th>
-      <th style={}>Description</th>
+      <th style={{}}>Date</th>
+      <th style={{}}>Description</th>
       <th style={{ ...hcell, textAlign: 'right' }}>Base</th>
       <th style={{ ...hcell, textAlign: 'right' }}>Discount</th>
       <th style={{ ...hcell, textAlign: 'right' }}>Service Chg.</th>
