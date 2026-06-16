@@ -1,6 +1,7 @@
 import { fmtBDT, fmtDate, takaInWords, nightsBetween } from '../../lib/helpers'
 
 export default function GuestBill({ invoice, res, guest, company }) {
+  if (!invoice) return <div style={{ padding: 24, textAlign: 'center', color: '#b91c1c' }}>No guest bill to display. Check the guest out from the Folio &amp; Payments tab first, then print the bill.</div>
   const lines = (invoice.line_snapshot || []).filter((l) => l.charge_type !== 'ROUNDING')
   const t = invoice.totals || {}
   const cell = { borderBottom: '1px solid #ccc', padding: '5px 6px', fontSize: 11 }
@@ -10,7 +11,6 @@ export default function GuestBill({ invoice, res, guest, company }) {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative' }}>
       {invoice.is_void && <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>VOID</div>}
-      {/* Branded header */}
       <table style={{ width: '100%' }}>
         <tbody>
           <tr>
@@ -37,7 +37,6 @@ export default function GuestBill({ invoice, res, guest, company }) {
         </tbody>
       </table>
 
-      {/* Guest & stay block */}
       <table style={{ width: '100%', marginTop: 12, border: '1px solid #2E7D32', borderRadius: 4, fontSize: 11 }}>
         <tbody>
           <tr>
@@ -53,7 +52,6 @@ export default function GuestBill({ invoice, res, guest, company }) {
         </tbody>
       </table>
 
-      {/* Charge lines — every component separate (req. 8) */}
       <table style={{ width: '100%', marginTop: 12, borderCollapse: 'collapse' }}>
         <thead>
           <tr>
@@ -84,7 +82,6 @@ export default function GuestBill({ invoice, res, guest, company }) {
         </tbody>
       </table>
 
-      {/* Totals — separated, then total (req. 8) */}
       <table style={{ width: '46%', marginLeft: 'auto', marginTop: 10, fontSize: 11 }}>
         <tbody>
           <TR k="Room / service charges (base)" v={fmtBDT(t.base)} />

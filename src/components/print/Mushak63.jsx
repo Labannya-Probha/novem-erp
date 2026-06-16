@@ -2,6 +2,7 @@ import { fmtBDT, fmtDate, takaInWords } from '../../lib/helpers'
 
 // NBR-prescribed Mushak-6.3 (কর চালানপত্র) layout — strict black on white
 export default function Mushak63({ invoice, res, company, refNo }) {
+  if (!invoice) return <div style={{ padding: 24, textAlign: 'center', color: '#b91c1c' }}>No tax invoice to display. Check the guest out from the Folio &amp; Payments tab first, then print the Mushak-6.3.</div>
   const lines = (invoice.line_snapshot || []).filter((l) => l.charge_type !== 'ROUNDING')
   const t = invoice.totals || {}
   const issued = new Date(invoice.issued_at)
@@ -11,7 +12,6 @@ export default function Mushak63({ invoice, res, company, refNo }) {
   const bc = { ...b, textAlign: 'center' }
   const br = { ...b, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
 
-  // Per NBR layout: value column = net (base − discount) + service charge; SD and VAT shown separately
   const lineValue = (l) => +(Number(l.base_amount) - Number(l.discount) + Number(l.service_charge)).toFixed(2)
   const totalValue = lines.reduce((a, l) => a + lineValue(l), 0)
 
