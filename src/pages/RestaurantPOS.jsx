@@ -8,7 +8,7 @@ import GuestPicker from '../components/GuestPicker.jsx'
 import { Plus, Minus, Trash2, Printer, ChefHat, Banknote, BedDouble, Search, Save, XCircle, RotateCcw, Receipt, Clock, FileText } from 'lucide-react'
 
 const TABS = ['New Order', 'Orders', 'Menu', 'Day Close']
-const PAYMENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
+const MENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
 
 // Cash rounding logic: >= 0.50 round up, < 0.50 round down
 const applyCashRounding = (amount) => {
@@ -193,20 +193,36 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   }
 
   const chargeToRoom = async () => {
-    if (!guard()) return
-    if (!link.reservation_id) { flash('Link an in-house guest first to charge to room.'); return }
-    setBusy(true)
-    try {
-      const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
-      const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT', description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, base_amount: t.base_amount, discount: discountAmount, service_charge: t.service_charge, sd: t.sd, vat: t.vat, total: t.total, status: 'DUE', created_by: userName }).select().single()
-      if (fe) throw fe
-      await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
-      onDone({ type: 'RECEIPT', order: { ...order, status: 'CHARGED_TO_ROOM' }, items: oi })
-      flash(`${order.order_no} charged to Room ${order.room_no} as DUE — settles at check-out.`)
-    } catch (e) { flash(e.message) }
-    setBusy(false)
-  }
-
+  if (!guard()) return
+  if (!link.reservation_id) { flash('Link an in-house guest first to charge to room.'); return }
+  setBusy(true)
+  try {
+    const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
+    
+    // folio_charges এ invoice_type যোগ করা হয়েছে
+    const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ 
+      reservation_id: order.reservation_id, 
+      charge_date: todayISO(), 
+      charge_type: 'RESTAURANT', 
+      description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, 
+      base_amount: t.base_amount, 
+      discount: discountAmount, 
+      service_charge: t.service_charge, 
+      sd: t.sd, 
+      vat: t.vat, 
+      total: t.total, 
+      status: 'DUE', 
+      invoice_type: 'RESTAURANT', // <--- এখানে যুক্ত করুন
+      created_by: userName 
+    }).select().single()
+    
+    if (fe) throw fe
+    await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
+    onDone({ type: 'RECEIPT', order: { ...order, status: 'CHARGED_TO_ROOM' }, items: oi })
+    flash(`${order.order_no} charged to Room ${order.room_no} as DUE — settles at check-out.`)
+  } catch (e) { flash(e.message) }
+  setBusy(false)
+}
   return (
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
       <div className="xl:col-span-3">
