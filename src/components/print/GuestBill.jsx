@@ -189,26 +189,26 @@ export default function GuestBill({
 
       {/* ═══ 7. SIGNATURE LINES ═══ */}
       <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 36, marginBottom: 18, pageBreakInside: 'avoid' }}>
-  {['Prepared By', 'Authorized By', 'Guest Signature'].map((label) => (
-    <div key={label} style={{ textAlign: 'center' }}>
-      {/* এখানে marginTop বাড়ালে লাইনটি নিচের দিকে নেমে আসবে */}
-      <div style={{ 
-        borderTop: `1px solid ${INK}`, 
-        marginTop: '50px',   // এই ভ্যালুটি যত বাড়াবেন, লাইনটি তত নিচে নামবে
-        paddingTop: 5, 
-        fontSize: 10.5, 
-        color: MUTE 
-      }}>
-        {label}
-      </div>
-    </div>
-  ))}
-</section>
+        {['Prepared By', 'Authorized By', 'Guest Signature'].map((label) => (
+          <div key={label} style={{ textAlign: 'center' }}>
+            <div style={{ 
+              borderTop: `1px solid ${INK}`, 
+              marginTop: '50px', 
+              paddingTop: 5, 
+              fontSize: 10.5, 
+              color: MUTE 
+            }}>
+              {label}
+            </div>
+          </div>
+        ))}
+      </section>
 
       {/* ═══ 8. FOOTER ═══ */}
-      <footer style={{ borderTop: `1px solid ${LINE}`, paddingTop: 9, textAlign: 'center', pageBreakInside: 'avoid' }}>
+      <footer id="print-footer" style={{ borderTop: `1px solid ${LINE}`, paddingTop: 9, textAlign: 'center', pageBreakInside: 'avoid' }}>
         <div style={{ fontSize: 11.5, fontWeight: 600, color: FOREST }}>Thank you for staying with {co.name}.</div>
-        Powered by <span style={{ fontWeight: 700, color: PINE }}>{co.software}</span>
+        <div style={{ fontSize: 9, color: MUTE, marginTop: 5, letterSpacing: '0.04em' }}>
+          Powered by <span style={{ fontWeight: 700, color: PINE }}>{co.software || 'Aura Stay'}</span>
         </div>
       </footer>
     </div>
