@@ -374,7 +374,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, onDone, flas
 }
 
 /* ================= ORDERS LIST ================= */
-function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin }) {
+function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userName }) {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('TODAY')
 
@@ -387,16 +387,23 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin }) {
   }
   useEffect(() => { load() }, [filter])
 
-  const today = rows.filter((r) => r.created_at >= `${todayISO()}T00:00:00`)
   const sumBy = (st) => rows.filter((r) => r.status === st).reduce((a, r) => a + Number(r.total), 0)
 
-  const withItems = async (order) => {
-    const { data } = await supabase.from('pos_order_items').select('*').eq('order_id', order.id)
-    return data || []
+  // Edit logic: শুধুমাত্র অ্যাডমিন বা ম্যানেজার হলে এডিট বাটন দেখাবে
+  const canEdit = (order) => {
+    return isAdmin || userName === 'Manager'; // এখানে আপনার ম্যানেজারের ইউজারনেম চেক করুন
   }
-  const printReceipt = async (o) => setPrintDoc({ type: 'RECEIPT', order: o, items: await withItems(o), mushakNo: null })
-  const printKot = async (o) => setPrintDoc({ type: 'KOT', order: o, items: await withItems(o) })
-  const printMushak = async (o) => {
+
+  const printReceipt = async (o) => {
+    const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', o.id)
+    setPrintDoc({ type: 'RECEIPT', order: o, items: oi || [], mushakNo: null })
+  }
+
+  const printKot = async (o) => {
+    const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', o.id)
+    setPrintDoc({ type: 'KOT', order: o, items: oi || [] })
+  }
+    const printMushak = async (o) => {
     const { data: inv } = await supabase.from('invoices').select('*').eq('id', o.invoice_id).single()
     if (inv) setPrintDoc({ type: 'MUSHAK', invoice: inv, refNo: o.order_no })
   }
