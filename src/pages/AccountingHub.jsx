@@ -173,10 +173,22 @@ function TrialBalance() {
 
   useEffect(() => {
     const loadTB = async () => {
-      // 1. Fetch all journal lines joined with account details
-      const { data } = await supabase
-        .from('journal_lines')
-        .select('debit, credit, chart_of_accounts(code, name, type)');
+  const { data, error } = await supabase
+    .from('journal_lines')
+    .select('debit, credit, chart_of_accounts(code, name, type)');
+  
+  if (error) { console.error("Error loading TB:", error); return; }
+
+  const summary = (data || []).reduce((acc, l) => {
+    const accInfo = l.chart_of_accounts;
+    if (!accInfo) return acc;
+    if (!acc[accInfo.code]) acc[accInfo.code] = { code: accInfo.code, name: accInfo.name, type: accInfo.type, dr: 0, cr: 0 };
+    acc[accInfo.code].dr += (+l.debit || 0);
+    acc[accInfo.code].cr += (+l.credit || 0);
+    return acc;
+  }, {});
+  setRows(Object.values(summary));
+};
       
       // 2. Aggregate totals by Account Code
       const summary = (data || []).reduce((acc, l) => {
