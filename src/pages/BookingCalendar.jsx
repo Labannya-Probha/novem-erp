@@ -31,7 +31,7 @@ export default function BookingCalendar({ openReservation, onNewReservation }) {
       supabase.from('reservation_rooms')
         .select('id, room_id, from_date, to_date, reservations!inner(id, res_no, reservation_name, status, check_in, check_out, source, guests:primary_guest_id(full_name, phone))')
         .in('reservations.status', ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED', 'QUOTED'])
-        .lte('reservations.check_in', end).gte('reservations.check_out', start),
+        .lte('from_date', end).gte('to_date', start),
     ])
     setRooms(rm || [])
     const map = {}
