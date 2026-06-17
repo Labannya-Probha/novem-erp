@@ -60,6 +60,7 @@ export default function App() {
   const [company, setCompany] = useState(null)
   const [page, setPage] = useState('dashboard')
   const [activeRes, setActiveRes] = useState(null)
+  const [resPrefill, setResPrefill] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -86,6 +87,10 @@ export default function App() {
   const isAdmin = role === 'ADMIN'
   const userName = profile?.full_name || session.user?.email?.split('@')[0] || 'User'
   const openReservation = (id) => { setActiveRes(id); setPage('detail') }
+  const startReservation = (prefill = null) => {
+  setResPrefill(prefill)
+  setPage('reservations')
+}
   const softwareName = company?.software_name || 'Aura Stay'
 
   return (
@@ -139,11 +144,9 @@ export default function App() {
         )}
         
         {page === 'dashboard' && <Dashboard openReservation={openReservation} userName={userName} />}
-        {page === 'reservations' && <Reservations openReservation={openReservation} userName={userName} />}
-        {page === 'calendar' && can(role, 'calendar') && <BookingCalendar openReservation={openReservation} />}
-        {page === 'detail' && activeRes && (
-          <ReservationDetail id={activeRes} back={() => setPage('reservations')} userName={userName} role={role} isAdmin={isAdmin} />
-        )}
+        {page === 'reservations' && ( <Reservations openReservation={openReservation} userName={userName} prefill={resPrefill} clearPrefill={() => setResPrefill(null)} />)}
+        {page === 'calendar' && ( <BookingCalendar openReservation={openReservation} onNewReservation={startReservation} />)}
+        {page === 'detail' && activeRes && ( <ReservationDetail id={activeRes} back={() => setPage('reservations')} userName={userName} role={role} isAdmin={isAdmin} />)}
         {page === 'nightaudit' && can(role, 'nightaudit') && <NightAudit userName={userName} isAdmin={isAdmin} />}
         {page === 'housekeeping' && can(role, 'housekeeping') && <HousekeepingHub userName={userName} role={role} isAdmin={isAdmin} />}
         {page === 'pos' && can(role, 'pos') && <RestaurantPOS userName={userName} role={role} isAdmin={isAdmin} />}
