@@ -76,10 +76,10 @@ export default function BookingCalendar({ openReservation, onNewReservation }) {
                     <td key={d} className="border border-leaf/60 p-0" style={{ minWidth: 30, height: 34 }}>
                       {res
                         ? <button onClick={() => openReservation(res.id)} title={`${res.res_no} — ${res.reservation_name || ''} (${res.status})`} className="w-full h-full" style={{ background: STATUS_BG[res.status] || '#ddd' }} />
-                        : : <button
-            onClick={() => onNewReservation?.({ room_id: r.id, from_date: d, to_date: nextDay(d) })}
-            title={`New reservation — Room ${r.room_no}, ${d}`}
-            className="w-full h-full hover:bg-forest/15 transition-colors"/>}
+                        : <button
+                            onClick={() => onNewReservation?.({ room_id: r.id, from_date: d, to_date: nextDay(d) })}
+                            title={`New reservation — Room ${r.room_no}, ${d}`}
+                            className="w-full h-full hover:bg-forest/15 transition-colors"/>}
                     </td>) })}
                 </tr>
               ))}
