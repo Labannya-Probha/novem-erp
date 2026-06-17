@@ -31,7 +31,8 @@ function BrandLogo({ url }) {
 const NAV_GROUPS = [
    { title: 'Front Office', items: [
     { id: 'calendar', label: 'Booking Calendar', icon: CalendarDays }, 
-    { id: 'reservations', label: 'Reservations', icon: CalendarRange }, 
+    { id: 'reservations', label: 'Reservations', icon: CalendarRange },
+  ]},    
   { title: 'Front Office', items: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'nightaudit', label: 'Night Audit', icon: MoonStar },
@@ -58,7 +59,8 @@ const NAV_GROUPS = [
     { id: 'settings', label: 'Settings', icon: Settings2 },
   ]},
 ]
-export default function App() {
+
+  export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
   const [company, setCompany] = useState(null)
