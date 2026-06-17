@@ -5,7 +5,7 @@ import { Plus, Search, Trash2 } from 'lucide-react'
 
 const STATUSES = ['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED', 'CANCELLED']
 
-export default function Reservations({ openReservation, userName }) {
+export default function Reservations({ openReservation, userName, prefill, clearPrefill }) {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('ALL')
   const [q, setQ] = useState('')
@@ -18,6 +18,7 @@ export default function Reservations({ openReservation, userName }) {
     setRows(data || [])
   }
   useEffect(() => { load() }, [])
+  useEffect(() => { if (prefill) setShowNew(true) }, [prefill])
 
   const filtered = rows.filter((r) =>
     (filter === 'ALL' || r.status === filter) &&
@@ -73,7 +74,7 @@ export default function Reservations({ openReservation, userName }) {
         </table>
       </div>
 
-      {showNew && <NewReservation close={() => { setShowNew(false); load() }} openReservation={openReservation} userName={userName} />}
+      {showNew && ( <NewReservation prefill={prefill} close={() => { setShowNew(false); clearPrefill?.(); load() }} openReservation={openReservation} userName={userName} />)}
     </div>
   )
 }
