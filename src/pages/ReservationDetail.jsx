@@ -12,7 +12,7 @@ import Quotation from '../components/print/Quotation.jsx'
 import { exportXLSX } from '../lib/helpers'
 import {
   ArrowLeft, MessageCircle, Mail, CheckCircle2, LogIn, BedDouble,
-  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, BadgePercent,
+  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, BadgePercent, Pencil,
 } from 'lucide-react'
 
 const TABS = ['Overview', 'Quotation', 'Check-In', 'Billings & Check-Out', 'Partners']
@@ -396,6 +396,7 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
   const [validDays, setValidDays] = useState(7)
   const [quotes, setQuotes]       = useState([])
   const [terms, setTerms]         = useState(res.terms_conditions || company?.terms_conditions || '')
+  const [editingQuoteId, setEditingQuoteId] = useState(null)
   const rate = rateFor(taxConfig, 'ROOM', todayISO())
 
   useEffect(() => { setTerms(res.terms_conditions || company?.terms_conditions || '') }, [res.id, company?.terms_conditions])
@@ -413,22 +414,49 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
   }
   useEffect(() => { loadQuotes() }, [res.id])
 
+  const editQuote = (q) => {
+    setEditingQuoteId(q.id)
+    if (q.room_rate != null) setRoomRate(q.room_rate)
+    if (q.room_count != null) setRoomCount(q.room_count)
+    if (q.discount_pct != null) setDisc(q.discount_pct)
+    if (q.valid_days != null) setValidDays(q.valid_days)
+    flash(`Editing quotation ${q.quote_no || ''} — adjust the fields and re-send to update it.`)
+  }
+  const cancelEdit = () => {
+    setEditingQuoteId(null)
+    setRoomRate(res.room_rate || resRooms[0]?.rate || resRooms[0]?.rooms?.base_rate || 0)
+    setRoomCount(resRooms.length || 1)
+    setDisc(Number(res.discount_pct) || 0)
+    setValidDays(7)
+  }
+
   const message = useMemo(() => (
     `Dear ${guest?.full_name || 'Guest'},\n\nGreetings from ${company?.name || 'Novem Eco Resort'}, Sreemangal!\n\nQuotation for your stay:\n• Check-in: ${fmtDate(res.check_in)}\n• Check-out: ${fmtDate(res.check_out)} (${nights} night${nights !== 1 ? 's' : ''})\n• Rooms: ${roomCount} × ${fmtBDT(roomRate)}/night${disc > 0 ? `\n• Special discount: ${disc}%` : ''}\n• Service charge ${rate.service_charge_pct}% & VAT ${rate.vat_pct}% included\n• Total: ${fmtBDT(total)}\n\nAn advance payment confirms your booking. This quotation is valid for ${validDays} days.\n\nWarm regards,\n${company?.name || 'Novem Eco Resort'}\n${company?.phone || ''}`
   ), [guest, res, nights, roomCount, roomRate, disc, total, validDays, rate, company])
 
   const record = async (via) => {
     const validUntil = new Date(Date.now() + validDays * 86400000).toISOString().slice(0, 10)
-    await supabase.from('quotations').insert({
-      reservation_id: res.id, total_amount: total, valid_until: validUntil,
-      status: 'SENT', sent_via: via, sent_at: new Date().toISOString(), message,
-    })
+    const snapshot = {
+      total_amount: total, valid_until: validUntil, status: 'SENT', sent_via: via,
+      sent_at: new Date().toISOString(), message,
+      room_rate: +roomRate || 0, room_count: +roomCount || 1, discount_pct: +disc || 0, valid_days: +validDays || 7,
+    }
+    if (editingQuoteId) {
+      const { error } = await supabase.from('quotations')
+        .update({ ...snapshot, updated_at: new Date().toISOString() })
+        .eq('id', editingQuoteId)
+      if (error) { flash(error.message); return }
+    } else {
+      const { error } = await supabase.from('quotations').insert({ reservation_id: res.id, ...snapshot })
+      if (error) { flash(error.message); return }
+    }
     if (['QUERY'].includes(res.status))
       await supabase.from('reservations').update({ status: 'QUOTED', room_rate: roomRate, discount_pct: +disc || 0 }).eq('id', res.id)
     else
       await supabase.from('reservations').update({ room_rate: roomRate, discount_pct: +disc || 0 }).eq('id', res.id)
     await reload(); await loadQuotes()
-    flash(`Quotation recorded as sent via ${via}.`)
+    flash(editingQuoteId ? `Quotation updated and re-sent via ${via}.` : `Quotation recorded as sent via ${via}.`)
+    setEditingQuoteId(null)
   }
 
   const sendWhatsApp = () => {
@@ -446,6 +474,12 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Build quotation</h3>
+        {editingQuoteId && (
+          <div className="mb-3 px-3 py-2 rounded-lg bg-amber/10 text-amber text-sm font-medium flex items-center justify-between">
+            <span>Editing a previously sent quotation — re-send to save changes.</span>
+            <button className="btn-ghost !py-1 text-xs" onClick={cancelEdit}>Cancel edit</button>
+          </div>
+        )}
         <div className="grid grid-cols-4 gap-3 mb-4">
           <div><label className="label">Rate / room / night</label><input type="number" className="input money" value={roomRate} onChange={(e) => setRoomRate(e.target.value)} /></div>
           <div><label className="label">Rooms</label><input type="number" min="1" className="input money" value={roomCount} onChange={(e) => setRoomCount(e.target.value)} /></div>
@@ -461,8 +495,8 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
           <div className="border-t border-pine/20 pt-1 font-bold"><Row k="Total" v={fmtBDT(total)} /></div>
         </div>
         <div className="flex gap-2 mt-4">
-          <button className="btn-primary flex-1 justify-center" onClick={sendWhatsApp} disabled={!guest?.phone}><MessageCircle size={16} /> Send via WhatsApp</button>
-          <button className="btn-ghost flex-1 justify-center" onClick={sendEmail}><Mail size={16} /> Send via Email</button>
+          <button className="btn-primary flex-1 justify-center" onClick={sendWhatsApp} disabled={!guest?.phone}><MessageCircle size={16} /> {editingQuoteId ? 'Update & resend via WhatsApp' : 'Send via WhatsApp'}</button>
+          <button className="btn-ghost flex-1 justify-center" onClick={sendEmail}><Mail size={16} /> {editingQuoteId ? 'Update & resend via Email' : 'Send via Email'}</button>
           <button className="btn-amber justify-center" onClick={printQuote}><Printer size={16} /> PDF</button>
         </div>
         {!guest?.phone && <p className="text-xs text-amber mt-2">Add the guest's phone number to enable WhatsApp.</p>}
@@ -481,9 +515,14 @@ function QuotationTab({ res, guest, nights, taxConfig, company, reload, flash, u
         <h4 className="label mt-4">Sent quotations</h4>
         {quotes.length === 0 && <p className="text-sm text-pine/50">None yet.</p>}
         {quotes.map((q) => (
-          <div key={q.id} className="flex justify-between text-sm py-1.5 border-b border-leaf/60 money">
+          <div key={q.id} className={`flex justify-between items-center text-sm py-1.5 border-b border-leaf/60 money ${editingQuoteId === q.id ? 'bg-amber/10 -mx-2 px-2 rounded' : ''}`}>
             <span>{q.quote_no} · {q.sent_via}</span>
-            <span>{fmtBDT(q.total_amount)} · valid till {fmtDate(q.valid_until)}</span>
+            <span className="flex items-center gap-2">
+              {fmtBDT(q.total_amount)} · valid till {fmtDate(q.valid_until)}
+              <button className="text-pine/50 hover:text-forest" title="Edit this quotation" onClick={() => editQuote(q)}>
+                <Pencil size={13} />
+              </button>
+            </span>
           </div>
         ))}
       </div>
