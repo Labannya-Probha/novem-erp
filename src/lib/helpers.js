@@ -44,15 +44,26 @@ export const rateFor = (taxConfig, chargeType, onDate) => {
 }
 
 // Hotel practice: discount on base → SC & SD on net → VAT on (net + SC + SD)
-export const computeCharge = (base, discountPct, rate) => {
+// `discount` accepts either:
+//   - a plain number (legacy/default) — treated as a PERCENTAGE, e.g. 10 = 10%
+//   - { type: 'fixed', value }        — a flat amount subtracted from base (capped at base)
+//   - { type: 'percentage', value }   — same as passing a plain number
+export const computeCharge = (base, discount, rate) => {
   const b = Number(base) || 0
-  const discount = +(b * (Number(discountPct) || 0) / 100).toFixed(2)
-  const net = +(b - discount).toFixed(2)
+  let discountAmt
+  if (discount && typeof discount === 'object') {
+    if (discount.type === 'fixed') discountAmt = Math.min(Number(discount.value) || 0, b)
+    else discountAmt = b * (Number(discount.value) || 0) / 100
+  } else {
+    discountAmt = b * (Number(discount) || 0) / 100
+  }
+  const disc = +discountAmt.toFixed(2)
+  const net = +(b - disc).toFixed(2)
   const service_charge = +(net * (Number(rate.service_charge_pct) || 0) / 100).toFixed(2)
   const sd = +(net * (Number(rate.sd_pct) || 0) / 100).toFixed(2)
   const vat = +((net + service_charge + sd) * (Number(rate.vat_pct) || 0) / 100).toFixed(2)
   const total = +(net + service_charge + sd + vat).toFixed(2)
-  return { base_amount: b, discount, service_charge, sd, vat, total }
+  return { base_amount: b, discount: disc, service_charge, sd, vat, total }
 }
 
 export const sumCharges = (charges) =>
@@ -107,7 +118,7 @@ export const STATUS_COLORS = {
   QUOTED: 'bg-amber/20 text-amber',
   CONFIRMED: 'bg-forest/15 text-forest',
   CHECKED_IN: 'bg-forest text-white',
-  CHECKED_OUT: 'bg-pine/15 text-pine',
+  CHECKED_OUT: 'bg-orange-100 text-orange-600',
   SETTLED: 'bg-leaf text-pine',
   CANCELLED: 'bg-red-100 text-red-600',
   NO_SHOW: 'bg-red-100 text-red-600',
