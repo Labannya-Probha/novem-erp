@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation,
 } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { supabase } from './supabase'
 import { setCurrency } from './lib/helpers'
 import { can, ROLE_LABELS } from './lib/roles'
@@ -280,6 +281,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppShell company={company} role={role} isAdmin={isAdmin} userName={userName} loadCompany={loadCompany} />
+      <Analytics />
     </BrowserRouter>
   )
 }
