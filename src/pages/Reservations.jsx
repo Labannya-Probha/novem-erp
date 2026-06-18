@@ -79,18 +79,40 @@ export default function Reservations({ openReservation, userName, prefill, clear
   )
 }
 
+const SALUTATIONS = ['Mr.', 'Ms.', 'Mrs.', 'Dr.', 'Prof.', 'Engr.']
+
+const ADDON_DEFS = [
+  { key: 'BB', label: 'Bed & Breakfast' },
+  { key: 'PICKUP', label: 'Pick & Drop' },
+  { key: 'LUNCH', label: 'Lunch' },
+  { key: 'DINNER', label: 'Dinner' },
+  { key: 'DECOR', label: 'Room Decoration' },
+  { key: 'CAKE', label: 'Cake' },
+  { key: 'BOUQUET', label: 'Flower Bouquet' },
+  { key: 'SIGHTSEEING', label: 'Sight Seeing' },
+]
+
 function NewReservation({ close, openReservation, userName }) {
   const t = todayISO()
   const [f, setF] = useState({
+    salutation: 'Mr.', guest_type: 'Individual',
     guest_name: '', phone: '', email: '', address: '', reservation_name: '',
+    use_reservation_name_only: false,
     check_in: t, check_out: t, pax_adults: 2, pax_children: 0, source: 'Phone', notes: '', discount_pct: 0,
+    commission_pct: 0, vat_vds_pct: 0, tax_tds_pct: 0,
   })
   const [rooms, setRooms] = useState([])
   const [booked, setBooked] = useState([]) // {room_id, ci, co}
   const [roomRows, setRoomRows] = useState([]) // {room_id, from_date, to_date}
+  // addons: { [item_key]: { selected: bool, label, price, qty } }
+  const [addons, setAddons] = useState(() =>
+    Object.fromEntries(ADDON_DEFS.map((a) => [a.key, { selected: false, label: a.label, price: '', qty: 1 }]))
+  )
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
+  const toggleAddon = (key) => setAddons((p) => ({ ...p, [key]: { ...p[key], selected: !p[key].selected } }))
+  const updAddon = (key, field, val) => setAddons((p) => ({ ...p, [key]: { ...p[key], [field]: val } }))
 
   useEffect(() => {
     supabase.from('rooms').select('*').eq('is_active', true).order('room_no').then(({ data }) => setRooms(data || []))
@@ -120,6 +142,7 @@ function NewReservation({ close, openReservation, userName }) {
     setBusy(true); setErr('')
     try {
       if (!f.guest_name) throw new Error('Guest name is required')
+      if (f.guest_type === 'Company' && !f.reservation_name) throw new Error('Reservation/Company name is required for Company & OTA bookings')
       if (validRows.length === 0) {
         if (f.check_out <= f.check_in) throw new Error('Check-out must be after check-in')
       }
@@ -133,10 +156,15 @@ function NewReservation({ close, openReservation, userName }) {
       if (ge) throw ge
       const firstRoom = validRows.length ? rooms.find((r) => r.id === validRows[0].room_id) : null
       const { data: r, error: re } = await supabase.from('reservations').insert({
+        salutation: f.salutation, guest_type: f.guest_type,
+        use_reservation_name_only: f.use_reservation_name_only,
         reservation_name: f.reservation_name || f.guest_name,
         primary_guest_id: g.id, check_in: overallCI, check_out: overallCO,
         pax_adults: +f.pax_adults, pax_children: +f.pax_children,
         discount_pct: +f.discount_pct || 0, room_rate: firstRoom ? firstRoom.base_rate : null,
+        commission_pct: f.guest_type === 'Company' ? (+f.commission_pct || 0) : 0,
+        vat_vds_pct: f.guest_type === 'Company' ? (+f.vat_vds_pct || 0) : 0,
+        tax_tds_pct: f.guest_type === 'Company' ? (+f.tax_tds_pct || 0) : 0,
         source: f.source, notes: f.notes, created_by: userName,
       }).select().single()
       if (re) throw re
@@ -146,6 +174,17 @@ function NewReservation({ close, openReservation, userName }) {
           const rm = rooms.find((x) => x.id === row.room_id)
           return { reservation_id: r.id, room_id: row.room_id, rate: rm?.base_rate || 0, from_date: row.from_date, to_date: row.to_date }
         }))
+      }
+      const selectedAddons = ADDON_DEFS
+        .filter((a) => addons[a.key].selected)
+        .map((a) => ({
+          reservation_id: r.id, item_key: a.key, label: addons[a.key].label || a.label,
+          price: +addons[a.key].price || 0, qty: +addons[a.key].qty || 1,
+          posted: false, created_by: userName,
+        }))
+      if (selectedAddons.length > 0) {
+        const { error: ae } = await supabase.from('reservation_addons').insert(selectedAddons)
+        if (ae) throw ae
       }
       close(); openReservation(r.id)
     } catch (e) { setErr(e.message) }
@@ -157,10 +196,42 @@ function NewReservation({ close, openReservation, userName }) {
       <div className="card max-w-2xl w-full p-6 my-6">
         <h2 className="font-display text-lg font-bold text-pine mb-4">New reservation query</h2>
         <div className="grid grid-cols-2 gap-4">
+          <div><label className="label">Salutation</label>
+            <select className="input" value={f.salutation} onChange={(e) => set('salutation', e.target.value)}>
+              {SALUTATIONS.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div><label className="label">Guest Type</label>
+            <div className="flex gap-2 h-[38px] items-center">
+              {['Individual', 'Company'].map((gt) => (
+                <button key={gt} type="button" onClick={() => set('guest_type', gt)}
+                  className={`flex-1 h-full rounded-lg text-sm font-semibold border ${f.guest_type === gt ? 'bg-pine text-white border-pine' : 'border-leaf text-pine/70'}`}>
+                  {gt}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="col-span-2"><label className="label">Guest name *</label><input className="input" value={f.guest_name} onChange={(e) => set('guest_name', e.target.value)} /></div>
           <div><label className="label">Phone (WhatsApp)</label><input className="input" placeholder="01XXXXXXXXX" value={f.phone} onChange={(e) => set('phone', e.target.value)} /></div>
           <div><label className="label">Email</label><input className="input" value={f.email} onChange={(e) => set('email', e.target.value)} /></div>
-          <div className="col-span-2"><label className="label">Reservation name (if different)</label><input className="input" value={f.reservation_name} onChange={(e) => set('reservation_name', e.target.value)} /></div>
+          <div className="col-span-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="label !mb-0">{f.guest_type === 'Company' ? 'Reservation / Company name *' : 'Reservation name (if different)'}</label>
+              <label className="flex items-center gap-1.5 text-xs text-pine/70 cursor-pointer">
+                <input type="checkbox" checked={f.use_reservation_name_only} onChange={(e) => set('use_reservation_name_only', e.target.checked)} />
+                Use reservation name everywhere (instead of guest name)
+              </label>
+            </div>
+            <input className="input" value={f.reservation_name} onChange={(e) => set('reservation_name', e.target.value)} placeholder={f.guest_type === 'Company' ? 'e.g. Acme Corporation' : ''} />
+          </div>
+
+          {f.guest_type === 'Company' && (
+            <div className="col-span-2 grid grid-cols-3 gap-4 p-3 rounded-lg bg-leaf/30 border border-leaf">
+              <div><label className="label">Commission Rate %</label><input type="number" min="0" max="100" className="input money" value={f.commission_pct} onChange={(e) => set('commission_pct', e.target.value)} /></div>
+              <div><label className="label">Vat/VDS %</label><input type="number" min="0" max="100" className="input money" value={f.vat_vds_pct} onChange={(e) => set('vat_vds_pct', e.target.value)} /></div>
+              <div><label className="label">Tax/TDS %</label><input type="number" min="0" max="100" className="input money" value={f.tax_tds_pct} onChange={(e) => set('tax_tds_pct', e.target.value)} /></div>
+            </div>
+          )}
           <div><label className="label">Default check-in *</label><input type="date" className="input" value={f.check_in} onChange={(e) => set('check_in', e.target.value)} /></div>
           <div><label className="label">Default check-out *</label><input type="date" className="input" value={f.check_out} onChange={(e) => set('check_out', e.target.value)} /></div>
 
@@ -191,6 +262,27 @@ function NewReservation({ close, openReservation, userName }) {
               {rooms.length === 0 && <p className="text-xs text-amber">No rooms defined — add room inventory in Settings first.</p>}
             </div>
             {validRows.length > 0 && <p className="text-xs text-pine/50 mt-1">Stay window: <b>{overallCI} → {overallCO}</b> · {validRows.length} room booking(s).</p>}
+          </div>
+
+          <div className="col-span-2">
+            <label className="label">Including Items</label>
+            <p className="text-xs text-pine/50 mb-2">Select any items included with this booking. Prices entered here are saved against the reservation but only posted to the bill when you choose to (Overview tab → Post addon charges).</p>
+            <div className="grid grid-cols-2 gap-2">
+              {ADDON_DEFS.map((a) => (
+                <div key={a.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${addons[a.key].selected ? 'border-forest bg-forest/5' : 'border-leaf'}`}>
+                  <input type="checkbox" checked={addons[a.key].selected} onChange={() => toggleAddon(a.key)} />
+                  <span className="text-sm flex-1">{a.label}</span>
+                  {addons[a.key].selected && (
+                    <>
+                      <input type="number" min="0" step="0.01" className="input !w-24 !py-1 money text-right" placeholder="Price ৳"
+                        value={addons[a.key].price} onChange={(e) => updAddon(a.key, 'price', e.target.value)} />
+                      <input type="number" min="1" className="input !w-14 !py-1 money text-right" placeholder="Qty"
+                        value={addons[a.key].qty} onChange={(e) => updAddon(a.key, 'qty', e.target.value)} />
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div><label className="label">Adults</label><input type="number" min="1" className="input" value={f.pax_adults} onChange={(e) => set('pax_adults', e.target.value)} /></div>
