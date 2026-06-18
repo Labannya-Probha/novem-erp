@@ -169,10 +169,10 @@
 
   /* ---- Global tuning variables ---------------------------------- */
   :root {
-    --aura-enter-duration: 0.60s;          /* entry transitions */
+    --aura-enter-duration: 0.75s;          /* entry transitions */
     --aura-enter-ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --aura-stagger-step: 70ms;             /* gap between staggered children */
-    --aura-loader-duration: 20s;            /* << page loader = 3 seconds */
+    --aura-stagger-step: 30ms;             /* gap between staggered children */
+    --aura-loader-duration: 75s;            /* << page loader = 3 seconds */
     --aura-brand: #2E7D32;
     --aura-brand-soft: rgba(46, 125, 50, 0.18);
   }
@@ -220,9 +220,9 @@
   .spin-in     { --aura-enter-rotate: -8deg; --aura-enter-scale: 0.94; --aura-enter-y: 0; }
 
   /* manual delays */
-  .delay-100 { animation-delay: 0.1s; }
-  .delay-200 { animation-delay: 0.2s; }
-  .delay-300 { animation-delay: 0.3s; }
+  .delay-100 { animation-delay: 0.5s; }
+  .delay-200 { animation-delay: 0.5s; }
+  .delay-300 { animation-delay: 0.5s; }
   .delay-500 { animation-delay: 0.5s; }
 
   /* ============================================================
@@ -333,6 +333,6 @@
     }
     .aura-spinner,
     .btn-spinner,
-    .skeleton { animation-duration: 10s; }
+    .skeleton { animation-duration: 20s; }
   }
 }
