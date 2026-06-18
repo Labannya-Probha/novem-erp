@@ -13,7 +13,7 @@ import Quotation from '../components/print/Quotation.jsx'
 import { exportXLSX } from '../lib/helpers'
 import {
   ArrowLeft, MessageCircle, Mail, CheckCircle2, LogIn, BedDouble,
-  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, BadgePercent, Pencil,
+  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, BadgePercent, Pencil, Save,
 } from 'lucide-react'
 
 const TABS = ['Overview', 'Check-In', 'Billings & Check-Out', 'Partners']
@@ -136,7 +136,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
 
       {tab === 'Overview' && (
         <Overview
-          res={res} guest={guest} resRooms={resRooms} setStatus={setStatus}
+          res={res} guest={guest} resRooms={resRooms} resGuests={resGuests} setStatus={setStatus}
           payments={payments} advance={paid} flash={flash} isAdmin={isAdmin} userName={userName}
           addons={addons} taxConfig={taxConfig} reload={loadAll}
           nights={nights} company={company} setPrintDoc={setPrintDoc}
@@ -243,7 +243,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
 /* ------------------------------------------------------------------ */
 /*  OVERVIEW TAB                                                        */
 /* ------------------------------------------------------------------ */
-function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, isAdmin, userName, addons = [], taxConfig = [], reload, nights, company, setPrintDoc }) {
+function Overview({ res, guest, resRooms, resGuests = [], setStatus, payments, advance, flash, isAdmin, userName, addons = [], taxConfig = [], reload, nights, company, setPrintDoc }) {
   const canConfirm = ['QUERY', 'QUOTED'].includes(res.status)
   const isCompany  = res.guest_type === 'Company'
   const [posting, setPosting] = useState(false)
@@ -442,96 +442,176 @@ function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, i
         )}
       </div>
 
+      {/* ---- QUOTATION TABLE ---- */}
       <div className="card p-5 lg:col-span-2">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-semibold text-pine">Quotation</h3>
-          {!quoteEditorOpen && (
-            <div className="flex gap-2">
-              <button className="btn-ghost !py-1.5 text-xs" onClick={latestQuote ? () => editQuote(latestQuote) : startNewQuote}>
-                <Pencil size={13} /> {latestQuote ? 'Edit' : 'Create quotation'}
-              </button>
-              {latestQuote && (
-                <>
-                  <button className="btn-ghost !py-1.5 text-xs" onClick={printQuote}><Printer size={13} /> Print</button>
-                  <button className="btn-ghost !py-1.5 text-xs" onClick={sendQuoteWhatsApp} disabled={!guest?.phone}><MessageCircle size={13} /> WhatsApp</button>
-                  <button className="btn-ghost !py-1.5 text-xs" onClick={sendQuoteEmail}><Mail size={13} /> Email</button>
-                </>
-              )}
-            </div>
-          )}
+          <button className="btn-ghost !py-1.5 text-xs" onClick={startNewQuote}>
+            <Plus size={13} /> New quotation
+          </button>
         </div>
 
-        {!quoteEditorOpen && (
-          latestQuote ? (
-            <div className="flex items-center justify-between text-sm bg-leaf/30 rounded-lg px-4 py-3">
-              <div>
-                <div className="font-semibold text-pine">{latestQuote.quote_no} · sent via {latestQuote.sent_via}</div>
-                <div className="text-xs text-pine/50">Valid till {fmtDate(latestQuote.valid_until)} · {quotes.length} quotation{quotes.length !== 1 ? 's' : ''} on file</div>
-              </div>
-              <div className="font-display text-lg font-bold money text-forest">{fmtBDT(latestQuote.total_amount)}</div>
-            </div>
-          ) : (
-            <p className="text-sm text-pine/50">No quotation created yet for this reservation.</p>
-          )
+        {quotes.length === 0 ? (
+          <p className="text-sm text-pine/50">No quotation created yet for this reservation.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="th">Quotation No</th>
+                  <th className="th">Guest / Reservation</th>
+                  <th className="th">Stay</th>
+                  <th className="th text-center">Rooms</th>
+                  <th className="th text-center">Pax</th>
+                  <th className="th">Source</th>
+                  <th className="th text-right">Total</th>
+                  <th className="th text-right">Valid Till</th>
+                  <th className="th"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotes.map((q) => (
+                  <tr key={q.id} className="hover:bg-leaf/20">
+                    <td className="td money font-semibold text-sm">{q.quote_no || '—'}</td>
+                    <td className="td text-sm">
+                      <div className="font-medium">{guest?.full_name || res.reservation_name || '—'}</div>
+                      <div className="text-xs text-pine/50">{res.res_no}</div>
+                    </td>
+                    <td className="td text-xs text-pine/70 whitespace-nowrap">
+                      {fmtDate(res.check_in)} → {fmtDate(res.check_out)}
+                      <div className="text-pine/50">{nights} night{nights !== 1 ? 's' : ''}</div>
+                    </td>
+                    <td className="td text-center money">{q.room_count ?? resRooms.length}</td>
+                    <td className="td text-center money">{resGuests.length || '—'}</td>
+                    <td className="td text-sm">{res.source || '—'}</td>
+                    <td className="td text-right money font-semibold text-forest">{fmtBDT(q.total_amount)}</td>
+                    <td className="td text-right text-xs text-pine/60 whitespace-nowrap">{fmtDate(q.valid_until)}</td>
+                    <td className="td">
+                      <div className="flex gap-1 justify-end">
+                        <button
+                          className="btn-ghost !py-1 !px-2 text-xs"
+                          onClick={() => editQuote(q)}
+                          title="Edit quotation"
+                        >
+                          <Pencil size={12} /> Edit
+                        </button>
+                        <button
+                          className="btn-ghost !py-1 !px-2 text-xs"
+                          onClick={() => { setEditingQuoteId(q.id); printQuote() }}
+                          title="Print quotation"
+                        >
+                          <Printer size={12} /> Print
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
+      </div>
 
-        {quoteEditorOpen && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
+      {/* ---- QUOTATION EDIT MODAL ---- */}
+      {quoteEditorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-pine/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-leaf">
+              <h2 className="font-display font-bold text-pine text-lg">
+                {editingQuoteId ? 'Update Quotation' : 'New Quotation'}
+              </h2>
+              <button onClick={cancelQuoteEdit} className="text-pine/40 hover:text-pine text-xl leading-none">✕</button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Reservation summary strip */}
+              <div className="bg-leaf/30 rounded-xl px-4 py-3 text-sm grid grid-cols-2 gap-2">
+                <div><span className="text-pine/50">Guest:</span> <span className="font-medium">{guest?.full_name || res.reservation_name || '—'}</span></div>
+                <div><span className="text-pine/50">Res No:</span> <span className="font-mono font-medium">{res.res_no}</span></div>
+                <div><span className="text-pine/50">Stay:</span> {fmtDate(res.check_in)} → {fmtDate(res.check_out)} ({nights} nights)</div>
+                <div><span className="text-pine/50">Rooms:</span> {resRooms.length} · <span className="text-pine/50">Pax:</span> {resGuests.length || '—'} · <span className="text-pine/50">Source:</span> {res.source || '—'}</div>
+              </div>
+
               {editingQuoteId && (
-                <div className="mb-3 px-3 py-2 rounded-lg bg-amber/10 text-amber text-sm font-medium">
-                  Editing a previously sent quotation — re-send to save changes.
+                <div className="px-3 py-2 rounded-lg bg-amber/10 text-amber text-sm font-medium">
+                  Editing a previously sent quotation — click Update Quotation to save changes.
                 </div>
               )}
-              <div className="grid grid-cols-4 gap-3 mb-4">
-                <div><label className="label">Rate / room / night</label><input type="number" className="input money" value={roomRate} onChange={(e) => setRoomRate(e.target.value)} /></div>
-                <div><label className="label">Rooms</label><input type="number" min="1" className="input money" value={roomCount} onChange={(e) => setRoomCount(e.target.value)} /></div>
-                <div><label className="label">Discount %</label><input type="number" min="0" max="100" className="input money" value={disc} onChange={(e) => setDisc(e.target.value)} onBlur={saveDisc} /></div>
-                <div><label className="label">Valid (days)</label><input type="number" min="1" className="input money" value={validDays} onChange={(e) => setValidDays(e.target.value)} /></div>
+
+              {/* Rate inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Rate / room / night (৳)</label>
+                  <input type="number" className="input money" value={roomRate} onChange={(e) => setRoomRate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">No. of rooms</label>
+                  <input type="number" min="1" className="input money" value={roomCount} onChange={(e) => setRoomCount(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Discount %</label>
+                  <input type="number" min="0" max="100" className="input money" value={disc} onChange={(e) => setDisc(e.target.value)} onBlur={saveDisc} />
+                </div>
+                <div>
+                  <label className="label">Valid for (days)</label>
+                  <input type="number" min="1" className="input money" value={validDays} onChange={(e) => setValidDays(e.target.value)} />
+                </div>
               </div>
-              <div className="bg-leaf/40 rounded-lg p-4 text-sm space-y-1 money">
+
+              {/* Charge breakdown */}
+              <div className="bg-leaf/40 rounded-xl p-4 text-sm space-y-1.5 money">
                 <Row k={`Room charge × ${nights} night(s)`} v={fmtBDT(quotePerNight.base_amount * (nights || 0))} />
                 {disc > 0 && <Row k={`Discount ${disc}%`} v={'− ' + fmtBDT(quotePerNight.discount * (nights || 0))} />}
                 <Row k={`Service charge ${quoteRate.service_charge_pct}%`} v={fmtBDT(quotePerNight.service_charge * (nights || 0))} />
                 <Row k={`VAT ${quoteRate.vat_pct}%`} v={fmtBDT(quotePerNight.vat * (nights || 0))} />
-                <div className="border-t border-pine/20 pt-1 font-bold"><Row k="Total" v={fmtBDT(quoteTotal)} /></div>
+                <div className="border-t border-pine/20 pt-2 font-bold text-base"><Row k="Total" v={fmtBDT(quoteTotal)} /></div>
               </div>
-              <div className="flex gap-2 mt-4">
-                <button className="btn-primary flex-1 justify-center" onClick={sendQuoteWhatsApp} disabled={!guest?.phone}><MessageCircle size={16} /> {editingQuoteId ? 'Update & resend via WhatsApp' : 'Send via WhatsApp'}</button>
-                <button className="btn-ghost flex-1 justify-center" onClick={sendQuoteEmail}><Mail size={16} /> {editingQuoteId ? 'Update & resend via Email' : 'Send via Email'}</button>
-                <button className="btn-amber justify-center" onClick={printQuote}><Printer size={16} /> PDF</button>
-                <button className="btn-ghost justify-center" onClick={cancelQuoteEdit}>Close</button>
-              </div>
-              {!guest?.phone && <p className="text-xs text-amber mt-2">Add the guest's phone number to enable WhatsApp.</p>}
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <label className="label !mb-0">Terms &amp; Conditions (printed on the quotation PDF)</label>
+
+              {/* Terms & Conditions */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="label !mb-0">Terms &amp; Conditions</label>
                   <button className="btn-ghost !py-1 text-xs" onClick={saveTerms}>Save T&amp;C</button>
                 </div>
-                <textarea className="input mt-1" rows={5} value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="Enter the terms & conditions to print on the quotation…" />
-                <p className="text-xs text-pine/50 mt-1">Default comes from Settings → company profile; edits here apply to this reservation only.</p>
+                <textarea className="input" rows={4} value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="Enter terms & conditions for this quotation…" />
+                <p className="text-xs text-pine/50 mt-1">Changes here apply to this reservation only.</p>
               </div>
-            </div>
-            <div>
-              <h4 className="label">Message preview</h4>
-              <pre className="text-xs whitespace-pre-wrap bg-paper border border-leaf rounded-lg p-3">{quoteMessage}</pre>
-              <h4 className="label mt-4">Sent quotations</h4>
-              {quotes.length === 0 && <p className="text-sm text-pine/50">None yet.</p>}
-              {quotes.map((q) => (
-                <div key={q.id} className={`flex justify-between items-center text-sm py-1.5 border-b border-leaf/60 money ${editingQuoteId === q.id ? 'bg-amber/10 -mx-2 px-2 rounded' : ''}`}>
-                  <span>{q.quote_no} · {q.sent_via}</span>
-                  <span className="flex items-center gap-2">
-                    {fmtBDT(q.total_amount)} · valid till {fmtDate(q.valid_until)}
-                    <button className="text-pine/50 hover:text-forest" title="Edit this quotation" onClick={() => editQuote(q)}>
-                      <Pencil size={13} />
-                    </button>
-                  </span>
-                </div>
-              ))}
+
+              {/* Message preview */}
+              <div>
+                <label className="label">Message preview</label>
+                <pre className="text-xs whitespace-pre-wrap bg-paper border border-leaf rounded-xl p-3 max-h-40 overflow-y-auto">{quoteMessage}</pre>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-leaf">
+                <button
+                  className="btn-primary flex-1 justify-center"
+                  onClick={() => editingQuoteId ? recordQuote('Updated') : sendQuoteWhatsApp()}
+                  disabled={!guest?.phone && !editingQuoteId}
+                >
+                  {editingQuoteId
+                    ? <><Save size={15} /> Update Quotation</>
+                    : <><MessageCircle size={15} /> Send via WhatsApp</>
+                  }
+                </button>
+                {!editingQuoteId && (
+                  <button className="btn-ghost flex-1 justify-center" onClick={sendQuoteEmail}>
+                    <Mail size={15} /> Send via Email
+                  </button>
+                )}
+                <button className="btn-ghost justify-center" onClick={printQuote}>
+                  <Printer size={15} /> Print PDF
+                </button>
+                <button className="btn-ghost justify-center" onClick={cancelQuoteEdit}>Cancel</button>
+              </div>
+              {!guest?.phone && !editingQuoteId && (
+                <p className="text-xs text-amber">Add the guest's phone number to enable WhatsApp sending.</p>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
       <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Pipeline actions</h3>
         <div className="space-y-2">
