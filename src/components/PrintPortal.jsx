@@ -30,6 +30,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
           width: 100% !important;
           max-width: ${type === 'thermal' ? '72mm' : '190mm'} !important;
           margin: 0 auto !important;
+          padding: 0 !important;
           font-size: 11px !important;
           line-height: 1.4 !important;
           color: #111 !important;
@@ -65,7 +66,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
   return createPortal(
     <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto p-6">
       {/* বর্ডার ও শ্যাডো রিমুভ করা হয়েছে */}
-      <div className="bg-white max-w-3xl w-full my-4 relative overflow-hidden border border-gray-300">
+      <div className="bg-white max-w-3xl w-full my-4 relative overflow-hidden">
         
         {/* Toolbar */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-300 sticky top-0 bg-white z-10 no-print">
@@ -86,11 +87,6 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
         {/* Print Content Wrapper */}
         <div id="print-root" className={`p-8 ${type === 'thermal' ? 'epos-receipt' : 'print-doc'}`}>
           {children}
-        </div>
-
-        {/* Footer */}
-        <div id="print-footer" className="hidden print:block text-gray-500">
-          Powered by Aura Stay
         </div>
 
       </div>
