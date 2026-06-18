@@ -28,6 +28,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
   const [charges, setCharges] = useState([])
   const [payments, setPayments] = useState([])
   const [invoices, setInvoices] = useState([])
+  const [addons, setAddons] = useState([])
   const [taxConfig, setTaxConfig] = useState([])
   const [company, setCompany] = useState(null)
   const [tab, setTab] = useState('Overview')
@@ -47,7 +48,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
     }
     const [
       { data: rg }, { data: rr }, { data: rm }, { data: ch },
-      { data: pm }, { data: inv }, { data: tc }, { data: co },
+      { data: pm }, { data: inv }, { data: ad }, { data: tc }, { data: co },
     ] = await Promise.all([
       supabase.from('reservation_guests').select('*').eq('reservation_id', id).order('is_primary', { ascending: false }),
       supabase.from('reservation_rooms').select('*, rooms(*)').eq('reservation_id', id),
@@ -55,12 +56,13 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       supabase.from('folio_charges').select('*').eq('reservation_id', id).order('charge_date'),
       supabase.from('payments').select('*').eq('reservation_id', id).order('received_date'),
       supabase.from('invoices').select('*').eq('reservation_id', id).order('created_at', { ascending: false }),
+      supabase.from('reservation_addons').select('*').eq('reservation_id', id).order('created_at'),
       supabase.from('tax_config').select('*'),
       supabase.from('company_settings').select('*').eq('id', 1).single(),
     ])
     setResGuests(rg || []); setResRooms(rr || []); setRooms(rm || [])
     setCharges(ch || []); setPayments(pm || []); setInvoices(inv || [])
-    setTaxConfig(tc || []); setCompany(co)
+    setAddons(ad || []); setTaxConfig(tc || []); setCompany(co)
   }
 
   useEffect(() => { loadAll() }, [id])
@@ -124,6 +126,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
         <Overview
           res={res} guest={guest} resRooms={resRooms} setStatus={setStatus}
           payments={payments} advance={paid} flash={flash} isAdmin={isAdmin} userName={userName}
+          addons={addons} taxConfig={taxConfig} reload={loadAll}
         />
       )}
       {tab === 'Quotation' && (
@@ -233,21 +236,104 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
 /* ------------------------------------------------------------------ */
 /*  OVERVIEW TAB                                                        */
 /* ------------------------------------------------------------------ */
-function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, isAdmin, userName }) {
+function Overview({ res, guest, resRooms, setStatus, payments, advance, flash, isAdmin, userName, addons = [], taxConfig = [], reload }) {
   const canConfirm = ['QUERY', 'QUOTED'].includes(res.status)
+  const isCompany  = res.guest_type === 'Company'
+  const [posting, setPosting] = useState(false)
+
+  const unposted = addons.filter((a) => !a.posted)
+  const lineTotal = (a) => Number(a.price) * Number(a.qty)
+  const addonsTotal = addons.reduce((sum, a) => sum + lineTotal(a), 0)
+
+  const postAddonCharges = async () => {
+    if (unposted.length === 0) { flash('No unposted addon items to post.'); return }
+    setPosting(true)
+    try {
+      const rate = rateFor(taxConfig, 'OTHER', todayISO())
+      for (const a of unposted) {
+        const calc = computeCharge(lineTotal(a), 0, rate)
+        const { data: fc, error: fcErr } = await supabase.from('folio_charges').insert({
+          reservation_id: res.id, charge_date: todayISO(), charge_type: 'OTHER',
+          description: `${a.label}${a.qty > 1 ? ` × ${a.qty}` : ''}`,
+          ...calc, created_by: userName,
+        }).select().single()
+        if (fcErr) throw fcErr
+        const { error: updErr } = await supabase.from('reservation_addons')
+          .update({ posted: true, folio_charge_id: fc.id }).eq('id', a.id)
+        if (updErr) throw updErr
+      }
+      await reload?.()
+      flash(`${unposted.length} addon item(s) posted to the folio.`)
+    } catch (e) {
+      flash(e.message || 'Failed to post addon charges.')
+    }
+    setPosting(false)
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="card p-5 lg:col-span-2">
         <h3 className="font-display font-semibold text-pine mb-3">Guest & stay</h3>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <div><dt className="label">Primary guest</dt><dd className="font-semibold">{guest?.full_name || '—'}</dd></div>
+          <div><dt className="label">Primary guest</dt><dd className="font-semibold">{res.salutation ? `${res.salutation} ` : ''}{guest?.full_name || '—'}</dd></div>
           <div><dt className="label">Contact</dt><dd>{guest?.phone || '—'}{guest?.email ? ` · ${guest.email}` : ''}</dd></div>
           <div><dt className="label">Address</dt><dd>{guest?.address || '—'}</dd></div>
           <div><dt className="label">Source</dt><dd>{res.source}</dd></div>
+          <div><dt className="label">Guest type</dt><dd>{res.guest_type || 'Individual'}</dd></div>
+          <div><dt className="label">Reservation name</dt><dd>{res.reservation_name || '—'}{res.use_reservation_name_only && <span className="text-xs text-pine/50"> (used everywhere)</span>}</dd></div>
           <div><dt className="label">Discount</dt><dd>{Number(res.discount_pct) > 0 ? `${res.discount_pct}% — applied on room charges` : '—'}</dd></div>
           <div><dt className="label">Rooms assigned</dt><dd>{resRooms.length ? resRooms.map((r) => r.rooms?.room_no).join(', ') : 'Not yet assigned'}</dd></div>
-          <div><dt className="label">Notes</dt><dd>{res.notes || '—'}</dd></div>
+          <div className="col-span-2"><dt className="label">Notes</dt><dd>{res.notes || '—'}</dd></div>
         </dl>
+
+        {isCompany && (
+          <>
+            <h3 className="font-display font-semibold text-pine mb-3 mt-5">Company / OTA terms</h3>
+            <dl className="grid grid-cols-3 gap-x-6 gap-y-3 text-sm">
+              <div><dt className="label">Commission rate</dt><dd className="font-semibold money">{Number(res.commission_pct) || 0}%</dd></div>
+              <div><dt className="label">Vat/VDS</dt><dd className="font-semibold money">{Number(res.vat_vds_pct) || 0}%</dd></div>
+              <div><dt className="label">Tax/TDS</dt><dd className="font-semibold money">{Number(res.tax_tds_pct) || 0}%</dd></div>
+            </dl>
+          </>
+        )}
+
+        <div className="flex items-center justify-between mt-5 mb-2">
+          <h3 className="font-display font-semibold text-pine">Including items</h3>
+          {addons.length > 0 && (
+            <button className="btn-amber !py-1.5 text-xs" onClick={postAddonCharges} disabled={posting || unposted.length === 0}>
+              {posting ? 'Posting…' : unposted.length === 0 ? 'All posted' : `Post ${unposted.length} item(s) to folio`}
+            </button>
+          )}
+        </div>
+        {addons.length === 0 && <p className="text-sm text-pine/50">No additional items selected for this booking.</p>}
+        {addons.length > 0 && (
+          <div className="border border-leaf rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-leaf/30">
+                <th className="th">Item</th><th className="th text-right">Price</th><th className="th text-right">Qty</th>
+                <th className="th text-right">Total</th><th className="th text-center">Status</th>
+              </tr></thead>
+              <tbody>
+                {addons.map((a) => (
+                  <tr key={a.id} className="border-t border-leaf/60">
+                    <td className="td">{a.label}</td>
+                    <td className="td money text-right">{fmtBDT(a.price)}</td>
+                    <td className="td money text-right">{a.qty}</td>
+                    <td className="td money text-right font-semibold">{fmtBDT(lineTotal(a))}</td>
+                    <td className="td text-center">
+                      <span className={`status-chip ${a.posted ? 'bg-forest/15 text-forest' : 'bg-amber/20 text-amber'}`}>{a.posted ? 'Posted' : 'Pending'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr className="bg-leaf/40 font-bold money border-t border-leaf">
+                <td className="td" colSpan={3}>Total</td>
+                <td className="td text-right">{fmtBDT(addonsTotal)}</td>
+                <td className="td"></td>
+              </tr></tfoot>
+            </table>
+          </div>
+        )}
       </div>
       <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Pipeline actions</h3>
