@@ -8,8 +8,8 @@ const STATUSES = ['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_
 
 // Which ReservationDetail tab the status badge should jump to when clicked
 const STATUS_TO_TAB = {
-  QUERY: 'Quotation',
-  QUOTED: 'Quotation',
+  QUERY: 'Overview',
+  QUOTED: 'Overview',
   CONFIRMED: 'Check-In',
   CHECKED_IN: 'Billings & Check-Out',
   CHECKED_OUT: 'Billings & Check-Out',
