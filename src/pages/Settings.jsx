@@ -121,100 +121,141 @@ function MyAccountCard({ userName }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  RICH TEXT EDITOR — standalone, reliable, no external deps          */
+/*  RICH TEXT EDITOR — textarea-based, no execCommand, works everywhere */
 /* ------------------------------------------------------------------ */
 function RichTextEditor({ initialHtml, onSave }) {
-  const editorRef = useRef(null)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved]   = useState(false)
+  // Convert simple HTML to readable text for the textarea
+  const htmlToText = (html) => {
+    if (!html) return ''
+    return html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<\/h[1-6]>/gi, '\n')
+      .replace(/<li>/gi, '• ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
 
-  // Populate editor once on mount — never on re-render (avoids cursor jumps)
-  useEffect(() => {
-    if (editorRef.current && initialHtml !== undefined) {
-      editorRef.current.innerHTML = initialHtml
-    }
-  }, []) // empty deps — intentionally only on mount
+  // Convert plain text back to simple HTML for storage & printing
+  const textToHtml = (text) => {
+    if (!text) return ''
+    return text
+      .split('\n')
+      .map((line) => {
+        const t = line.trim()
+        if (!t) return '<br>'
+        if (t.startsWith('• ') || t.startsWith('- ')) return `<li>${t.slice(2)}</li>`
+        if (t.startsWith('# ')) return `<h3>${t.slice(2)}</h3>`
+        return `<p>${t}</p>`
+      })
+      .join('')
+  }
 
-  // Execute a formatting command without stealing focus
-  const fmt = (e, cmd, val = null) => {
-    e.preventDefault() // prevent button from stealing focus from editor
-    editorRef.current?.focus()
-    document.execCommand(cmd, false, val)
+  const taRef = useRef(null)
+  const [text, setText]     = useState(() => htmlToText(initialHtml))
+  const [preview, setPreview] = useState(false)
+  const [saving, setSaving]   = useState(false)
+  const [saved, setSaved]     = useState(false)
+
+  // Insert formatting tag around selected text in textarea
+  const wrap = (before, after) => {
+    const ta = taRef.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const end   = ta.selectionEnd
+    const sel   = text.slice(start, end)
+    const newText = text.slice(0, start) + before + sel + after + text.slice(end)
+    setText(newText)
+    // Restore selection after state update
+    setTimeout(() => {
+      ta.focus()
+      ta.setSelectionRange(start + before.length, start + before.length + sel.length)
+    }, 0)
+  }
+
+  // Insert text at cursor or prepend to each selected line
+  const insertLine = (prefix) => {
+    const ta = taRef.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const end   = ta.selectionEnd
+    const before = text.slice(0, start)
+    const selected = text.slice(start, end)
+    const after = text.slice(end)
+    // Apply prefix to each line in selection
+    const prefixed = selected
+      ? selected.split('\n').map((l) => prefix + l).join('\n')
+      : prefix
+    const newText = before + prefixed + after
+    setText(newText)
+    setTimeout(() => { ta.focus() }, 0)
   }
 
   const handleSave = async () => {
-    if (!editorRef.current) return
     setSaving(true)
-    await onSave(editorRef.current.innerHTML)
+    await onSave(textToHtml(text))
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
-  const ToolBtn = ({ cmd, val, title, children }) => (
-    <button
-      type="button"
-      onMouseDown={(e) => fmt(e, cmd, val)}
-      title={title}
-      className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/80 text-pine/60 hover:text-pine transition-colors text-sm font-bold select-none"
-    >
-      {children}
-    </button>
-  )
+  const BtnStyle = 'w-8 h-8 flex items-center justify-center rounded hover:bg-leaf text-pine/60 hover:text-forest transition-colors text-sm font-bold select-none'
 
   return (
     <div className="border border-leaf rounded-xl overflow-hidden">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 bg-stone-50 border-b border-leaf">
-        <ToolBtn cmd="bold" title="Bold (Ctrl+B)"><span className="font-bold">B</span></ToolBtn>
-        <ToolBtn cmd="italic" title="Italic (Ctrl+I)"><span className="italic">I</span></ToolBtn>
-        <ToolBtn cmd="underline" title="Underline (Ctrl+U)"><span className="underline">U</span></ToolBtn>
+        <button type="button" className={BtnStyle} title="Bold — wraps selection in **" onClick={() => wrap('**', '**')}><span className="font-bold">B</span></button>
+        <button type="button" className={BtnStyle} title="Italic — wraps selection in _" onClick={() => wrap('_', '_')}><span className="italic">I</span></button>
+        <button type="button" className={BtnStyle} title="Underline — wraps selection in __" onClick={() => wrap('<u>', '</u>')}><span className="underline">U</span></button>
         <div className="w-px h-5 bg-pine/15 mx-1" />
-        <ToolBtn cmd="insertUnorderedList" title="Bullet list"><span className="text-base">•≡</span></ToolBtn>
-        <ToolBtn cmd="insertOrderedList" title="Numbered list"><span className="text-base">1≡</span></ToolBtn>
+        <button type="button" className={BtnStyle} title="Bullet point — prefix line with • " onClick={() => insertLine('• ')}><span>•≡</span></button>
+        <button type="button" className={BtnStyle} title="Heading — prefix line with # " onClick={() => insertLine('# ')}><span className="font-bold text-xs">H</span></button>
         <div className="w-px h-5 bg-pine/15 mx-1" />
-        <ToolBtn cmd="justifyLeft" title="Align left"><span>⬛▭▭</span></ToolBtn>
-        <ToolBtn cmd="justifyCenter" title="Align center"><span>▭⬛▭</span></ToolBtn>
-        <ToolBtn cmd="justifyRight" title="Align right"><span>▭▭⬛</span></ToolBtn>
-        <div className="w-px h-5 bg-pine/15 mx-1" />
-        <ToolBtn cmd="formatBlock" val="h3" title="Heading"><span className="text-xs font-bold">H</span></ToolBtn>
-        <ToolBtn cmd="formatBlock" val="p" title="Paragraph"><span className="text-xs">¶</span></ToolBtn>
-        <ToolBtn cmd="removeFormat" title="Clear formatting"><span className="text-xs line-through">A</span></ToolBtn>
+        <button
+          type="button"
+          onClick={() => setPreview((v) => !v)}
+          className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${preview ? 'bg-forest/15 text-forest' : 'bg-white border border-leaf text-pine/60 hover:text-pine'}`}
+        >
+          {preview ? '✏ Edit' : '👁 Preview'}
+        </button>
         <div className="flex-1" />
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-            saved
-              ? 'bg-forest/15 text-forest'
-              : 'bg-forest text-white hover:bg-forest/90'
-          }`}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${saved ? 'bg-forest/15 text-forest' : 'bg-forest text-white hover:bg-forest/90'}`}
         >
-          <Save size={12} />
-          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save T&C'}
+          <Save size={12} /> {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save T&C'}
         </button>
       </div>
 
-      {/* Editor area */}
-      <div
-        ref={editorRef}
-        contentEditable
-        suppressContentEditableWarning
-        className="min-h-[200px] max-h-[400px] overflow-y-auto p-4 text-sm text-pine focus:outline-none bg-white"
-        style={{
-          lineHeight: '1.7',
-        }}
-        onPaste={(e) => {
-          // Paste as plain text to avoid importing messy external HTML
-          e.preventDefault()
-          const text = e.clipboardData.getData('text/plain')
-          document.execCommand('insertText', false, text)
-        }}
-      />
+      {/* Editor or Preview */}
+      {preview ? (
+        <div
+          className="min-h-[200px] max-h-[400px] overflow-y-auto p-4 text-sm text-pine bg-white prose prose-sm max-w-none"
+          dangerouslySetInnerHTML={{ __html: textToHtml(text) }}
+        />
+      ) : (
+        <textarea
+          ref={taRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          className="w-full min-h-[200px] max-h-[400px] p-4 text-sm text-pine bg-white focus:outline-none resize-y font-mono leading-relaxed"
+          placeholder={`Write terms & conditions here…\n\nFormatting tips:\n• Start a line with "• " for bullet points\n• Start a line with "# " for a heading\nSelect text and click B / I / U to format`}
+          spellCheck={false}
+        />
+      )}
 
-      <div className="px-4 py-2 bg-stone-50 border-t border-leaf text-xs text-pine/40">
-        Supports bold, italic, underline, lists and alignment. Saves separately from the main profile.
+      <div className="px-4 py-2 bg-stone-50 border-t border-leaf text-xs text-pine/40 flex items-center justify-between">
+        <span>Select text then click <strong>B</strong> / <strong>I</strong> / <strong>U</strong> · Start line with <code>•</code> for bullets · <code>#</code> for heading</span>
+        <span>{text.length} chars</span>
       </div>
     </div>
   )
