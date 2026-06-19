@@ -80,7 +80,6 @@ export default function Login() {
                 key={logoUrl}
                 src={logoUrl}
                 alt={propertyName}
-                crossOrigin="anonymous"
                 className={`w-20 h-20 rounded-2xl object-contain bg-white shadow-md p-1 transition-opacity duration-300 ${logoLoaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => setLogoLoaded(true)}
                 onError={() => { setLogoErr(true); setLogoLoaded(false) }}
