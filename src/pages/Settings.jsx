@@ -5,7 +5,7 @@ import { ROLES, ROLE_LABELS } from '../lib/roles'
 import {
   Save, Plus, BedDouble, Percent, Building2, Trash2, Users, ShieldCheck,
   Upload, Image, Bold, List, AlignLeft, AlignCenter, KeyRound, AlertTriangle,
-  Eye, EyeOff, ChevronDown, ChevronUp,
+  Eye, EyeOff, ChevronDown, ChevronUp, FileUp, FileDown, CheckCircle2, XCircle, TableProperties,
 } from 'lucide-react'
 
 /* ------------------------------------------------------------------ */
@@ -36,6 +36,7 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
         {isAdminPlus && <BrandingCard reloadCompany={reloadCompany} />}
         <TaxCard />
         <RoomsCard />
+        {isAdminPlus && <CsvImportCard />}
         <StaffCard isAdminPlus={isAdminPlus} isSuperuser={isSuperuser} currentUserName={userName} />
         {isSuperuser && <DataWipeCard />}
       </div>
@@ -629,6 +630,407 @@ function DataWipeCard() {
                 <AlertTriangle size={15} /> {busy ? 'Wiping…' : `Wipe ${module.label}`}
               </button>
             </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  CSV IMPORT — Admin & Superuser only                                 */
+/* ------------------------------------------------------------------ */
+
+// Table definitions: columns the CSV must supply, how to map to DB row
+const IMPORT_TABLES = {
+  rooms: {
+    label: 'Rooms',
+    description: 'Room inventory — room number, type, base rate',
+    csvColumns: ['room_no', 'room_name', 'room_type', 'base_rate', 'notes'],
+    required: ['room_no'],
+    mapRow: (r) => ({
+      room_no:   r.room_no?.trim(),
+      room_name: r.room_name?.trim() || null,
+      room_type: r.room_type?.trim() || 'Standard',
+      base_rate: parseFloat(r.base_rate) || 0,
+      notes:     r.notes?.trim() || null,
+      is_active: true,
+    }),
+    sampleRow: { room_no: '101', room_name: 'Garden View', room_type: 'Deluxe', base_rate: '3500', notes: '' },
+  },
+  chart_of_accounts: {
+    label: 'Opening Balance (Chart of Accounts)',
+    description: 'Account code, name, type, normal side (DEBIT/CREDIT)',
+    csvColumns: ['code', 'name', 'type', 'normal_side', 'subtype'],
+    required: ['code', 'name', 'type', 'normal_side'],
+    mapRow: (r) => ({
+      code:        r.code?.trim(),
+      name:        r.name?.trim(),
+      type:        r.type?.trim().toUpperCase(),
+      normal_side: r.normal_side?.trim().toUpperCase(),
+      subtype:     r.subtype?.trim() || null,
+      is_active:   true,
+      is_control:  false,
+      is_system:   false,
+    }),
+    sampleRow: { code: '1001', name: 'Cash in Hand', type: 'ASSET', normal_side: 'DEBIT', subtype: 'Current Asset' },
+  },
+  companies: {
+    label: 'Companies',
+    description: 'Corporate clients and partner companies',
+    csvColumns: ['name', 'contact_person', 'phone', 'email', 'address'],
+    required: ['name'],
+    mapRow: (r) => ({
+      name:           r.name?.trim(),
+      contact_person: r.contact_person?.trim() || null,
+      phone:          r.phone?.trim() || null,
+      email:          r.email?.trim() || null,
+      address:        r.address?.trim() || null,
+      is_active:      true,
+    }),
+    sampleRow: { name: 'ABC Corp Ltd', contact_person: 'Rahim Uddin', phone: '01700000000', email: 'info@abc.com', address: 'Dhaka' },
+  },
+  vendors: {
+    label: 'Vendors',
+    description: 'Suppliers and procurement vendors',
+    csvColumns: ['name', 'bin', 'phone', 'address'],
+    required: ['name'],
+    mapRow: (r) => ({
+      name:      r.name?.trim(),
+      bin:       r.bin?.trim() || null,
+      phone:     r.phone?.trim() || null,
+      address:   r.address?.trim() || null,
+      is_active: true,
+    }),
+    sampleRow: { name: 'Rahman Traders', bin: '000000000-0000', phone: '01800000000', address: 'Sreemangal' },
+  },
+  menu_items: {
+    label: 'Menu Items',
+    description: 'Restaurant POS menu — category name must match existing categories',
+    csvColumns: ['category_name', 'name', 'price', 'measuring_units', 'pos_menu_catagories', 'sort_order'],
+    required: ['name', 'price'],
+    // category_name resolved to category_id at import time via menuCatMap
+    mapRow: (r, menuCatMap) => ({
+      category_id:        menuCatMap[r.category_name?.trim().toLowerCase()] || null,
+      name:               r.name?.trim(),
+      price:              parseFloat(r.price) || 0,
+      measuring_units:    r.measuring_units?.trim() || null,
+      pos_menu_catagories: r.pos_menu_catagories?.trim() || null,
+      sort_order:         parseInt(r.sort_order) || 0,
+      is_active:          true,
+    }),
+    sampleRow: { category_name: 'Beverages', name: 'Fresh Lime Soda', price: '120', measuring_units: 'Glass', pos_menu_catagories: '', sort_order: '0' },
+  },
+  facility_items: {
+    label: 'Facility Items',
+    description: 'Tea garden, pickle, sports and other facility items',
+    csvColumns: ['category', 'name', 'unit', 'default_price', 'charge_type', 'pricing_mode', 'is_rental'],
+    required: ['category', 'name'],
+    mapRow: (r) => ({
+      category:     r.category?.trim(),
+      name:         r.name?.trim(),
+      unit:         r.unit?.trim() || 'pc',
+      default_price: parseFloat(r.default_price) || 0,
+      charge_type:  r.charge_type?.trim().toUpperCase() || 'OTHER',
+      pricing_mode: r.pricing_mode?.trim().toUpperCase() || 'PER_UNIT',
+      is_rental:    r.is_rental?.toString().toLowerCase() === 'true',
+      is_active:    true,
+    }),
+    sampleRow: { category: 'Tea Garden', name: 'Tea Plucking Tour', unit: 'person', default_price: '500', charge_type: 'OTHER', pricing_mode: 'PER_UNIT', is_rental: 'false' },
+  },
+  employees: {
+    label: 'Employees',
+    description: 'HR employee records — emp_code is auto-generated if left blank',
+    csvColumns: ['full_name', 'designation', 'department', 'join_date', 'phone', 'nid', 'address', 'gross_salary'],
+    required: ['full_name'],
+    mapRow: (r) => ({
+      full_name:    r.full_name?.trim(),
+      designation:  r.designation?.trim() || null,
+      department:   r.department?.trim() || null,
+      join_date:    r.join_date?.trim() || null,
+      phone:        r.phone?.trim() || null,
+      nid:          r.nid?.trim() || null,
+      address:      r.address?.trim() || null,
+      gross_salary: parseFloat(r.gross_salary) || 0,
+      status:       'ACTIVE',
+    }),
+    sampleRow: { full_name: 'Karim Hossain', designation: 'Waiter', department: 'F&B', join_date: '2024-01-01', phone: '01900000000', nid: '1234567890', address: 'Sreemangal', gross_salary: '9000' },
+  },
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/)
+  if (lines.length < 2) return { headers: [], rows: [] }
+  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+  const rows = lines.slice(1).map((line) => {
+    const vals = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''))
+    return Object.fromEntries(headers.map((h, i) => [h, vals[i] ?? '']))
+  })
+  return { headers, rows }
+}
+
+function generateCsv(columns, sampleRow) {
+  const header = columns.join(',')
+  const sample = columns.map((c) => sampleRow[c] ?? '').join(',')
+  return `${header}\n${sample}`
+}
+
+function downloadCsv(filename, content) {
+  const blob = new Blob([content], { type: 'text/csv' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function CsvImportCard() {
+  const [tableKey, setTableKey]   = useState('rooms')
+  const [preview, setPreview]     = useState([])   // parsed rows before import
+  const [headers, setHeaders]     = useState([])
+  const [errors, setErrors]       = useState([])   // per-row validation errors
+  const [result, setResult]       = useState(null) // { inserted, failed }
+  const [busy, setBusy]           = useState(false)
+  const [msg, setMsg]             = useState(null) // { text, ok }
+  const [expanded, setExpanded]   = useState(false)
+  const [menuCatMap, setMenuCatMap] = useState({}) // name.toLowerCase() -> id
+  const fileRef = useRef(null)
+
+  const flash = (text, ok = false) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 7000) }
+  const tbl   = IMPORT_TABLES[tableKey]
+
+  // Load menu categories for name→id resolution
+  useEffect(() => {
+    supabase.from('menu_categories').select('id, name').then(({ data }) => {
+      if (data) setMenuCatMap(Object.fromEntries(data.map((c) => [c.name.toLowerCase(), c.id])))
+    })
+  }, [])
+
+  const handleFile = (file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const { headers: h, rows } = parseCsv(e.target.result)
+      setHeaders(h)
+      setResult(null)
+
+      // Validate required columns present
+      const missing = tbl.required.filter((c) => !h.includes(c))
+      if (missing.length) {
+        flash(`CSV is missing required columns: ${missing.join(', ')}`)
+        setPreview([]); setErrors([])
+        return
+      }
+
+      // Validate each row
+      const rowErrors = rows.map((r, i) => {
+        const missing = tbl.required.filter((c) => !r[c]?.trim())
+        return missing.length ? `Row ${i + 2}: missing ${missing.join(', ')}` : null
+      }).filter(Boolean)
+
+      setPreview(rows)
+      setErrors(rowErrors)
+      if (rowErrors.length) flash(`${rowErrors.length} row(s) have validation issues — fix the CSV and re-upload, or proceed to skip invalid rows.`)
+    }
+    reader.readAsText(file)
+  }
+
+  const doImport = async () => {
+    if (!preview.length) { flash('No data to import — upload a CSV first.'); return }
+    setBusy(true)
+    setResult(null)
+
+    // Build valid rows only
+    const validRows = preview.filter((r) => {
+      return tbl.required.every((c) => r[c]?.trim())
+    }).map((r) => tbl.mapRow(r, menuCatMap))
+
+    const batchSize = 100
+    let inserted = 0, failed = 0
+    for (let i = 0; i < validRows.length; i += batchSize) {
+      const batch = validRows.slice(i, i + batchSize)
+      const { error, count } = await supabase
+        .from(tableKey)
+        .insert(batch)
+        .select('id')
+      if (error) {
+        failed += batch.length
+        flash(`Batch ${Math.floor(i / batchSize) + 1} failed: ${error.message}`)
+      } else {
+        inserted += (count ?? batch.length)
+      }
+    }
+
+    setBusy(false)
+    setResult({ inserted, failed, skipped: preview.length - validRows.length })
+    flash(`Import complete — ${inserted} inserted, ${failed} failed, ${preview.length - validRows.length} skipped (validation).`, inserted > 0)
+  }
+
+  const reset = () => { setPreview([]); setHeaders([]); setErrors([]); setResult(null); setMsg(null); if (fileRef.current) fileRef.current.value = '' }
+
+  return (
+    <div className="card p-5">
+      <button className="w-full flex items-center justify-between text-left" onClick={() => setExpanded((v) => !v)}>
+        <h2 className="font-display font-semibold text-pine flex items-center gap-2">
+          <TableProperties size={18} className="text-forest" /> CSV Import
+        </h2>
+        {expanded ? <ChevronUp size={18} className="text-pine/40" /> : <ChevronDown size={18} className="text-pine/40" />}
+      </button>
+      <p className="text-xs text-pine/50 mt-1">Bulk-upload data into any master table using a CSV file.</p>
+
+      {expanded && (
+        <div className="mt-5 space-y-5">
+          {msg && (
+            <div className={`px-3 py-2 rounded-lg text-sm ${msg.ok ? 'bg-forest/10 text-forest' : 'bg-amber/10 text-amber-700'}`}>
+              {msg.text}
+            </div>
+          )}
+
+          {/* Table selector */}
+          <div>
+            <label className="label">Select table to import into</label>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              {Object.entries(IMPORT_TABLES).map(([key, t]) => (
+                <button
+                  key={key}
+                  onClick={() => { setTableKey(key); reset() }}
+                  className={`text-left p-3 rounded-xl border text-sm transition-colors ${
+                    tableKey === key
+                      ? 'border-forest bg-forest/10 text-forest font-semibold'
+                      : 'border-leaf hover:border-forest/40 text-pine'
+                  }`}
+                >
+                  <div className="font-medium">{t.label}</div>
+                  <div className="text-xs text-pine/50 mt-0.5 line-clamp-2">{t.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Selected table info + template download */}
+          <div className="bg-leaf/30 rounded-xl p-4">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <div className="font-semibold text-pine text-sm">{tbl.label}</div>
+                <div className="text-xs text-pine/60 mt-0.5">{tbl.description}</div>
+                <div className="text-xs text-pine/50 mt-1.5">
+                  Required columns: <span className="font-mono font-medium">{tbl.required.join(', ')}</span>
+                </div>
+                <div className="text-xs text-pine/50">
+                  All columns: <span className="font-mono">{tbl.csvColumns.join(', ')}</span>
+                </div>
+              </div>
+              <button
+                className="btn-ghost text-xs shrink-0"
+                onClick={() => downloadCsv(`${tableKey}_template.csv`, generateCsv(tbl.csvColumns, tbl.sampleRow))}
+              >
+                <FileDown size={14} /> Download template CSV
+              </button>
+            </div>
+          </div>
+
+          {/* File upload */}
+          <div>
+            <label className="label">Upload CSV file</label>
+            <div className="flex items-center gap-3">
+              <label className="btn-ghost cursor-pointer">
+                <FileUp size={15} /> Choose CSV
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => handleFile(e.target.files?.[0])}
+                />
+              </label>
+              {preview.length > 0 && (
+                <span className="text-sm text-pine/70">
+                  {preview.length} row{preview.length !== 1 ? 's' : ''} loaded
+                  {errors.length > 0 && <span className="text-amber-600 ml-1">· {errors.length} with issues</span>}
+                </span>
+              )}
+              {preview.length > 0 && (
+                <button className="btn-ghost text-xs !py-1" onClick={reset}>Clear</button>
+              )}
+            </div>
+          </div>
+
+          {/* Validation errors */}
+          {errors.length > 0 && (
+            <div className="rounded-xl border border-amber/30 bg-amber/5 p-3">
+              <div className="text-xs font-semibold text-amber-700 mb-2">Validation issues (these rows will be skipped):</div>
+              {errors.slice(0, 8).map((e, i) => (
+                <div key={i} className="text-xs text-amber-600 flex items-start gap-1.5">
+                  <XCircle size={12} className="mt-0.5 shrink-0" /> {e}
+                </div>
+              ))}
+              {errors.length > 8 && <div className="text-xs text-amber-600 mt-1">…and {errors.length - 8} more.</div>}
+            </div>
+          )}
+
+          {/* Preview table */}
+          {preview.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-pine mb-2">Preview (first 5 rows):</div>
+              <div className="overflow-x-auto rounded-xl border border-leaf">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-leaf/30">
+                      <th className="th !py-2 !text-xs">#</th>
+                      {tbl.csvColumns.map((c) => <th key={c} className="th !py-2 !text-xs">{c}</th>)}
+                      <th className="th !py-2 !text-xs">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.slice(0, 5).map((r, i) => {
+                      const hasErr = tbl.required.some((c) => !r[c]?.trim())
+                      return (
+                        <tr key={i} className={hasErr ? 'bg-red-50' : ''}>
+                          <td className="td !py-1.5 text-pine/40">{i + 2}</td>
+                          {tbl.csvColumns.map((c) => (
+                            <td key={c} className={`td !py-1.5 ${tbl.required.includes(c) && !r[c]?.trim() ? 'text-red-500 font-semibold' : ''}`}>
+                              {r[c] || <span className="text-pine/30">—</span>}
+                            </td>
+                          ))}
+                          <td className="td !py-1.5">
+                            {hasErr
+                              ? <span className="flex items-center gap-1 text-red-500"><XCircle size={11} /> Skip</span>
+                              : <span className="flex items-center gap-1 text-forest"><CheckCircle2 size={11} /> OK</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {preview.length > 5 && (
+                      <tr><td className="td !py-1.5 text-pine/40 text-center" colSpan={tbl.csvColumns.length + 2}>…{preview.length - 5} more rows</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Import result */}
+          {result && (
+            <div className={`rounded-xl border p-4 text-sm ${result.failed === 0 ? 'border-forest/30 bg-forest/5' : 'border-amber/30 bg-amber/5'}`}>
+              <div className="flex items-center gap-2 font-semibold text-pine mb-1">
+                <CheckCircle2 size={16} className="text-forest" /> Import complete
+              </div>
+              <div className="text-pine/70 text-xs space-y-0.5">
+                <div>✅ Inserted: <span className="font-semibold text-forest">{result.inserted}</span></div>
+                {result.skipped > 0 && <div>⏭ Skipped (validation): <span className="font-semibold text-amber-600">{result.skipped}</span></div>}
+                {result.failed > 0 && <div>❌ Failed (DB error): <span className="font-semibold text-red-600">{result.failed}</span></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Import button */}
+          {preview.length > 0 && !result && (
+            <button
+              className="btn-primary"
+              onClick={doImport}
+              disabled={busy || preview.every((r) => tbl.required.some((c) => !r[c]?.trim()))}
+            >
+              <FileUp size={15} /> {busy ? 'Importing…' : `Import ${preview.filter((r) => tbl.required.every((c) => r[c]?.trim())).length} valid row(s) into ${tbl.label}`}
+            </button>
           )}
         </div>
       )}
