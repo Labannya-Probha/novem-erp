@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------ */
-/*  OVERVIEW TAB  (with Full Quotation Edit Modal)                     */
+/*  OVERVIEW TAB  (updated with single-quote row and full edit modal)  */
 /* ------------------------------------------------------------------ */
 function Overview({
   res, guest, resRooms, resGuests = [], setStatus, payments, advance, flash,
@@ -9,20 +9,18 @@ function Overview({
   const isCompany  = res.guest_type === 'Company'
   const [posting, setPosting] = useState(false)
 
-  // ──────── Quotation state ────────
-  const [quote, setQuote]               = useState(null)        // latest quotation object
+  // ──────── Quotation states ────────
+  const [quote, setQuote]               = useState(null)      // latest quotation
   const [quoteEditorOpen, setQuoteEditorOpen] = useState(false)
-  const [editing, setEditing]           = useState(false)       // true when editing existing quote
+  const [editing, setEditing]           = useState(false)     // true when editing existing
 
-  // Form fields for the full quotation edit
+  // Form fields for the quotation editor
   const [editForm, setEditForm] = useState({
-    // guest info
     salutation: res.salutation || '',
     full_name: guest?.full_name || '',
     phone: guest?.phone || '',
     email: guest?.email || '',
     address: guest?.address || '',
-    // reservation fields
     check_in: res.check_in,
     check_out: res.check_out,
     pax_adults: res.pax_adults || 1,
@@ -32,21 +30,18 @@ function Overview({
     use_reservation_name_only: res.use_reservation_name_only || false,
     guest_type: res.guest_type || 'Individual',
     notes: res.notes || '',
-    // rate & discount
     discount_type: res.discount_type || 'percentage',
     discount_val: res.discount_val || 0,
     discount_pct: res.discount_pct || 0,
-    // terms
     terms_conditions: res.terms_conditions || company?.terms_conditions || '',
   })
 
-  // Room assignment within the quotation editor
-  const [roomList, setRoomList]         = useState([])          // array of { id, room_id, room_no, room_name, room_type, rate }
-  const [roomsAll, setRoomsAll]         = useState([])          // full room inventory
-  const [addonList, setAddonList]       = useState([])          // addons snapshot
+  const [roomList, setRoomList]         = useState([])       // rooms in editor
+  const [roomsAll, setRoomsAll]         = useState([])       // full room inventory
+  const [addonList, setAddonList]       = useState([])       // addons in editor
   const [newAddon, setNewAddon]         = useState({ label: '', price: '', qty: 1 })
 
-  // Load latest quotation
+  // ───── load latest quotation ─────
   const loadLatestQuote = async () => {
     const { data } = await supabase
       .from('quotations')
@@ -57,13 +52,11 @@ function Overview({
     setQuote(data?.[0] || null)
   }
 
-  // Initial load
   useEffect(() => { loadLatestQuote() }, [res.id])
 
-  // When quotation modal opens, populate all fields
+  // ───── open editor ─────
   const openQuoteEditor = (editExisting = false) => {
     setEditing(editExisting)
-    // Reset form from current reservation/guest data
     setEditForm({
       salutation: res.salutation || '',
       full_name: guest?.full_name || '',
@@ -84,7 +77,6 @@ function Overview({
       discount_pct: res.discount_pct || 0,
       terms_conditions: res.terms_conditions || company?.terms_conditions || '',
     })
-    // Clone current room assignments
     setRoomList(resRooms.map(rr => ({
       id: rr.id,
       room_id: rr.room_id,
@@ -95,16 +87,11 @@ function Overview({
       from_date: rr.from_date,
       to_date: rr.to_date,
     })))
-    // Clone current addons
-    setAddonList(addons.map(a => ({ ...a }))) // shallow copy ok
+    setAddonList(addons.map(a => ({ ...a })))
     setNewAddon({ label: '', price: '', qty: 1 })
     setQuoteEditorOpen(true)
   }
 
-  const startNewQuote = () => openQuoteEditor(false)
-  const editQuote = () => openQuoteEditor(true)   // edit latest
-
-  // Load full room inventory for the assign dropdown
   useEffect(() => {
     if (quoteEditorOpen) {
       supabase.from('rooms').select('*').eq('is_active', true).order('room_no')
@@ -112,53 +99,41 @@ function Overview({
     }
   }, [quoteEditorOpen])
 
-  // Handlers for room list inside modal
+  // ───── room handlers ─────
   const assignRoomInModal = (room) => {
-    setRoomList(prev => [
-      ...prev,
-      {
-        id: null, // new room assignment (no ID yet)
-        room_id: room.id,
-        room_no: room.room_no,
-        room_name: room.room_name,
-        room_type: room.room_type,
-        rate: res.room_rate || room.base_rate || 0,
-        from_date: editForm.check_in,
-        to_date: editForm.check_out,
-      }
-    ])
+    setRoomList(prev => [...prev, {
+      id: null,
+      room_id: room.id,
+      room_no: room.room_no,
+      room_name: room.room_name,
+      room_type: room.room_type,
+      rate: res.room_rate || room.base_rate || 0,
+      from_date: editForm.check_in,
+      to_date: editForm.check_out,
+    }])
   }
 
-  const removeRoomInModal = (index) => {
-    setRoomList(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const updateRoomRateInModal = (index, newRate) => {
+  const removeRoomInModal = (index) => setRoomList(prev => prev.filter((_, i) => i !== index))
+  const updateRoomRateInModal = (index, newRate) =>
     setRoomList(prev => prev.map((r, i) => i === index ? { ...r, rate: Number(newRate) } : r))
-  }
 
-  // Addon handlers
+  // ───── addon handlers ─────
   const addAddonItem = () => {
     if (!newAddon.label || !newAddon.price) return
-    setAddonList(prev => [
-      ...prev,
-      {
-        id: null,  // new
-        label: newAddon.label,
-        price: Number(newAddon.price),
-        qty: Number(newAddon.qty) || 1,
-        posted: false,
-        reservation_id: res.id,
-      }
-    ])
+    setAddonList(prev => [...prev, {
+      id: null,
+      label: newAddon.label,
+      price: Number(newAddon.price),
+      qty: Number(newAddon.qty) || 1,
+      posted: false,
+      reservation_id: res.id,
+    }])
     setNewAddon({ label: '', price: '', qty: 1 })
   }
 
-  const removeAddonItem = (index) => {
-    setAddonList(prev => prev.filter((_, i) => i !== index))
-  }
+  const removeAddonItem = (index) => setAddonList(prev => prev.filter((_, i) => i !== index))
 
-  // ──────── Update handler ────────
+  // ───── Update handler (reservation + quotation) ─────
   const handleUpdateQuotation = async () => {
     // 1. Update primary guest
     if (guest) {
@@ -186,23 +161,18 @@ function Overview({
       discount_val: editForm.discount_type === 'fixed' ? Number(editForm.discount_val) : 0,
       discount_pct: editForm.discount_type === 'percentage' ? Number(editForm.discount_pct) : 0,
       terms_conditions: editForm.terms_conditions,
-      room_rate: roomList.length > 0 ? roomList[0].rate : 0, // keep overall room_rate
+      room_rate: roomList.length > 0 ? roomList[0].rate : 0,
     }
     const { error: resErr } = await supabase.from('reservations').update(resUpdate).eq('id', res.id)
     if (resErr) { flash(resErr.message); return }
 
-    // 3. Sync room assignments (reservation_rooms)
+    // 3. Sync rooms
     const currentRoomIds = resRooms.map(rr => rr.id)
     const newRoomIds = roomList.map(r => r.id).filter(id => id !== null)
     const toDelete = currentRoomIds.filter(id => !newRoomIds.includes(id))
-    // Delete removed rooms
-    if (toDelete.length > 0) {
-      await supabase.from('reservation_rooms').delete().in('id', toDelete)
-    }
-    // Update existing rooms and insert new
+    if (toDelete.length) await supabase.from('reservation_rooms').delete().in('id', toDelete)
     for (const room of roomList) {
       if (room.id) {
-        // existing
         await supabase.from('reservation_rooms').update({
           room_id: room.room_id,
           rate: room.rate,
@@ -210,7 +180,6 @@ function Overview({
           to_date: room.to_date || editForm.check_out,
         }).eq('id', room.id)
       } else {
-        // new
         await supabase.from('reservation_rooms').insert({
           reservation_id: res.id,
           room_id: room.room_id,
@@ -225,19 +194,11 @@ function Overview({
     const currentAddonIds = addons.map(a => a.id)
     const newAddonIds = addonList.map(a => a.id).filter(id => id !== null)
     const addonsToDelete = currentAddonIds.filter(id => !newAddonIds.includes(id))
-    if (addonsToDelete.length > 0) {
-      await supabase.from('reservation_addons').delete().in('id', addonsToDelete)
-    }
+    if (addonsToDelete.length) await supabase.from('reservation_addons').delete().in('id', addonsToDelete)
     for (const ad of addonList) {
       if (ad.id) {
-        // existing: update if changed (price, qty, label)
-        await supabase.from('reservation_addons').update({
-          label: ad.label,
-          price: ad.price,
-          qty: ad.qty,
-        }).eq('id', ad.id)
+        await supabase.from('reservation_addons').update({ label: ad.label, price: ad.price, qty: ad.qty }).eq('id', ad.id)
       } else {
-        // new
         await supabase.from('reservation_addons').insert({
           reservation_id: res.id,
           label: ad.label,
@@ -248,7 +209,7 @@ function Overview({
       }
     }
 
-    // 5. Update latest quotation record (or create if none)
+    // 5. Update/create quotation record
     const quoteRateObj = rateFor(taxConfig, 'ROOM', editForm.check_in)
     const roomTotal = roomList.reduce((sum, rm) => sum + Number(rm.rate), 0)
     const nightsCount = nightsBetween(editForm.check_in, editForm.check_out)
@@ -257,7 +218,7 @@ function Overview({
       : Number(editForm.discount_pct)
     const perNight = computeCharge(roomTotal, discDescriptor, quoteRateObj)
     const grandTotal = +(perNight.total * nightsCount).toFixed(2)
-    const validUntil = new Date(Date.now() + 7 * 86400000).toISOString().slice(0,10) // default 7 days
+    const validUntil = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
 
     const quoteSnapshot = {
       total_amount: grandTotal,
@@ -270,28 +231,26 @@ function Overview({
     if (quote) {
       await supabase.from('quotations').update(quoteSnapshot).eq('id', quote.id)
     } else {
-      // Create a new quotation record (even if not sent yet)
       await supabase.from('quotations').insert({
         reservation_id: res.id,
         ...quoteSnapshot,
         status: 'DRAFT',
-        message: '', // will be populated later if sent
+        message: '',
       })
     }
 
-    // 6. Reload all data
     await reload()
     await loadLatestQuote()
-    flash(editing ? 'Quotation updated successfully.' : 'New quotation drafted.')
+    flash(editing ? 'Quotation updated successfully.' : 'New quotation saved.')
     setQuoteEditorOpen(false)
   }
 
-  // ──────── Existing Addon posting etc unchanged ────────
+  // ───── Existing addon posting logic ─────
   const unposted = addons.filter((a) => !a.posted)
   const lineTotal = (a) => Number(a.price) * Number(a.qty)
   const addonsTotal = addons.reduce((sum, a) => sum + lineTotal(a), 0)
+
   const postAddonCharges = async () => {
-    // ... (keep existing code) ...
     if (unposted.length === 0) { flash('No unposted addon items to post.'); return }
     setPosting(true)
     try {
@@ -316,22 +275,47 @@ function Overview({
     setPosting(false)
   }
 
-  // ──────── Send actions remain in list row, not in edit modal ────────
-  const sendQuoteWhatsApp = () => { /* unchanged */ }
-  const sendQuoteEmail = () => { /* unchanged */ }
-  const printQuote = () => { /* unchanged, but uses quote state data */ }
+  // ───── Send / print functions for the list row ─────
+  const quoteMessage = useMemo(() => {
+    if (!quote) return ''
+    const qRate = rateFor(taxConfig, 'ROOM', res.check_in)
+    const perNightCalc = computeCharge((quote.room_rate || 0) * (quote.room_count || 0), quote.discount_pct || 0, qRate)
+    const total = +(perNightCalc.total * nights).toFixed(2)
+    return `Dear ${guest?.full_name || 'Guest'},\n\nGreetings from ${company?.name || 'Novem Eco Resort'}!\n\nQuotation for your stay:\n• Check-in: ${fmtDate(res.check_in)}\n• Check-out: ${fmtDate(res.check_out)} (${nights} night${nights !== 1 ? 's' : ''})\n• Rooms: ${quote.room_count} × ${fmtBDT(quote.room_rate)}/night${quote.discount_pct > 0 ? `\n• Discount: ${quote.discount_pct}%` : ''}\n• Total: ${fmtBDT(total)}\n\nWarm regards,\n${company?.name || 'Novem Eco Resort'}\n${company?.phone || ''}`
+  }, [quote, guest, res, nights, company, taxConfig])
 
-  // Compute summary for display if needed
-  const quoteRateForDisplay = rateFor(taxConfig, 'ROOM', res.check_in)
-  // ...
+  const sendQuoteWhatsApp = () => {
+    const phone = (guest?.phone || '').replace(/[^0-9]/g, '')
+    const intl   = phone.startsWith('880') ? phone : phone.startsWith('0') ? '88' + phone : '880' + phone
+    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(quoteMessage)}`, '_blank')
+  }
 
+  const sendQuoteEmail = () => {
+    window.open(`mailto:${guest?.email || ''}?subject=${encodeURIComponent(`Quotation — ${company?.name || 'Novem Eco Resort'} (${res.res_no})`)}&body=${encodeURIComponent(quoteMessage)}`, '_blank')
+  }
+
+  const printQuote = () => {
+    if (!quote) return
+    setPrintDoc?.({
+      type: 'QUOTE',
+      terms: editForm.terms_conditions || company?.terms_conditions || '',
+      roomRate: quote.room_rate,
+      roomCount: quote.room_count,
+      discountPct: quote.discount_pct,
+      validDays: 7, // default
+      taxConfig,
+      company,
+      resRooms,
+    })
+  }
+
+  // ───── UI ─────
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      {/* Left column: guest & stay, including items, etc. — unchanged */}
+      {/* Left column: Guest & stay (unchanged) */}
       <div className="card p-5 lg:col-span-2">
         <h3 className="font-display font-semibold text-pine mb-3">Guest & stay</h3>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          {/* same as before */}
           <div><dt className="label">Primary guest</dt><dd className="font-semibold">{res.salutation ? `${res.salutation} ` : ''}{guest?.full_name || '—'}</dd></div>
           <div><dt className="label">Contact</dt><dd>{guest?.phone || '—'}{guest?.email ? ` · ${guest.email}` : ''}</dd></div>
           <div><dt className="label">Address</dt><dd>{guest?.address || '—'}</dd></div>
@@ -340,8 +324,8 @@ function Overview({
           <div><dt className="label">Reservation name</dt><dd>{res.reservation_name || '—'}{res.use_reservation_name_only && <span className="text-xs text-pine/50"> (used everywhere)</span>}</dd></div>
           <div><dt className="label">Discount</dt><dd>{
             res.discount_type === 'fixed'
-              ? (Number(res.discount_val) > 0 ? `${fmtBDT(res.discount_val)} fixed — applied on room charges` : '—')
-              : (Number(res.discount_pct) > 0 ? `${res.discount_pct}% — applied on room charges` : '—')
+              ? (Number(res.discount_val) > 0 ? `${fmtBDT(res.discount_val)} fixed` : '—')
+              : (Number(res.discount_pct) > 0 ? `${res.discount_pct}%` : '—')
           }</dd></div>
           <div><dt className="label">Rooms assigned</dt><dd>{resRooms.length ? resRooms.map((r) => r.rooms?.room_no).join(', ') : 'Not yet assigned'}</dd></div>
           <div className="col-span-2"><dt className="label">Notes</dt><dd>{res.notes || '—'}</dd></div>
@@ -358,7 +342,6 @@ function Overview({
           </>
         )}
 
-        {/* Including items — unchanged */}
         <div className="flex items-center justify-between mt-5 mb-2">
           <h3 className="font-display font-semibold text-pine">Including items</h3>
           {addons.length > 0 && (
@@ -371,7 +354,6 @@ function Overview({
         {addons.length > 0 && (
           <div className="border border-leaf rounded-lg overflow-hidden">
             <table className="w-full text-sm">
-              {/* same addon table */}
               <thead><tr className="bg-leaf/30">
                 <th className="th">Item</th><th className="th text-right">Price</th><th className="th text-right">Qty</th>
                 <th className="th text-right">Total</th><th className="th text-center">Status</th>
@@ -399,7 +381,7 @@ function Overview({
         )}
       </div>
 
-      {/* RIGHT COLUMN — Pipeline actions (unchanged except maybe minor) */}
+      {/* Right column: Pipeline actions */}
       <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Pipeline actions</h3>
         <div className="space-y-2">
@@ -452,7 +434,7 @@ function Overview({
       <div className="card p-5 lg:col-span-2">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-semibold text-pine">Quotation</h3>
-          <button className="btn-ghost !py-1.5 text-xs" onClick={startNewQuote}>
+          <button className="btn-ghost !py-1.5 text-xs" onClick={() => openQuoteEditor(false)}>
             <Plus size={13} /> New quotation
           </button>
         </div>
@@ -492,20 +474,17 @@ function Overview({
                   <td className="td text-right text-xs text-pine/60 whitespace-nowrap">{fmtDate(quote.valid_until)}</td>
                   <td className="td">
                     <div className="flex gap-1 justify-end items-center">
-                      <button onClick={editQuote} title="Edit quotation"
+                      <button onClick={() => openQuoteEditor(true)} title="Edit quotation"
                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-leaf text-pine/40 hover:text-forest transition-colors">
                         <Pencil size={13} /></button>
-                      <button onClick={() => { /* Print: use current quote data */ }}
-                        title="Print quotation"
+                      <button onClick={printQuote} title="Print quotation"
                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-leaf text-pine/40 hover:text-forest transition-colors">
                         <Printer size={13} /></button>
-                      <button onClick={() => { /* WhatsApp */ }}
-                        title={guest?.phone ? 'Send via WhatsApp' : 'No phone number'}
+                      <button onClick={sendQuoteWhatsApp} title={guest?.phone ? 'Send via WhatsApp' : 'No phone number'}
                         disabled={!guest?.phone}
                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-green-100 text-pine/40 hover:text-green-600 transition-colors disabled:opacity-25 disabled:cursor-not-allowed">
                         <MessageCircle size={13} /></button>
-                      <button onClick={() => { /* Email */ }}
-                        title="Send via Email"
+                      <button onClick={sendQuoteEmail} title="Send via Email"
                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-blue-50 text-pine/40 hover:text-blue-600 transition-colors">
                         <Mail size={13} /></button>
                     </div>
@@ -645,7 +624,7 @@ function Overview({
               ))}
             </fieldset>
 
-            {/* Rate, Discount & Terms */}
+            {/* Rate & Discount */}
             <fieldset className="border border-leaf rounded-xl p-4 mb-4">
               <legend className="text-sm font-semibold text-pine px-2">Rate & Discount</legend>
               <div className="grid grid-cols-3 gap-3">
@@ -667,19 +646,17 @@ function Overview({
                     <input type="number" min="0" className="input money" value={editForm.discount_val} onChange={e => setEditForm({...editForm, discount_val: e.target.value})} />
                   </div>
                 )}
-                <div className="flex items-end">
-                  {/* optional live preview of total? could add */}
-                </div>
               </div>
             </fieldset>
 
+            {/* Terms & Conditions */}
             <fieldset className="border border-leaf rounded-xl p-4 mb-4">
               <legend className="text-sm font-semibold text-pine px-2">Terms & Conditions</legend>
               <textarea className="input" rows={4} value={editForm.terms_conditions} onChange={e => setEditForm({...editForm, terms_conditions: e.target.value})} />
               <p className="text-xs text-pine/50 mt-1">Default from Settings. You may modify.</p>
             </fieldset>
 
-            {/* Action buttons */}
+            {/* Actions */}
             <div className="flex gap-3 justify-end pt-4 border-t border-leaf">
               <button className="btn-ghost" onClick={() => setQuoteEditorOpen(false)}>Cancel</button>
               <button className="btn-primary" onClick={handleUpdateQuotation}>
@@ -689,8 +666,6 @@ function Overview({
           </div>
         </div>
       )}
-
-      {/* The right column card already rendered above */}
     </div>
   )
 }
