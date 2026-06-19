@@ -33,6 +33,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
   const [res, setRes] = useState(null)
   const [guest, setGuest] = useState(null)
   const [resGuests, setResGuests] = useState([])
+  const [guestIds, setGuestIds]   = useState([]) // multiple IDs per guest (guest_ids table)
   const [resRooms, setResRooms] = useState([])
   const [rooms, setRooms] = useState([])
   const [charges, setCharges] = useState([])
@@ -60,7 +61,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
     }
     const [
       { data: rg }, { data: rr }, { data: rm }, { data: ch },
-      { data: pm }, { data: inv }, { data: ad }, { data: tc }, { data: co },
+      { data: pm }, { data: inv }, { data: ad }, { data: tc }, { data: co }, { data: gi },
     ] = await Promise.all([
       supabase.from('reservation_guests').select('*').eq('reservation_id', id).order('is_primary', { ascending: false }),
       supabase.from('reservation_rooms').select('*, rooms(*)').eq('reservation_id', id),
@@ -71,10 +72,11 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       supabase.from('reservation_addons').select('*').eq('reservation_id', id).order('created_at'),
       supabase.from('tax_config').select('*'),
       supabase.from('company_settings').select('*').eq('id', 1).single(),
+      supabase.from('guest_ids').select('*').eq('reservation_id', id).order('created_at'),
     ])
     setResGuests(rg || []); setResRooms(rr || []); setRooms(rm || [])
     setCharges(ch || []); setPayments(pm || []); setInvoices(inv || [])
-    setAddons(ad || []); setTaxConfig(tc || []); setCompany(co)
+    setAddons(ad || []); setTaxConfig(tc || []); setCompany(co); setGuestIds(gi || [])
   }
 
   useEffect(() => { loadAll() }, [id])
@@ -148,6 +150,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
           reload={loadAll} setStatus={setStatus} userName={userName}
           openCard={() => setPrintDoc({ type: 'REG' })}
           payments={payments} flash={flash} isAdmin={isAdmin}
+          guestIds={guestIds}
         />
       )}
       {tab === 'Billings & Check-Out' && (
@@ -450,15 +453,14 @@ function Overview({ res, guest, resRooms, resGuests = [], setStatus, payments, a
             <Plus size={13} /> New quotation
           </button>
         </div>
-
         {quotes.length === 0 ? (
-          <p className="text-sm text-pine/50">No quotation created yet for this reservation.</p>
+          <p className="text-sm text-pine/50 py-4">No quotation created yet for this reservation.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr>
-                  <th className="th">Quotation No</th>
+                  <th className="th">Quotation ID</th>
                   <th className="th">Guest / Reservation</th>
                   <th className="th">Stay</th>
                   <th className="th text-center">Rooms</th>
@@ -466,42 +468,44 @@ function Overview({ res, guest, resRooms, resGuests = [], setStatus, payments, a
                   <th className="th">Source</th>
                   <th className="th text-right">Total</th>
                   <th className="th text-right">Valid Till</th>
-                  <th className="th"></th>
+                  <th className="th text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {quotes.map((q) => (
-                  <tr key={q.id} className="hover:bg-leaf/20">
-                    <td className="td money font-semibold text-sm">{q.quote_no || '—'}</td>
+                  <tr key={q.id} className="hover:bg-leaf/20 border-b border-leaf/40 last:border-0">
+                    <td className="td money font-semibold text-sm text-forest">{res.res_no}</td>
                     <td className="td text-sm">
-                      <div className="font-medium">{guest?.full_name || res.reservation_name || '—'}</div>
-                      <div className="text-xs text-pine/50">{res.res_no}</div>
+                      <div className="font-semibold">{guest?.full_name || res.reservation_name || '—'}</div>
+                      <div className="text-xs text-pine/50">{guest?.phone || '—'}</div>
                     </td>
                     <td className="td text-xs text-pine/70 whitespace-nowrap">
                       {fmtDate(res.check_in)} → {fmtDate(res.check_out)}
-                      <div className="text-pine/50">{nights} night{nights !== 1 ? 's' : ''}</div>
+                      <div className="text-pine/40">{nights} night{nights !== 1 ? 's' : ''}</div>
                     </td>
-                    <td className="td text-center money">{q.room_count ?? resRooms.length}</td>
+                    <td className="td text-center money font-semibold">{q.room_count ?? resRooms.length}</td>
                     <td className="td text-center money">{((res.pax_adults || 0) + (res.pax_children || 0)) || resGuests.length || '—'}</td>
-                    <td className="td text-sm">{res.source || '—'}</td>
-                    <td className="td text-right money font-semibold text-forest">{fmtBDT(q.total_amount)}</td>
+                    <td className="td text-sm text-pine/70">{res.source || '—'}</td>
+                    <td className="td text-right money font-bold text-forest">{fmtBDT(q.total_amount)}</td>
                     <td className="td text-right text-xs text-pine/60 whitespace-nowrap">{fmtDate(q.valid_until)}</td>
                     <td className="td">
-                      <div className="flex gap-1 justify-end">
-                        <button
-                          className="btn-ghost !py-1 !px-2 text-xs"
-                          onClick={() => editQuote(q)}
-                          title="Edit quotation"
-                        >
-                          <Pencil size={12} /> Edit
-                        </button>
-                        <button
-                          className="btn-ghost !py-1 !px-2 text-xs"
-                          onClick={() => printQuote()}
+                      <div className="flex gap-1 justify-end items-center">
+                        <button onClick={() => editQuote(q)} title="Edit quotation"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-leaf text-pine/40 hover:text-forest transition-colors">
+                          <Pencil size={13} /></button>
+                        <button onClick={() => { setEditingQuoteId(q.id); setRoomRate(q.room_rate ?? roomRate); setRoomCount(q.room_count ?? roomCount); setDisc(q.discount_pct ?? disc); setValidDays(q.valid_days ?? validDays); printQuote() }}
                           title="Print quotation"
-                        >
-                          <Printer size={12} /> Print
-                        </button>
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-leaf text-pine/40 hover:text-forest transition-colors">
+                          <Printer size={13} /></button>
+                        <button onClick={() => { setEditingQuoteId(q.id); setRoomRate(q.room_rate ?? roomRate); setRoomCount(q.room_count ?? roomCount); setDisc(q.discount_pct ?? disc); setValidDays(q.valid_days ?? validDays); sendQuoteWhatsApp() }}
+                          title={guest?.phone ? 'Send via WhatsApp' : 'No phone number'}
+                          disabled={!guest?.phone}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-green-100 text-pine/40 hover:text-green-600 transition-colors disabled:opacity-25 disabled:cursor-not-allowed">
+                          <MessageCircle size={13} /></button>
+                        <button onClick={() => { setEditingQuoteId(q.id); setRoomRate(q.room_rate ?? roomRate); setRoomCount(q.room_count ?? roomCount); setDisc(q.discount_pct ?? disc); setValidDays(q.valid_days ?? validDays); sendQuoteEmail() }}
+                          title="Send via Email"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-blue-50 text-pine/40 hover:text-blue-600 transition-colors">
+                          <Mail size={13} /></button>
                       </div>
                     </td>
                   </tr>
@@ -512,124 +516,56 @@ function Overview({ res, guest, resRooms, resGuests = [], setStatus, payments, a
         )}
       </div>
 
-      {/* ---- QUOTATION EDIT MODAL ---- */}
+      {/* ---- QUOTATION EDIT MODAL (Reservation Query style) ---- */}
       {quoteEditorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-pine/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
-
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-leaf shrink-0">
-              <div>
-                <h2 className="font-display font-bold text-pine text-xl">
-                  {editingQuoteId ? 'Update Quotation' : 'New Quotation'}
-                </h2>
-                <p className="text-xs text-pine/50 mt-0.5">{res.res_no} · {guest?.full_name || res.reservation_name}</p>
-              </div>
-              <button onClick={cancelQuoteEdit} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-leaf text-pine/40 hover:text-pine text-lg">✕</button>
+        <div className="fixed inset-0 bg-ink/60 z-50 flex items-start justify-center overflow-auto p-6">
+          <div className="card max-w-2xl w-full p-6 my-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-lg font-bold text-pine">
+                {editingQuoteId ? 'Quotation Details' : 'New Quotation'}
+              </h2>
+              <button onClick={cancelQuoteEdit} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-leaf text-pine/40 hover:text-pine text-xl leading-none">✕</button>
             </div>
-
-            {/* Scrollable body */}
-            <div className="overflow-y-auto flex-1 p-6 space-y-5">
-
-              {/* Reservation info strip — like Query form header */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-leaf/30 rounded-xl px-4 py-3 text-sm">
-                <div>
-                  <div className="text-[10px] text-pine/50 uppercase tracking-wide mb-0.5">Guest</div>
-                  <div className="font-semibold text-pine">{guest?.full_name || res.reservation_name || '—'}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-pine/50 uppercase tracking-wide mb-0.5">Stay</div>
-                  <div className="font-medium">{fmtDate(res.check_in)} → {fmtDate(res.check_out)}</div>
-                  <div className="text-xs text-pine/50">{nights} night{nights !== 1 ? 's' : ''}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-pine/50 uppercase tracking-wide mb-0.5">Rooms · Pax</div>
-                  <div className="font-medium">{resRooms.length} room{resRooms.length !== 1 ? 's' : ''} · {((res.pax_adults || 0) + (res.pax_children || 0)) || resGuests.length || '—'} pax</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-pine/50 uppercase tracking-wide mb-0.5">Source</div>
-                  <div className="font-medium">{res.source || '—'}</div>
-                </div>
-              </div>
-
-              {editingQuoteId && (
-                <div className="px-3 py-2 rounded-lg bg-amber/10 border border-amber/20 text-amber text-sm font-medium">
-                  Editing a previously sent quotation — click <strong>Update Quotation</strong> to save.
-                </div>
-              )}
-
-              {/* Rate & validity inputs — 4 column grid like Query form */}
-              <div>
-                <h4 className="label mb-3">Quotation details</h4>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label className="label">Rate / room / night (৳)</label>
-                    <input type="number" className="input money" value={roomRate} onChange={(e) => setRoomRate(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="label">No. of rooms</label>
-                    <input type="number" min="1" className="input money" value={roomCount} onChange={(e) => setRoomCount(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="label">Discount %</label>
-                    <input type="number" min="0" max="100" className="input money" value={disc} onChange={(e) => setDisc(e.target.value)} onBlur={saveDisc} />
-                  </div>
-                  <div>
-                    <label className="label">Valid for (days)</label>
-                    <input type="number" min="1" className="input money" value={validDays} onChange={(e) => setValidDays(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Charge breakdown */}
-              <div className="bg-leaf/40 rounded-xl p-4 text-sm space-y-1.5 money">
-                <Row k={`Room charge (${roomCount} room × ${nights} night${nights !== 1 ? 's' : ''})`} v={fmtBDT(quotePerNight.base_amount * (nights || 0))} />
-                {disc > 0 && <Row k={`Discount ${disc}%`} v={'− ' + fmtBDT(quotePerNight.discount * (nights || 0))} />}
-                <Row k={`Service charge ${quoteRate.service_charge_pct}%`} v={fmtBDT(quotePerNight.service_charge * (nights || 0))} />
-                <Row k={`VAT ${quoteRate.vat_pct}%`} v={fmtBDT(quotePerNight.vat * (nights || 0))} />
-                <div className="border-t border-pine/20 pt-2 font-bold text-base flex justify-between">
-                  <span>Total</span><span className="text-forest">{fmtBDT(quoteTotal)}</span>
-                </div>
-              </div>
-
-              {/* Two-column lower section: Terms + Message preview */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="label !mb-0">Terms &amp; Conditions</label>
-                    <button className="btn-ghost !py-1 text-xs" onClick={saveTerms}>Save T&amp;C</button>
-                  </div>
-                  <textarea
-                    className="input"
-                    rows={6}
-                    value={terms}
-                    onChange={(e) => setTerms(e.target.value)}
-                    placeholder="Enter terms & conditions printed on the quotation PDF…"
-                  />
-                  <p className="text-xs text-pine/50 mt-1">Default comes from Settings → Branding. Changes here apply to this reservation only.</p>
-                </div>
-                <div>
-                  <label className="label">Message preview (WhatsApp / Email)</label>
-                  <pre className="text-xs whitespace-pre-wrap bg-paper border border-leaf rounded-xl p-3 h-[148px] overflow-y-auto">{quoteMessage}</pre>
-                </div>
-              </div>
-
+            <div className="bg-leaf/30 rounded-xl px-4 py-3 mb-5 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+              <div><span className="text-pine/50 text-xs">Reservation ID</span><div className="font-mono font-semibold text-forest">{res.res_no}</div></div>
+              <div><span className="text-pine/50 text-xs">Guest</span><div className="font-semibold">{guest?.full_name || res.reservation_name || '—'}</div></div>
+              <div><span className="text-pine/50 text-xs">Stay</span><div>{fmtDate(res.check_in)} → {fmtDate(res.check_out)} ({nights} nights)</div></div>
+              <div><span className="text-pine/50 text-xs">Rooms · Pax · Source</span><div>{resRooms.length} rooms · {((res.pax_adults||0)+(res.pax_children||0))||resGuests.length||'—'} pax · {res.source||'—'}</div></div>
             </div>
-
-            {/* Sticky footer with action buttons */}
-            <div className="shrink-0 border-t border-leaf px-6 py-4 flex flex-wrap gap-2 bg-white rounded-b-2xl">
+            {editingQuoteId && (
+              <div className="mb-4 px-3 py-2 rounded-lg bg-amber/10 text-amber text-sm font-medium flex items-center gap-2">
+                <Pencil size={13} /> Editing quotation — click <strong>Update Quotation</strong> to save.
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label">Rate / room / night (৳)</label><input type="number" className="input money" value={roomRate} onChange={(e) => setRoomRate(e.target.value)} /></div>
+              <div><label className="label">No. of rooms</label><input type="number" min="1" className="input money" value={roomCount} onChange={(e) => setRoomCount(e.target.value)} /></div>
+              <div><label className="label">Discount %</label><input type="number" min="0" max="100" className="input money" value={disc} onChange={(e) => setDisc(e.target.value)} onBlur={saveDisc} /></div>
+              <div><label className="label">Valid for (days)</label><input type="number" min="1" className="input money" value={validDays} onChange={(e) => setValidDays(e.target.value)} /></div>
+            </div>
+            <div className="mt-4 bg-leaf/40 rounded-xl p-4 text-sm space-y-1.5 money">
+              <Row k={`Room charge × ${nights} night(s)`} v={fmtBDT(quotePerNight.base_amount * (nights || 0))} />
+              {disc > 0 && <Row k={`Discount ${disc}%`} v={'− ' + fmtBDT(quotePerNight.discount * (nights || 0))} />}
+              <Row k={`Service charge ${quoteRate.service_charge_pct}%`} v={fmtBDT(quotePerNight.service_charge * (nights || 0))} />
+              <Row k={`VAT ${quoteRate.vat_pct}%`} v={fmtBDT(quotePerNight.vat * (nights || 0))} />
+              <div className="border-t border-pine/20 pt-2 font-bold text-base"><Row k="Grand Total" v={fmtBDT(quoteTotal)} /></div>
+            </div>
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="label !mb-0">Terms &amp; Conditions</label>
+                <button className="btn-ghost !py-1 text-xs" onClick={saveTerms}>Save T&amp;C</button>
+              </div>
+              <textarea className="input" rows={3} value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="Enter terms & conditions…" />
+            </div>
+            <div className="mt-4">
+              <label className="label">Message preview</label>
+              <pre className="text-xs whitespace-pre-wrap bg-paper border border-leaf rounded-xl p-3 max-h-32 overflow-y-auto text-pine/70">{quoteMessage}</pre>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-leaf">
               {editingQuoteId ? (
-                <>
-                  <button className="btn-primary flex-1 justify-center" onClick={() => recordQuote('Updated')}>
-                    <Save size={15} /> Update Quotation
-                  </button>
-                  <button className="btn-ghost justify-center" onClick={sendQuoteWhatsApp} disabled={!guest?.phone}>
-                    <MessageCircle size={15} /> Re-send WhatsApp
-                  </button>
-                  <button className="btn-ghost justify-center" onClick={sendQuoteEmail}>
-                    <Mail size={15} /> Re-send Email
-                  </button>
-                </>
+                <button className="btn-primary flex-1 justify-center" onClick={() => recordQuote('Updated')}>
+                  <Save size={15} /> Update Quotation
+                </button>
               ) : (
                 <>
                   <button className="btn-primary flex-1 justify-center" onClick={sendQuoteWhatsApp} disabled={!guest?.phone}>
@@ -640,15 +576,14 @@ function Overview({ res, guest, resRooms, resGuests = [], setStatus, payments, a
                   </button>
                 </>
               )}
-              <button className="btn-ghost justify-center" onClick={printQuote}>
-                <Printer size={15} /> Print PDF
-              </button>
+              <button className="btn-ghost justify-center" onClick={printQuote}><Printer size={15} /> Print PDF</button>
               <button className="btn-ghost justify-center" onClick={cancelQuoteEdit}>Cancel</button>
             </div>
-
+            {!guest?.phone && !editingQuoteId && <p className="text-xs text-amber mt-2">Add guest phone to enable WhatsApp.</p>}
           </div>
         </div>
       )}
+
       <div className="card p-5">
         <h3 className="font-display font-semibold text-pine mb-3">Pipeline actions</h3>
         <div className="space-y-2">
@@ -703,12 +638,201 @@ function Overview({ res, guest, resRooms, resGuests = [], setStatus, payments, a
 const Row = ({ k, v }) => <div className="flex justify-between"><span>{k}</span><span>{v}</span></div>
 
 /* ------------------------------------------------------------------ */
+/*  GUEST ID MANAGER — multiple NID/Photo IDs per reservation          */
+/* ------------------------------------------------------------------ */
+const ID_TYPES = ['NID', 'Smart NID', 'Passport', 'Driving License', 'Birth Certificate', 'Company ID', 'Other']
+
+function GuestIdManager({ reservationId, resGuests, guestIds, locked, reload, flash }) {
+  const [adding, setAdding]     = useState(false)
+  const [editId, setEditId]     = useState(null)
+  const [form, setForm]         = useState({ guest_name: '', id_type: 'NID', id_number: '', notes: '' })
+  const [busy, setBusy]         = useState(false)
+
+  const startAdd = (guestName = '') => {
+    setForm({ guest_name: guestName, id_type: 'NID', id_number: '', notes: '' })
+    setEditId(null)
+    setAdding(true)
+  }
+
+  const startEdit = (idRow) => {
+    setForm({ guest_name: idRow.guest_name || '', id_type: idRow.id_type, id_number: idRow.id_number, notes: idRow.notes || '' })
+    setEditId(idRow.id)
+    setAdding(true)
+  }
+
+  const cancel = () => { setAdding(false); setEditId(null) }
+
+  const save = async () => {
+    if (!form.id_number.trim()) { flash('ID number is required.'); return }
+    setBusy(true)
+    if (editId) {
+      const { error } = await supabase.from('guest_ids').update({
+        guest_name: form.guest_name, id_type: form.id_type,
+        id_number: form.id_number.trim(), notes: form.notes,
+      }).eq('id', editId)
+      if (error) { flash(error.message); setBusy(false); return }
+    } else {
+      const { error } = await supabase.from('guest_ids').insert({
+        reservation_id: reservationId,
+        guest_name: form.guest_name, id_type: form.id_type,
+        id_number: form.id_number.trim(), notes: form.notes,
+      })
+      if (error) { flash(error.message); setBusy(false); return }
+    }
+    setBusy(false)
+    setAdding(false)
+    setEditId(null)
+    await reload()
+  }
+
+  const remove = async (id) => {
+    if (locked) { flash('Administrator access required after check-in.'); return }
+    await supabase.from('guest_ids').delete().eq('id', id)
+    await reload()
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="label !mb-0">Photo ID / Valid Documents</label>
+        {!locked && (
+          <button
+            type="button"
+            className="btn-ghost !py-1 text-xs"
+            onClick={() => startAdd()}
+          >
+            <Plus size={12} /> Add ID
+          </button>
+        )}
+      </div>
+
+      {/* Existing IDs list */}
+      {guestIds.length === 0 && !adding && (
+        <p className="text-xs text-pine/40 py-2">No ID documents recorded yet. Click "+ Add ID" to add NID, Passport, or other documents.</p>
+      )}
+
+      {guestIds.length > 0 && (
+        <div className="space-y-1.5 mb-3">
+          {guestIds.map((id) => (
+            <div key={id.id} className="flex items-start justify-between gap-2 px-3 py-2 rounded-lg border border-leaf bg-leaf/10 text-sm">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="status-chip bg-forest/15 text-forest text-xs font-semibold">{id.id_type}</span>
+                  <span className="font-mono font-semibold text-pine">{id.id_number}</span>
+                  {id.guest_name && <span className="text-pine/50 text-xs">· {id.guest_name}</span>}
+                </div>
+                {id.notes && <div className="text-xs text-pine/50 mt-0.5 truncate">{id.notes}</div>}
+              </div>
+              {!locked && (
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    onClick={() => startEdit(id)}
+                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-leaf text-pine/40 hover:text-forest"
+                    title="Edit"
+                  ><Pencil size={11} /></button>
+                  <button
+                    onClick={() => remove(id.id)}
+                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-50 text-red-300 hover:text-red-600"
+                    title="Delete"
+                  ><Trash2 size={11} /></button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add / Edit form */}
+      {adding && (
+        <div className="rounded-xl border border-leaf bg-white p-3 space-y-3 mt-2">
+          <div className="text-xs font-semibold text-pine/60">{editId ? 'Edit ID document' : 'Add new ID document'}</div>
+
+          {/* Guest name selector — pick from resGuests or type freely */}
+          <div>
+            <label className="label !text-xs">Guest name (optional)</label>
+            <div className="flex gap-2">
+              <select
+                className="input flex-1"
+                value={form.guest_name}
+                onChange={(e) => setForm((p) => ({ ...p, guest_name: e.target.value }))}
+              >
+                <option value="">— Select guest or type below —</option>
+                {resGuests.map((g) => (
+                  <option key={g.id} value={g.guest_name}>{g.guest_name}{g.is_primary ? ' (Primary)' : ''}</option>
+                ))}
+              </select>
+            </div>
+            <input
+              className="input mt-1 text-xs"
+              placeholder="Or type guest name manually…"
+              value={form.guest_name}
+              onChange={(e) => setForm((p) => ({ ...p, guest_name: e.target.value }))}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label !text-xs">ID type *</label>
+              <select className="input" value={form.id_type} onChange={(e) => setForm((p) => ({ ...p, id_type: e.target.value }))}>
+                {ID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label !text-xs">ID number *</label>
+              <input
+                className="input money"
+                placeholder="e.g. 1234567890123"
+                value={form.id_number}
+                onChange={(e) => setForm((p) => ({ ...p, id_number: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && save()}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="label !text-xs">Notes (optional)</label>
+            <input
+              className="input text-xs"
+              placeholder="e.g. Copy attached, Expired — renewal submitted, etc."
+              value={form.notes}
+              onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button className="btn-primary !py-1.5 text-xs" onClick={save} disabled={busy || !form.id_number.trim()}>
+              <Save size={12} /> {busy ? 'Saving…' : editId ? 'Update ID' : 'Save ID'}
+            </button>
+            <button className="btn-ghost !py-1.5 text-xs" onClick={cancel}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick-add buttons per guest */}
+      {!locked && !adding && resGuests.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {resGuests.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => startAdd(g.guest_name)}
+              className="text-xs px-2 py-1 rounded-lg border border-leaf hover:bg-leaf text-pine/60 hover:text-pine transition-colors"
+            >
+              <Plus size={10} className="inline mr-0.5" /> Add ID for {g.guest_name?.split(' ')[0] || 'guest'}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  CHECK-IN TAB                                                        */
 /* ------------------------------------------------------------------ */
-function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus, userName, openCard, payments, flash, isAdmin }) {
+function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus, userName, openCard, payments, flash, isAdmin, guestIds = [] }) {
   const locked = !isAdmin && ['CHECKED_IN', 'CHECKED_OUT', 'SETTLED'].includes(res.status)
   const [f, setF] = useState({
-    id_type: guest?.id_type || 'NID', id_number: guest?.id_number || '',
     extra_pax: res.extra_pax, extra_pax_rate: res.extra_pax_rate,
     driver_accommodation: res.driver_accommodation, driver_count: res.driver_count, driver_rate: res.driver_rate,
     special_instructions: res.special_instructions || '',
@@ -716,7 +840,6 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
   const [newGuest, setNewGuest] = useState('')
   const [roomSel, setRoomSel]   = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
-  useEffect(() => { if (guest) setF((p) => ({ ...p, id_type: guest.id_type || 'NID', id_number: guest.id_number || '' })) }, [guest])
 
   const assignRoom = async () => {
     if (locked) { flash('After check-in, only an administrator can change room assignment.'); return }
@@ -752,7 +875,6 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
 
   const doCheckIn = async () => {
     if (resRooms.length === 0) { flash('Assign at least one room before check-in.'); return }
-    await supabase.from('guests').update({ id_type: f.id_type, id_number: f.id_number }).eq('id', res.primary_guest_id)
     await setStatus('CHECKED_IN', {
       extra_pax: +f.extra_pax, extra_pax_rate: +f.extra_pax_rate,
       driver_accommodation: f.driver_accommodation, driver_count: +f.driver_count, driver_rate: +f.driver_rate,
@@ -829,14 +951,18 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
 
         <div className="card p-5 space-y-4">
           <h3 className="font-display font-semibold text-pine">Check-in details</h3>
+
+          {/* ── Multi-ID Section ── */}
+          <GuestIdManager
+            reservationId={res.id}
+            resGuests={resGuests}
+            guestIds={guestIds}
+            locked={locked}
+            reload={reload}
+            flash={flash}
+          />
+
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Photo ID type</label>
-              <select className="input" value={f.id_type} onChange={(e) => set('id_type', e.target.value)}>
-                {['NID', 'Smart ID', 'Passport', 'Driving License', 'Birth Certificate'].map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div><label className="label">ID number</label><input className="input money" value={f.id_number} onChange={(e) => set('id_number', e.target.value)} /></div>
             <div><label className="label">Extra pax</label><input type="number" min="0" className="input money" value={f.extra_pax} onChange={(e) => set('extra_pax', e.target.value)} /></div>
             <div><label className="label">Extra pax rate / night</label><input type="number" className="input money" value={f.extra_pax_rate} onChange={(e) => set('extra_pax_rate', e.target.value)} /></div>
             <div className="col-span-2 flex items-center gap-2 pt-1">
