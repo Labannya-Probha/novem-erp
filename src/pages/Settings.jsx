@@ -613,62 +613,112 @@ const WIPE_MODULES = [
   },
 ]
 
+// Step states for the process flow animation
+const STEP_IDLE    = 'idle'
+const STEP_RUNNING = 'running'
+const STEP_DONE    = 'done'
+const STEP_ERROR   = 'error'
+
 function DataWipeCard() {
-  const [selected, setSelected] = useState(null)   // module id currently staged for wipe
-  const [confirm, setConfirm]   = useState('')     // typed confirmation word
-  const [busy, setBusy]         = useState(false)
-  const [msg, setMsg]           = useState(null)   // { text, ok }
-  const [expanded, setExpanded] = useState(false)
-  const flash = (text, ok = false) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 8000) }
+  const [selected, setSelected]   = useState(null)
+  const [confirm, setConfirm]     = useState('')
+  const [expanded, setExpanded]   = useState(false)
+  const [phase, setPhase]         = useState('idle') // idle | confirm | wiping | done | error
+  const [steps, setSteps]         = useState([])     // [{ label, type:'table'|'sequence', state, detail }]
+  const [result, setResult]       = useState(null)   // final RPC result
+  const [errMsg, setErrMsg]       = useState('')
 
   const module = WIPE_MODULES.find((m) => m.id === selected)
 
-  const doWipe = async () => {
-    if (!module) return
-    if (confirm.trim().toUpperCase() !== 'WIPE') { flash('Type WIPE in capital letters to confirm.'); return }
-    setBusy(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${SUPABASE_CONFIG.url}/functions/v1/wipe-nonuser-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ action: 'wipe_module', module_id: module.id, tables: module.tables, sequences: module.sequences }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || json.message || 'Wipe failed.')
-      flash(`${module.label} data wiped. All reference numbers reset to 1.`, true)
-      setSelected(null); setConfirm('')
-    } catch (e) {
-      // If the Edge Function doesn't handle this action yet, fall back to direct SQL wipe
-      if (e.message?.includes('action') || e.message?.includes('not found') || e.message?.includes('404')) {
-        await directWipe(module)
-      } else {
-        flash(e.message)
-      }
-    }
-    setBusy(false)
+  const selectModule = (id) => {
+    if (phase === 'wiping') return
+    setSelected(selected === id ? null : id)
+    setConfirm('')
+    setPhase('idle')
+    setSteps([])
+    setResult(null)
+    setErrMsg('')
   }
 
-  const directWipe = async (mod) => {
-    try {
-      for (const table of mod.tables) {
-        const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000')
-        if (error && !error.message?.includes('does not exist')) throw error
-      }
-      // Reset sequences via RPC (requires a Postgres function or admin access)
-      flash(`${mod.label} tables cleared. Note: sequence numbers were not reset — contact your database admin to run ALTER SEQUENCE ... RESTART WITH 1 for: ${mod.sequences.join(', ')}.`, false)
-      setSelected(null); setConfirm('')
-    } catch (e) {
-      flash(`Wipe partially failed: ${e.message}`)
+  const startWipe = () => {
+    if (!module || confirm.trim().toUpperCase() !== 'WIPE') return
+    // Build step list for animation
+    const allSteps = [
+      ...module.tables.map((t) => ({ id: t, label: t, type: 'table', state: STEP_IDLE, detail: '' })),
+      ...module.sequences.map((s) => ({ id: s, label: s, type: 'sequence', state: STEP_IDLE, detail: '' })),
+    ]
+    setSteps(allSteps)
+    setPhase('wiping')
+    runWipe(allSteps)
+  }
+
+  const runWipe = async (initialSteps) => {
+    // Animate steps one by one with a small delay so user sees progress
+    // then call the RPC which does the real work atomically
+    const animated = [...initialSteps]
+
+    // Animate table steps
+    for (let i = 0; i < animated.length; i++) {
+      animated[i] = { ...animated[i], state: STEP_RUNNING }
+      setSteps([...animated])
+      await new Promise((r) => setTimeout(r, 120 + Math.random() * 80))
     }
+
+    // Now do the actual RPC call
+    try {
+      const { data, error } = await supabase.rpc('wipe_module', {
+        tables:    module.tables,
+        sequences: module.sequences,
+      })
+
+      if (error) throw new Error(error.message)
+
+      const rpcResult = data
+      const errMap = {}
+      for (const e of rpcResult.errors || []) {
+        errMap[e.table || e.sequence] = e.error
+      }
+      const clearedMap = {}
+      for (const c of rpcResult.tables_cleared || []) {
+        clearedMap[c.table] = c.rows_deleted
+      }
+      const resetMap = {}
+      for (const r of rpcResult.sequences_reset || []) {
+        resetMap[r.sequence] = r.restarted_at
+      }
+
+      // Update step states from real results
+      const finalSteps = animated.map((s) => {
+        if (s.type === 'table') {
+          if (errMap[s.id]) return { ...s, state: STEP_ERROR, detail: errMap[s.id] }
+          const rows = clearedMap[s.id]
+          return { ...s, state: STEP_DONE, detail: rows !== undefined ? `${rows} rows deleted` : 'cleared' }
+        } else {
+          if (errMap[s.id]) return { ...s, state: STEP_ERROR, detail: errMap[s.id] }
+          return { ...s, state: STEP_DONE, detail: 'reset to 1' }
+        }
+      })
+      setSteps(finalSteps)
+      setResult(rpcResult)
+      setPhase(rpcResult.success ? 'done' : 'error')
+      if (!rpcResult.success) setErrMsg(`${rpcResult.errors.length} step(s) failed — see details above.`)
+    } catch (e) {
+      // Mark all remaining as error
+      const errSteps = animated.map((s) => ({ ...s, state: STEP_ERROR, detail: e.message }))
+      setSteps(errSteps)
+      setPhase('error')
+      setErrMsg(e.message)
+    }
+  }
+
+  const reset = () => {
+    setSelected(null); setConfirm(''); setPhase('idle')
+    setSteps([]); setResult(null); setErrMsg('')
   }
 
   return (
     <div className="card p-5 border border-red-200">
-      <button
-        className="w-full flex items-center justify-between text-left"
-        onClick={() => setExpanded((v) => !v)}
-      >
+      <button className="w-full flex items-center justify-between text-left" onClick={() => setExpanded((v) => !v)}>
         <h2 className="font-display font-semibold text-red-600 flex items-center gap-2">
           <AlertTriangle size={18} /> Superuser: Data wipe
         </h2>
@@ -676,27 +726,24 @@ function DataWipeCard() {
       </button>
 
       {expanded && (
-        <div className="mt-4">
-          <p className="text-sm text-pine/70 mb-4">
-            Permanently delete all data in a module and reset its reference number sequences back to 1.
-            This <span className="font-semibold text-red-600">cannot be undone</span>. Only use this when setting up a fresh property or in a controlled data-reset scenario.
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-pine/70">
+            Permanently delete all data in a module and reset reference number sequences to 1.
+            This <span className="font-semibold text-red-600">cannot be undone.</span>
           </p>
-          {msg && (
-            <div className={`mb-4 px-3 py-2 rounded-lg text-sm ${msg.ok ? 'bg-forest/10 text-forest' : 'bg-red-50 text-red-600'}`}>
-              {msg.text}
-            </div>
-          )}
 
-          <div className="grid grid-cols-1 gap-2 mb-5">
+          {/* Module selector — disabled while wiping */}
+          <div className="grid grid-cols-1 gap-2">
             {WIPE_MODULES.map((m) => (
               <button
                 key={m.id}
-                onClick={() => { setSelected(selected === m.id ? null : m.id); setConfirm('') }}
-                className={`text-left p-3 rounded-lg border transition-colors ${
+                onClick={() => selectModule(m.id)}
+                disabled={phase === 'wiping'}
+                className={`text-left p-3 rounded-xl border transition-colors ${
                   selected === m.id
                     ? 'border-red-400 bg-red-50'
-                    : 'border-leaf hover:border-red-300 hover:bg-red-50/40'
-                }`}
+                    : 'border-leaf hover:border-red-300 hover:bg-red-50/30'
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
               >
                 <div className="font-medium text-sm text-pine">{m.label}</div>
                 <div className="text-xs text-pine/50 mt-0.5">{m.description}</div>
@@ -704,32 +751,128 @@ function DataWipeCard() {
             ))}
           </div>
 
-          {selected && module && (
+          {/* Confirm + trigger — only shown when a module is selected and not yet wiping */}
+          {selected && module && phase === 'idle' && (
             <div className="p-4 rounded-xl border border-red-300 bg-red-50 space-y-3">
               <p className="text-sm font-semibold text-red-700">
-                You are about to wipe: <span className="underline">{module.label}</span>
+                Wipe: <span className="underline">{module.label}</span>
               </p>
-              <p className="text-xs text-red-600">
-                Tables: {module.tables.join(', ')}<br />
-                Sequences to reset: {module.sequences.join(', ')}
+              <p className="text-xs text-red-500">
+                {module.tables.length} tables · {module.sequences.length} sequences to reset
               </p>
               <div>
-                <label className="label text-red-700">Type <span className="font-mono font-bold">WIPE</span> to confirm</label>
+                <label className="label text-red-700 !text-xs">Type <span className="font-mono font-bold">WIPE</span> to confirm</label>
                 <input
                   className="input border-red-300 focus:ring-red-400 max-w-xs"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   placeholder="WIPE"
                   autoComplete="off"
+                  spellCheck={false}
                 />
               </div>
               <button
-                className="btn-primary bg-red-600 hover:bg-red-700 focus:ring-red-400"
-                onClick={doWipe}
-                disabled={busy || confirm.trim().toUpperCase() !== 'WIPE'}
+                className="btn-primary !bg-red-600 hover:!bg-red-700"
+                onClick={startWipe}
+                disabled={confirm.trim().toUpperCase() !== 'WIPE'}
               >
-                <AlertTriangle size={15} /> {busy ? 'Wiping…' : `Wipe ${module.label}`}
+                <AlertTriangle size={15} /> Start Wipe
               </button>
+            </div>
+          )}
+
+          {/* ── PROCESS FLOW ANIMATION ── */}
+          {steps.length > 0 && (
+            <div className="rounded-xl border border-red-200 overflow-hidden">
+              {/* Header */}
+              <div className="px-4 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
+                <div className="text-sm font-semibold text-red-700 flex items-center gap-2">
+                  {phase === 'wiping' && (
+                    <span className="inline-block w-3 h-3 rounded-full bg-red-500 animate-ping" />
+                  )}
+                  {phase === 'done' && <span className="text-forest">✓</span>}
+                  {phase === 'error' && <span className="text-red-600">✗</span>}
+                  {phase === 'wiping' ? `Wiping ${module.label}…` : phase === 'done' ? 'Wipe complete' : 'Wipe finished with errors'}
+                </div>
+                {(phase === 'done' || phase === 'error') && (
+                  <button onClick={reset} className="text-xs text-pine/50 hover:text-pine underline">Reset</button>
+                )}
+              </div>
+
+              {/* Two-column: tables | sequences */}
+              <div className="grid grid-cols-2 divide-x divide-red-100">
+                {/* Tables column */}
+                <div className="p-3">
+                  <div className="text-[10px] font-bold text-pine/40 uppercase tracking-wider mb-2">Tables</div>
+                  <div className="space-y-1.5">
+                    {steps.filter((s) => s.type === 'table').map((s) => (
+                      <div key={s.id} className="flex items-start gap-2">
+                        {/* State icon */}
+                        <span className="mt-0.5 shrink-0">
+                          {s.state === STEP_IDLE    && <span className="inline-block w-3 h-3 rounded-full border-2 border-pine/20" />}
+                          {s.state === STEP_RUNNING && <span className="inline-block w-3 h-3 rounded-full bg-red-400 animate-pulse" />}
+                          {s.state === STEP_DONE    && <span className="inline-block w-3 h-3 rounded-full bg-forest" />}
+                          {s.state === STEP_ERROR   && <span className="inline-block w-3 h-3 rounded-full bg-red-600" />}
+                        </span>
+                        <div>
+                          <div className={`text-xs font-mono leading-tight ${
+                            s.state === STEP_DONE  ? 'text-forest line-through opacity-60' :
+                            s.state === STEP_ERROR ? 'text-red-600' :
+                            s.state === STEP_RUNNING ? 'text-red-500 font-semibold' : 'text-pine/50'
+                          }`}>{s.label}</div>
+                          {s.detail && s.state !== STEP_IDLE && (
+                            <div className="text-[10px] text-pine/40 leading-tight">{s.detail}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sequences column */}
+                <div className="p-3">
+                  <div className="text-[10px] font-bold text-pine/40 uppercase tracking-wider mb-2">Sequences → reset to 1</div>
+                  <div className="space-y-1.5">
+                    {steps.filter((s) => s.type === 'sequence').map((s) => (
+                      <div key={s.id} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0">
+                          {s.state === STEP_IDLE    && <span className="inline-block w-3 h-3 rounded-full border-2 border-pine/20" />}
+                          {s.state === STEP_RUNNING && <span className="inline-block w-3 h-3 rounded-full bg-amber-400 animate-pulse" />}
+                          {s.state === STEP_DONE    && <span className="inline-block w-3 h-3 rounded-full bg-forest" />}
+                          {s.state === STEP_ERROR   && <span className="inline-block w-3 h-3 rounded-full bg-red-600" />}
+                        </span>
+                        <div>
+                          <div className={`text-xs font-mono leading-tight ${
+                            s.state === STEP_DONE  ? 'text-forest line-through opacity-60' :
+                            s.state === STEP_ERROR ? 'text-red-600' :
+                            s.state === STEP_RUNNING ? 'text-amber-600 font-semibold' : 'text-pine/50'
+                          }`}>{s.label}</div>
+                          {s.detail && s.state !== STEP_IDLE && (
+                            <div className="text-[10px] text-pine/40 leading-tight">{s.detail}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Result summary bar */}
+              {phase === 'done' && result && (
+                <div className="px-4 py-3 bg-forest/10 border-t border-forest/20 flex flex-wrap gap-4 text-xs">
+                  <span className="font-semibold text-forest">✓ Wipe successful</span>
+                  <span className="text-pine/60">{result.tables_cleared?.length || 0} tables cleared</span>
+                  <span className="text-pine/60">{result.sequences_reset?.length || 0} sequences reset to 1</span>
+                  <span className="text-pine/60">
+                    {result.tables_cleared?.reduce((sum, t) => sum + (t.rows_deleted || 0), 0)} total rows deleted
+                  </span>
+                </div>
+              )}
+              {phase === 'error' && (
+                <div className="px-4 py-3 bg-red-50 border-t border-red-200 text-xs text-red-600">
+                  ✗ {errMsg}
+                </div>
+              )}
             </div>
           )}
         </div>
