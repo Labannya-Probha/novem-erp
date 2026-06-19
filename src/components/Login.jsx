@@ -13,7 +13,6 @@ export default function Login() {
     try {
       const uname = username.trim()
       if (!uname) throw new Error('Enter your username')
-      // Resolve the username to its login email (works for both real and system emails).
       const { data: email, error: re } = await supabase.rpc('email_for_username', { p_username: uname })
       if (re) throw re
       if (!email) throw new Error('No active account found for this username')
@@ -32,8 +31,8 @@ export default function Login() {
             <Leaf size={20} />
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold text-pine leading-tight">Aura Stay</h1>
-            <p className="text-xs text-pine/60">Resort Management System</p>
+            <h1 className="font-display text-xl font-bold text-pine leading-tight">Aura Stay ERP</h1>
+            <p className="text-xs text-pine/60">Novem Eco Resort</p>
           </div>
         </div>
         <div className="mt-6 space-y-4">
