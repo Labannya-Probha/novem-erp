@@ -121,141 +121,146 @@ function MyAccountCard({ userName }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  RICH TEXT EDITOR — textarea-based, no execCommand, works everywhere */
+/*  RICH TEXT EDITOR — contentEditable, properly implemented           */
 /* ------------------------------------------------------------------ */
 function RichTextEditor({ initialHtml, onSave }) {
-  // Convert simple HTML to readable text for the textarea
-  const htmlToText = (html) => {
-    if (!html) return ''
-    return html
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n')
-      .replace(/<\/li>/gi, '\n')
-      .replace(/<\/h[1-6]>/gi, '\n')
-      .replace(/<li>/gi, '• ')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
-  }
-
-  // Convert plain text back to simple HTML for storage & printing
-  const textToHtml = (text) => {
-    if (!text) return ''
-    return text
-      .split('\n')
-      .map((line) => {
-        const t = line.trim()
-        if (!t) return '<br>'
-        if (t.startsWith('• ') || t.startsWith('- ')) return `<li>${t.slice(2)}</li>`
-        if (t.startsWith('# ')) return `<h3>${t.slice(2)}</h3>`
-        return `<p>${t}</p>`
-      })
-      .join('')
-  }
-
-  const taRef = useRef(null)
-  const [text, setText]     = useState(() => htmlToText(initialHtml))
-  const [preview, setPreview] = useState(false)
+  const editorRef = useRef(null)
   const [saving, setSaving]   = useState(false)
   const [saved, setSaved]     = useState(false)
+  const [preview, setPreview] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState('')
 
-  // Insert formatting tag around selected text in textarea
-  const wrap = (before, after) => {
-    const ta = taRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const end   = ta.selectionEnd
-    const sel   = text.slice(start, end)
-    const newText = text.slice(0, start) + before + sel + after + text.slice(end)
-    setText(newText)
-    // Restore selection after state update
-    setTimeout(() => {
-      ta.focus()
-      ta.setSelectionRange(start + before.length, start + before.length + sel.length)
-    }, 0)
-  }
+  // Set content ONCE on mount via ref — never via dangerouslySetInnerHTML
+  // This avoids React re-rendering the div and resetting cursor position
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = initialHtml || ''
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Insert text at cursor or prepend to each selected line
-  const insertLine = (prefix) => {
-    const ta = taRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const end   = ta.selectionEnd
-    const before = text.slice(0, start)
-    const selected = text.slice(start, end)
-    const after = text.slice(end)
-    // Apply prefix to each line in selection
-    const prefixed = selected
-      ? selected.split('\n').map((l) => prefix + l).join('\n')
-      : prefix
-    const newText = before + prefixed + after
-    setText(newText)
-    setTimeout(() => { ta.focus() }, 0)
+  // Toolbar button handler — MUST use onMouseDown + preventDefault
+  // so the editor div never loses focus before execCommand fires
+  const cmd = (command, value = null) => (e) => {
+    e.preventDefault()        // stop button from blurring the editor
+    e.stopPropagation()
+    editorRef.current?.focus() // ensure editor has focus
+    document.execCommand(command, false, value)
+    editorRef.current?.focus() // restore focus after command (some browsers lose it)
   }
 
   const handleSave = async () => {
+    const html = editorRef.current?.innerHTML || ''
     setSaving(true)
-    await onSave(textToHtml(text))
+    await onSave(html)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
-  const BtnStyle = 'w-8 h-8 flex items-center justify-center rounded hover:bg-leaf text-pine/60 hover:text-forest transition-colors text-sm font-bold select-none'
+  const togglePreview = () => {
+    const html = editorRef.current?.innerHTML || ''
+    setPreviewHtml(html)
+    setPreview((v) => !v)
+  }
+
+  const Btn = ({ command, value, title, children }) => (
+    <button
+      type="button"
+      title={title}
+      onMouseDown={cmd(command, value)}
+      className="w-8 h-8 flex items-center justify-center rounded text-pine/50 hover:bg-leaf hover:text-forest transition-colors select-none"
+    >
+      {children}
+    </button>
+  )
+
+  const Sep = () => <div className="w-px h-5 bg-pine/15 mx-0.5 shrink-0" />
 
   return (
-    <div className="border border-leaf rounded-xl overflow-hidden">
-      {/* Toolbar */}
+    <div className="border border-leaf rounded-xl overflow-hidden shadow-sm">
+
+      {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 bg-stone-50 border-b border-leaf">
-        <button type="button" className={BtnStyle} title="Bold — wraps selection in **" onClick={() => wrap('**', '**')}><span className="font-bold">B</span></button>
-        <button type="button" className={BtnStyle} title="Italic — wraps selection in _" onClick={() => wrap('_', '_')}><span className="italic">I</span></button>
-        <button type="button" className={BtnStyle} title="Underline — wraps selection in __" onClick={() => wrap('<u>', '</u>')}><span className="underline">U</span></button>
-        <div className="w-px h-5 bg-pine/15 mx-1" />
-        <button type="button" className={BtnStyle} title="Bullet point — prefix line with • " onClick={() => insertLine('• ')}><span>•≡</span></button>
-        <button type="button" className={BtnStyle} title="Heading — prefix line with # " onClick={() => insertLine('# ')}><span className="font-bold text-xs">H</span></button>
-        <div className="w-px h-5 bg-pine/15 mx-1" />
+
+        {/* Text style */}
+        <Btn command="bold"      title="Bold (Ctrl+B)">      <strong>B</strong></Btn>
+        <Btn command="italic"    title="Italic (Ctrl+I)">    <em>I</em></Btn>
+        <Btn command="underline" title="Underline (Ctrl+U)"> <span className="underline">U</span></Btn>
+        <Btn command="strikeThrough" title="Strikethrough">  <span className="line-through">S</span></Btn>
+        <Sep />
+
+        {/* Block format */}
+        <Btn command="formatBlock" value="h2"  title="Heading 1"> <span className="text-xs font-bold">H1</span></Btn>
+        <Btn command="formatBlock" value="h3"  title="Heading 2"> <span className="text-xs font-bold">H2</span></Btn>
+        <Btn command="formatBlock" value="p"   title="Paragraph"> <span className="text-xs">¶</span></Btn>
+        <Sep />
+
+        {/* Lists */}
+        <Btn command="insertUnorderedList" title="Bullet list">  <span className="text-sm">•≡</span></Btn>
+        <Btn command="insertOrderedList"   title="Numbered list"><span className="text-sm">1≡</span></Btn>
+        <Btn command="outdent"  title="Decrease indent"> <span className="text-sm">←</span></Btn>
+        <Btn command="indent"   title="Increase indent"> <span className="text-sm">→</span></Btn>
+        <Sep />
+
+        {/* Alignment */}
+        <Btn command="justifyLeft"   title="Align left">   <span className="text-xs">◀═</span></Btn>
+        <Btn command="justifyCenter" title="Align center"> <span className="text-xs">═◼═</span></Btn>
+        <Btn command="justifyRight"  title="Align right">  <span className="text-xs">═▶</span></Btn>
+        <Btn command="justifyFull"   title="Justify">      <span className="text-xs">☰</span></Btn>
+        <Sep />
+
+        {/* Misc */}
+        <Btn command="removeFormat" title="Clear formatting"><span className="text-xs line-through opacity-60">A</span></Btn>
+
+        <div className="flex-1" />
+
+        {/* Preview toggle */}
         <button
           type="button"
-          onClick={() => setPreview((v) => !v)}
-          className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${preview ? 'bg-forest/15 text-forest' : 'bg-white border border-leaf text-pine/60 hover:text-pine'}`}
+          onClick={togglePreview}
+          className={`px-2.5 py-1 rounded text-xs font-medium mr-1 transition-colors ${preview ? 'bg-forest/15 text-forest' : 'bg-white border border-leaf text-pine/60 hover:text-pine'}`}
         >
           {preview ? '✏ Edit' : '👁 Preview'}
         </button>
-        <div className="flex-1" />
+
+        {/* Save button */}
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
           className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${saved ? 'bg-forest/15 text-forest' : 'bg-forest text-white hover:bg-forest/90'}`}
         >
-          <Save size={12} /> {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save T&C'}
+          <Save size={12} />
+          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save T&C'}
         </button>
       </div>
 
-      {/* Editor or Preview */}
+      {/* ── Editor / Preview ── */}
       {preview ? (
         <div
-          className="min-h-[200px] max-h-[400px] overflow-y-auto p-4 text-sm text-pine bg-white prose prose-sm max-w-none"
-          dangerouslySetInnerHTML={{ __html: textToHtml(text) }}
+          className="min-h-[220px] max-h-[420px] overflow-y-auto p-4 bg-white text-sm text-pine leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: previewHtml }}
         />
       ) : (
-        <textarea
-          ref={taRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full min-h-[200px] max-h-[400px] p-4 text-sm text-pine bg-white focus:outline-none resize-y font-mono leading-relaxed"
-          placeholder={`Write terms & conditions here…\n\nFormatting tips:\n• Start a line with "• " for bullet points\n• Start a line with "# " for a heading\nSelect text and click B / I / U to format`}
-          spellCheck={false}
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          className="min-h-[220px] max-h-[420px] overflow-y-auto p-4 bg-white text-sm text-pine leading-relaxed focus:outline-none"
+          style={{ caretColor: '#1B4D2E' }}
+          onKeyDown={(e) => {
+            // Ctrl+B / Ctrl+I / Ctrl+U — let browser handle natively, they work in contentEditable
+            if ((e.ctrlKey || e.metaKey) && ['b','i','u'].includes(e.key.toLowerCase())) {
+              // Allow default — browser handles these natively in contentEditable
+            }
+          }}
         />
       )}
 
-      <div className="px-4 py-2 bg-stone-50 border-t border-leaf text-xs text-pine/40 flex items-center justify-between">
-        <span>Select text then click <strong>B</strong> / <strong>I</strong> / <strong>U</strong> · Start line with <code>•</code> for bullets · <code>#</code> for heading</span>
-        <span>{text.length} chars</span>
+      {/* Footer hint */}
+      <div className="px-4 py-2 bg-stone-50 border-t border-leaf flex items-center justify-between text-xs text-pine/40">
+        <span>Select text then use toolbar · Ctrl+B Bold · Ctrl+I Italic · Ctrl+U Underline</span>
+        <span>Saves separately from profile</span>
       </div>
     </div>
   )
