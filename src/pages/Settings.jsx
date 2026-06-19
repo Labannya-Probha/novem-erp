@@ -4,7 +4,7 @@ import { fmtBDT, todayISO, setCurrency } from '../lib/helpers'
 import { ROLES, ROLE_LABELS } from '../lib/roles'
 import {
   Save, Plus, BedDouble, Percent, Building2, Trash2, Users, ShieldCheck,
-  Upload, Image, Bold, List, AlignLeft, AlignCenter, KeyRound, AlertTriangle,
+  Upload, Image, List, KeyRound, AlertTriangle,
   Eye, EyeOff, ChevronDown, ChevronUp, FileUp, FileDown, CheckCircle2, XCircle, TableProperties, Pencil,
 } from 'lucide-react'
 
@@ -121,20 +121,117 @@ function MyAccountCard({ userName }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  RICH TEXT EDITOR — standalone, reliable, no external deps          */
+/* ------------------------------------------------------------------ */
+function RichTextEditor({ initialHtml, onSave }) {
+  const editorRef = useRef(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
+
+  // Populate editor once on mount — never on re-render (avoids cursor jumps)
+  useEffect(() => {
+    if (editorRef.current && initialHtml !== undefined) {
+      editorRef.current.innerHTML = initialHtml
+    }
+  }, []) // empty deps — intentionally only on mount
+
+  // Execute a formatting command without stealing focus
+  const fmt = (e, cmd, val = null) => {
+    e.preventDefault() // prevent button from stealing focus from editor
+    editorRef.current?.focus()
+    document.execCommand(cmd, false, val)
+  }
+
+  const handleSave = async () => {
+    if (!editorRef.current) return
+    setSaving(true)
+    await onSave(editorRef.current.innerHTML)
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }
+
+  const ToolBtn = ({ cmd, val, title, children }) => (
+    <button
+      type="button"
+      onMouseDown={(e) => fmt(e, cmd, val)}
+      title={title}
+      className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/80 text-pine/60 hover:text-pine transition-colors text-sm font-bold select-none"
+    >
+      {children}
+    </button>
+  )
+
+  return (
+    <div className="border border-leaf rounded-xl overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 bg-stone-50 border-b border-leaf">
+        <ToolBtn cmd="bold" title="Bold (Ctrl+B)"><span className="font-bold">B</span></ToolBtn>
+        <ToolBtn cmd="italic" title="Italic (Ctrl+I)"><span className="italic">I</span></ToolBtn>
+        <ToolBtn cmd="underline" title="Underline (Ctrl+U)"><span className="underline">U</span></ToolBtn>
+        <div className="w-px h-5 bg-pine/15 mx-1" />
+        <ToolBtn cmd="insertUnorderedList" title="Bullet list"><span className="text-base">•≡</span></ToolBtn>
+        <ToolBtn cmd="insertOrderedList" title="Numbered list"><span className="text-base">1≡</span></ToolBtn>
+        <div className="w-px h-5 bg-pine/15 mx-1" />
+        <ToolBtn cmd="justifyLeft" title="Align left"><span>⬛▭▭</span></ToolBtn>
+        <ToolBtn cmd="justifyCenter" title="Align center"><span>▭⬛▭</span></ToolBtn>
+        <ToolBtn cmd="justifyRight" title="Align right"><span>▭▭⬛</span></ToolBtn>
+        <div className="w-px h-5 bg-pine/15 mx-1" />
+        <ToolBtn cmd="formatBlock" val="h3" title="Heading"><span className="text-xs font-bold">H</span></ToolBtn>
+        <ToolBtn cmd="formatBlock" val="p" title="Paragraph"><span className="text-xs">¶</span></ToolBtn>
+        <ToolBtn cmd="removeFormat" title="Clear formatting"><span className="text-xs line-through">A</span></ToolBtn>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+            saved
+              ? 'bg-forest/15 text-forest'
+              : 'bg-forest text-white hover:bg-forest/90'
+          }`}
+        >
+          <Save size={12} />
+          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save T&C'}
+        </button>
+      </div>
+
+      {/* Editor area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        className="min-h-[200px] max-h-[400px] overflow-y-auto p-4 text-sm text-pine focus:outline-none bg-white"
+        style={{
+          lineHeight: '1.7',
+        }}
+        onPaste={(e) => {
+          // Paste as plain text to avoid importing messy external HTML
+          e.preventDefault()
+          const text = e.clipboardData.getData('text/plain')
+          document.execCommand('insertText', false, text)
+        }}
+      />
+
+      <div className="px-4 py-2 bg-stone-50 border-t border-leaf text-xs text-pine/40">
+        Supports bold, italic, underline, lists and alignment. Saves separately from the main profile.
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  BRANDING — Admin & Superuser only                                   */
 /* ------------------------------------------------------------------ */
 function BrandingCard({ reloadCompany }) {
   const [c, setC]   = useState(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg]   = useState('')
-  const editorRef = useRef(null)
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
   const load  = async () => { const { data } = await supabase.from('company_settings').select('*').eq('id', 1).single(); setC(data) }
   useEffect(() => { load() }, [])
   if (!c) return <div className="card p-5 text-pine/50">Loading…</div>
   const set = (k, v) => setC((p) => ({ ...p, [k]: v }))
-  const exec = (cmd, val = null) => document.execCommand(cmd, false, val)
-  const autoResize = (e) => { const el = e.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
 
   const uploadLogo = async (file) => {
     if (!file) return
@@ -151,12 +248,11 @@ function BrandingCard({ reloadCompany }) {
 
   const save = async () => {
     setBusy(true)
-    const content = editorRef.current.innerHTML
     const { error } = await supabase.from('company_settings').update({
       name: c.name, legal_name: c.legal_name, address: c.address, phone: c.phone, email: c.email,
       bin: c.bin, vat_circle: c.vat_circle, invoice_footer: c.invoice_footer,
       short_code: c.short_code, software_name: c.software_name, currency: c.currency,
-      mushak610_threshold: +c.mushak610_threshold || 0, terms_conditions: content,
+      mushak610_threshold: +c.mushak610_threshold || 0,
       updated_at: new Date().toISOString(),
     }).eq('id', 1)
     setBusy(false)
@@ -195,16 +291,15 @@ function BrandingCard({ reloadCompany }) {
       </div>
       <div className="mt-5">
         <label className="label">Default Terms &amp; Conditions</label>
-        <div className="flex gap-1 p-1 bg-stone-100 rounded-t-lg border border-leaf">
-          <button type="button" onClick={() => exec('bold')} className="p-2 hover:bg-white rounded"><Bold size={16} /></button>
-          <button type="button" onClick={() => exec('insertUnorderedList')} className="p-2 hover:bg-white rounded"><List size={16} /></button>
-          <button type="button" onClick={() => exec('justifyLeft')} className="p-2 hover:bg-white rounded"><AlignLeft size={16} /></button>
-          <button type="button" onClick={() => exec('justifyCenter')} className="p-2 hover:bg-white rounded"><AlignCenter size={16} /></button>
-        </div>
-        <div
-          ref={editorRef} contentEditable onInput={autoResize}
-          className="w-full min-h-[160px] p-4 border-x border-b border-leaf rounded-b-lg text-sm focus:outline-none bg-white overflow-hidden"
-          dangerouslySetInnerHTML={{ __html: c.terms_conditions || '' }}
+        <RichTextEditor
+          initialHtml={c.terms_conditions || ''}
+          onSave={async (html) => {
+            const { error } = await supabase.from('company_settings').update({
+              terms_conditions: html, updated_at: new Date().toISOString(),
+            }).eq('id', 1)
+            if (error) flash(error.message)
+            else { flash('Terms & Conditions saved.'); reloadCompany?.() }
+          }}
         />
       </div>
       <button className="btn-primary mt-4" disabled={busy} onClick={save}><Save size={15} /> Save profile</button>
