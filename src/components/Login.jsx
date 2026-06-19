@@ -2,20 +2,30 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { LogIn } from 'lucide-react'
 
+// Hardcoded fallback — used if company_settings query fails for any reason
+const FALLBACK_LOGO = 'https://gwllsoembqacolzfrquu.supabase.co/storage/v1/object/public/branding/logo_1781457117977.png'
+const FALLBACK_NAME = 'Novem Eco Resort'
+const FALLBACK_SOFTWARE = 'Aura Stay ERP'
+
 export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [err, setErr]   = useState('')
-  const [busy, setBusy] = useState(false)
-  const [company, setCompany] = useState(null)
+  const [err, setErr]           = useState('')
+  const [busy, setBusy]         = useState(false)
+  const [company, setCompany]   = useState(null)
+  const [imgFailed, setImgFailed] = useState(false)
 
   useEffect(() => {
+    // Use anon key — RLS now allows anonymous read on company_settings
     supabase
       .from('company_settings')
       .select('logo_url, name, software_name')
       .eq('id', 1)
       .single()
-      .then(({ data }) => { if (data) setCompany(data) })
+      .then(({ data, error }) => {
+        if (data) setCompany(data)
+        // If query fails, fallback constants above will be used
+      })
   }, [])
 
   const signIn = async () => {
@@ -32,12 +42,11 @@ export default function Login() {
     setBusy(false)
   }
 
-  const propertyName = company?.name || 'Novem Eco Resort'
-  const softwareName = company?.software_name ? `${company.software_name} ERP` : 'Aura Stay ERP'
-  // Add cache-bust so browser doesn't use a stale failed request
-  const logoUrl = company?.logo_url
-    ? `${company.logo_url}?t=${Math.floor(Date.now() / 60000)}`
-    : null
+  const propertyName = company?.name || FALLBACK_NAME
+  const softwareName = company?.software_name
+    ? `${company.software_name} ERP`
+    : FALLBACK_SOFTWARE
+  const logoUrl = (company?.logo_url || FALLBACK_LOGO)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-pine relative overflow-hidden">
@@ -50,18 +59,20 @@ export default function Login() {
 
         {/* Logo */}
         <div className="flex flex-col items-center text-center mb-7">
-          <div className="w-20 h-20 rounded-2xl mb-4 overflow-hidden bg-forest flex items-center justify-center shadow-md">
-            {logoUrl ? (
+          <div className="w-20 h-20 rounded-2xl mb-4 overflow-hidden shadow-md bg-white flex items-center justify-center">
+            {!imgFailed ? (
               <img
                 src={logoUrl}
                 alt={propertyName}
-                className="w-full h-full object-contain"
-                style={{ background: 'white', padding: '4px' }}
+                className="w-full h-full object-contain p-1"
+                onError={() => setImgFailed(true)}
               />
             ) : (
-              <span className="text-3xl font-bold text-white select-none">
-                {propertyName.charAt(0).toUpperCase()}
-              </span>
+              <div className="w-full h-full bg-forest flex items-center justify-center">
+                <span className="text-3xl font-bold text-white select-none">
+                  {propertyName.charAt(0).toUpperCase()}
+                </span>
+              </div>
             )}
           </div>
           <h1 className="font-display text-2xl font-bold text-pine leading-tight">{softwareName}</h1>
