@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT } from '../lib/helpers'
+import SearchableSelect from '../components/SearchableSelect.jsx'
 import {
   Plus, Pencil, Trash2, Save, ShieldCheck,
-  Building2, Truck, Package, FolderTree, UtensilsCrossed, Sparkles, Calculator, Handshake, Users,
+  Building2, Truck, Package, FolderTree, UtensilsCrossed, Sparkles, Calculator, Handshake, Users, BedDouble,
 } from 'lucide-react'
 
 /* ------------------------------------------------------------------ */
@@ -96,6 +97,15 @@ const CMS_ENTITIES = [
       { key: 'subtype', label: 'Subtype', type: 'text' },
     ],
   },
+  {
+    id: 'rooms', table: 'rooms', label: 'Rooms', icon: BedDouble, orderBy: 'room_no', hasIsActive: true,
+    fields: [
+      { key: 'room_no', label: 'Room no', type: 'text', required: true },
+      { key: 'room_name', label: 'Room name', type: 'text' },
+      { key: 'room_type', label: 'Type', type: 'searchable', allowCreate: true, default: 'Standard' },
+      { key: 'base_rate', label: 'Base rate', type: 'number', default: 0, format: 'money' },
+    ],
+  },
 ]
 
 function emptyForm(entity) {
@@ -117,11 +127,23 @@ function EntityManager({ entity }) {
   const [editF, setEditF]       = useState({})
   const [f, setF]               = useState(() => emptyForm(entity))
   const [fkOptions, setFkOptions] = useState({})
+  // Distinct values already used in any "searchable" (non-FK) text field — e.g. room_type —
+  // so SearchableSelect can offer them as suggestions, same as a free-text autocomplete.
+  const [searchOptions, setSearchOptions] = useState({})
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
 
   const load = async () => {
     const { data } = await supabase.from(entity.table).select('*').order(entity.orderBy || 'name', { ascending: true })
     setRows(data || [])
+    // Build distinct-value suggestion lists for any 'searchable' field from the loaded rows
+    const nextSearch = {}
+    for (const fld of entity.fields) {
+      if (fld.type === 'searchable') {
+        const vals = Array.from(new Set((data || []).map((r) => r[fld.key]).filter(Boolean)))
+        nextSearch[fld.key] = vals.sort().map((v) => ({ value: v, label: v }))
+      }
+    }
+    setSearchOptions(nextSearch)
   }
   const loadFkOptions = async () => {
     const next = {}
@@ -186,6 +208,28 @@ function EntityManager({ entity }) {
     return (val || val === 0) ? val : '—'
   }
   const renderInput = (fld, state, onChange) => {
+    if (fld.type === 'searchable') {
+      // Local addition (e.g. a brand-new room_type) is added on the fly to this field's
+      // suggestion list so it immediately appears as selectable everywhere, without a reload.
+      const opts = searchOptions[fld.key] || []
+      return (
+        <SearchableSelect
+          options={opts}
+          value={state[fld.key] ?? ''}
+          onChange={(v) => onChange(v)}
+          placeholder={fld.label}
+          allowCreate={!!fld.allowCreate}
+          onCreate={async (q) => {
+            setSearchOptions((p) => ({
+              ...p,
+              [fld.key]: [...(p[fld.key] || []), { value: q, label: q }],
+            }))
+            return q
+          }}
+          clearable={!fld.required}
+        />
+      )
+    }
     if (fld.type === 'select') {
       const opts = fld.fkTable ? (fkOptions[fld.key] || []) : (fld.options || [])
       return (
