@@ -177,18 +177,6 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
 
-  // ------------------------------------------------------------------
-  // [P5] invoiceData shape used by both live and historical print paths:
-  // {
-  //   charges    : ChargeRow[]   — folio charge array snapshot (JSONB from DB or live state)
-  //   totals     : TotalsObject  — { base, discount, service_charge, vat, grand_total, ... }
-  //   paid       : number        — total payments received
-  //   due        : number        — outstanding balance (may be 0)
-  //   invoice_no : string | undefined — undefined for live/draft previews
-  //   issued_at  : string | undefined — ISO timestamp; undefined for live previews
-  // }
-  // ------------------------------------------------------------------
-
   return (
     <div>
       <button className="btn-ghost mb-4" onClick={back}><ArrowLeft size={15} /> All reservations</button>
@@ -246,11 +234,8 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
 
       {/* ================================================================
           PRINT PORTALS
-          All portals live here in the parent so they always have access
-          to the latest res, guest, company, charges, totals, paid, due.
           ================================================================ */}
 
-      {/* REG — Registration Card [P4] */}
       {printDoc?.type === 'REG' && (
         <PrintPortal title="Registration Card" onClose={() => setPrintDoc(null)}>
           <RegistrationCard
@@ -260,16 +245,13 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
         </PrintPortal>
       )}
 
-      {/* BILL — Guest Bill [P1]
-          ?.length guard: empty snapshot [] is falsy-equivalent here; fall back to live charges.
-          ?? guard: preserves paid=0 / due=0 correctly (|| would wrongly fall back for zero). */}
       {printDoc?.type === 'BILL' && (
         <PrintPortal title="Guest Bill" onClose={() => setPrintDoc(null)}>
           <GuestBill
             charges={
               printDoc.invoiceData?.charges?.length
-                ? printDoc.invoiceData.charges   // historical snapshot
-                : charges                        // live folio
+                ? printDoc.invoiceData.charges
+                : charges
             }
             totals={printDoc.invoiceData?.totals ?? totals}
             paid={printDoc.invoiceData?.paid ?? paid}
@@ -283,7 +265,6 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
         </PrintPortal>
       )}
 
-      {/* MUSHAK — Mushak-6.3 [P2] same guards as BILL */}
       {printDoc?.type === 'MUSHAK' && (
         <PrintPortal title="Mushak-6.3" onClose={() => setPrintDoc(null)}>
           <Mushak63
@@ -301,7 +282,6 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
         </PrintPortal>
       )}
 
-      {/* QUOTE — Quotation [P3] */}
       {printDoc?.type === 'QUOTE' && (
         <PrintPortal title="Quotation" onClose={() => setPrintDoc(null)}>
           <Quotation
@@ -323,9 +303,6 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  OVERVIEW TAB                                                        */
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
 /*  GUEST PROFILE CARD — Stay History, Preferences, Dates, Loyalty     */
 /* ------------------------------------------------------------------ */
 const PRESET_PREFERENCES = [
@@ -336,7 +313,7 @@ const PRESET_PREFERENCES = [
 ]
 
 function GuestProfileCard({ guest, reservationId, isAdmin, userName, reload, flash }) {
-  const [profile, setProfile]     = useState(null)  // from v_guest_profile
+  const [profile, setProfile]     = useState(null)
   const [ledger, setLedger]       = useState([])
   const [editing, setEditing]     = useState(false)
   const [prefInput, setPrefInput] = useState('')
@@ -1238,6 +1215,8 @@ function GuestIdManager({ reservationId, resGuests, guestIds, locked, reload, fl
   const [form, setForm]         = useState({ guest_name: '', id_type: 'NID', id_number: '', notes: '' })
   const [busy, setBusy]         = useState(false)
 
+  const ID_TYPES = ['NID', 'Passport', 'Driving License', 'Birth Certificate', 'Other']
+
   const startAdd = (guestName = '') => {
     setForm({ guest_name: guestName, id_type: 'NID', id_number: '', notes: '' })
     setEditId(null)
@@ -1612,10 +1591,6 @@ function BillingsAndCheckOutTab({
   const [discType, setDiscType]   = useState('ROOM')
   const [p, setP]           = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
 
-  // ----------------------------------------------------------------
-  // [P5] Live invoice data — used for "Preview Bill" / "Mushak Print"
-  //      invoice_no is undefined → GuestBill/Mushak63 render as DRAFT
-  // ----------------------------------------------------------------
   const printLiveInvoice = (type) => {
     setPrintDoc({
       type,
@@ -1624,21 +1599,16 @@ function BillingsAndCheckOutTab({
         totals,
         paid,
         due,
-        invoice_no: undefined,   // draft — no number yet
+        invoice_no: undefined,
         issued_at:  new Date().toISOString(),
       },
     })
   }
 
-  // ----------------------------------------------------------------
-  // [P6] Historical invoice print — uses DB snapshot
-  //      ?? guards keep paid=0 / due=0 from falling back to live values
-  // ----------------------------------------------------------------
   const printHistoryInvoice = (inv, type) => {
     setPrintDoc({
       type,
       invoiceData: {
-        // ?.length: empty [] (no charges stored) falls back to live charges
         charges:    inv.charges?.length ? inv.charges : charges,
         totals:     inv.totals  ?? totals,
         paid:       inv.paid    ?? paid,
@@ -1655,10 +1625,6 @@ function BillingsAndCheckOutTab({
   const buildRoomRows = () => {
     const rows = []
     const discDescriptor = resDiscount(res)
-    // A fixed ৳ discount must total to the entered value across the whole stay,
-    // not be re-applied in full on every night — so split it evenly per room-night.
-    // A percentage discount doesn't need splitting: 10% off each night already
-    // equals 10% off the total, so it's applied as-is per night.
     const totalRoomNights = resRooms.reduce((sum, rr) => {
       const ci = rr.from_date || res.check_in
       const co = rr.to_date   || res.check_out
@@ -1680,9 +1646,6 @@ function BillingsAndCheckOutTab({
         })
       }
     }
-    // Extra pax / driver accommodation are separate add-on lines, not part of the
-    // room rate the discount was quoted against — they keep using the plain
-    // percentage (or no discount) rather than a further slice of a fixed amount.
     const addonDiscount = discDescriptor && typeof discDescriptor === 'object' ? 0 : discDescriptor
     for (const night of eachNight(res.check_in, res.check_out)) {
       const rate = rateFor(taxConfig, 'ROOM', night)
@@ -1730,7 +1693,6 @@ function BillingsAndCheckOutTab({
   // Payment actions
   // ----------------------------------------------------------------
   const syncInvoiceStatus = async () => {
-    // Re-query fresh payments to avoid stale React state after reload()
     const { data: freshPayments } = await supabase
       .from('payments').select('amount').eq('reservation_id', res.id)
     const { data: activeInv } = await supabase
@@ -1740,14 +1702,12 @@ function BillingsAndCheckOutTab({
     if (!activeInv) return
 
     const totalPaid = (freshPayments || []).reduce((a, p) => a + Number(p.amount), 0)
-    // Use the snapshot grand_total stored on the invoice, not live totals (which may differ post-void)
     const snapGrandTotal = activeInv.totals?.grand_total ?? totals.grand_total
     const newDue    = +(snapGrandTotal - totalPaid).toFixed(2)
     const newStatus = newDue <= 0 ? 'PAID' : 'PARTIAL'
 
     await supabase.from('invoices').update({ paid: totalPaid, due: newDue, status: newStatus }).eq('id', activeInv.id)
 
-    // Auto-settle when fully paid
     if (newDue <= 0 && res.status === 'CHECKED_OUT') {
       await supabase.from('reservations').update({ status: 'SETTLED' }).eq('id', res.id)
       await reload()
@@ -1776,13 +1736,25 @@ function BillingsAndCheckOutTab({
   }
 
   // ----------------------------------------------------------------
-  // Discount action
+  // Discount action — FIXED: pure ৳ deduction, no VAT/Service Charge applied
   // ----------------------------------------------------------------
   const addDiscount = async () => {
     const amt = +discAmt
     if (!amt || amt <= 0) { flash('Enter a positive discount amount.'); return }
-    const rate = rateFor(taxConfig, discType, todayISO())
-    const calc = computeCharge(-amt, 0, rate)
+
+    // Previously this ran computeCharge(-amt, 0, rate), which re-applied the
+    // tax-config VAT/service-charge rate on top of the negative amount —
+    // meaning the discount line itself was carrying VAT/SC, distorting the
+    // folio totals. An "Additional discount" must be a pure ৳ deduction with
+    // no tax component, so VAT and service_charge are hardcoded to 0 here.
+    const calc = {
+      base_amount: -amt,
+      discount: 0,
+      service_charge: 0,
+      vat: 0,
+      total: -amt,
+    }
+
     const { error } = await supabase.from('folio_charges').insert({
       reservation_id: res.id, charge_date: todayISO(), charge_type: 'DISCOUNT', status: 'PAID',
       description: `Additional discount (${discType})${discReason ? ' — ' + discReason : ''}`,
@@ -1814,18 +1786,18 @@ function BillingsAndCheckOutTab({
     const invStatus  = due <= 0 ? 'PAID' : 'PARTIAL'
 
     const { error: invErr } = await supabase.from('invoices').insert({
-  reservation_id: res.id,
-  invoice_no:     invoiceNo,
-  issued_at:      issuedAt,
-  issued_by:      userName,
-  invoice_type:   'GUEST_BILL', // এখানে 'SALES' এর বদলে 'GUEST_BILL' দিন
-  charges,
-  totals,
-  paid,
-  due,
-  status:         invStatus,
-  is_void:        false,
-})
+      reservation_id: res.id,
+      invoice_no:     invoiceNo,
+      issued_at:      issuedAt,
+      issued_by:      userName,
+      invoice_type:   'GUEST_BILL',
+      charges,
+      totals,
+      paid,
+      due,
+      status:         invStatus,
+      is_void:        false,
+    })
 
     if (invErr) { flash(`Failed to generate invoice: ${invErr.message}`); return }
 
@@ -2097,7 +2069,6 @@ function PartnerAccounts({ res, reload, flash, userName }) {
   const agency      = res.agencies
   const shareholder = res.shareholders
 
-  // [6] Controlled state — replaces document.getElementById anti-pattern
   const [redeemAmt, setRedeemAmt] = useState('')
 
   const addAgencyDue = async () => {
