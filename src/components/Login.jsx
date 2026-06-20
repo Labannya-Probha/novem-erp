@@ -48,18 +48,18 @@ export default function Login({ slug }) {
   }, [slug])
 
   const signIn = async () => {
-  setBusy(true); setErr('')
-  try {
-    const uname = username.trim()
-    if (!uname) throw new Error('Enter your username')
-    const { data: email, error: re } = await supabase.rpc('email_for_username', { p_username: uname, p_slug: slug || null })  // <-- this line
-    if (re) throw re
-    if (!email) throw new Error('No active account found for this username')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw new Error('Wrong username or password')
-  } catch (e) { setErr(e.message) }
-  setBusy(false)
-}
+    setBusy(true); setErr('')
+    try {
+      const uname = username.trim()
+      if (!uname) throw new Error('Enter your username')
+      const { data: email, error: re } = await supabase.rpc('email_for_username', { p_username: uname, p_slug: slug || null })
+      if (re) throw re
+      if (!email) throw new Error('No active account found for this username')
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw new Error('Wrong username or password')
+    } catch (e) { setErr(e.message) }
+    setBusy(false)
+  }
 
   if (slug && notFound) {
     return (
@@ -88,8 +88,9 @@ export default function Login({ slug }) {
       <div className="card w-full max-w-sm p-8 relative shadow-2xl">
 
         {/* Logo */}
-         <div className="w-24 h-24 rounded-2xl mb-4 overflow-hidden shadow-md bg-white flex items-center justify-center">
-           {!imgFailed ? (
+        <div className="flex flex-col items-center text-center mb-7">
+          <div className="w-24 h-24 rounded-2xl mb-4 overflow-hidden shadow-md bg-white flex items-center justify-center">
+            {!imgFailed ? (
               <img
                 src={logoUrl}
                 alt={propertyName}
@@ -100,10 +101,10 @@ export default function Login({ slug }) {
               <div className="w-full h-full bg-forest flex items-center justify-center">
                 <span className="text-3xl font-bold text-white select-none">
                   {propertyName.charAt(0).toUpperCase()}
-              </span>
-            </div>
-          )}
-        </div> 
+                </span>
+              </div>
+            )}
+          </div>
           <h1 className="font-display text-2xl font-bold text-pine leading-tight">{softwareName}</h1>
           <p className="text-sm text-pine/60 mt-1">Welcome to {propertyName}</p>
         </div>
