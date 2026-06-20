@@ -88,23 +88,20 @@ export default function Login({ slug }) {
       <div className="card w-full max-w-sm p-8 relative shadow-2xl">
 
         {/* Logo */}
-        <div className="flex flex-col items-center text-center mb-7">
-          <div className="w-20 h-20 rounded-2xl mb-4 overflow-hidden shadow-md bg-white flex items-center justify-center">
-            {!imgFailed ? (
-              <img
-                src={logoUrl}
-                alt={propertyName}
-                className="w-full h-full object-contain p-1"
-                onError={() => setImgFailed(true)}
-              />
-            ) : (
-              <div className="w-full h-full bg-forest flex items-center justify-center">
-                <span className="text-3xl font-bold text-white select-none">
-                  {propertyName.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
-          </div>
+      <div className="h-20 min-w-[5rem] max-w-[14rem] px-3 rounded-2xl mb-4 overflow-hidden shadow-md bg-white flex items-center justify-center">
+  {!imgFailed ? (
+    <img
+      src={logoUrl}
+      alt={propertyName}
+      className="h-full w-auto max-w-full object-contain py-2"
+      onError={() => setImgFailed(true)}
+    />
+  ) : (
+    <span className="text-3xl font-bold text-forest select-none px-2">
+      {propertyName.charAt(0).toUpperCase()}
+    </span>
+  )}
+</div>  
           <h1 className="font-display text-2xl font-bold text-pine leading-tight">{softwareName}</h1>
           <p className="text-sm text-pine/60 mt-1">Welcome to {propertyName}</p>
         </div>
