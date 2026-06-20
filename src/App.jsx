@@ -22,8 +22,9 @@ import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import {
+  Leaf, LayoutDashboard, CalendarRange, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
   FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, Building2,
- } from 'lucide-react'
+} from 'lucide-react'
 
 function BrandLogo({ url }) {
   const [ok, setOk] = useState(true)
