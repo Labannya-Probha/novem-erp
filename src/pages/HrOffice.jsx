@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
-import { Users, Plus, Check, X, CalendarDays, FileText } from 'lucide-react'
+import { Users, Plus, Check, X, CalendarDays, FileText, Wallet, Printer } from 'lucide-react'
+import PrintPortal from '../components/PrintPortal.jsx'
 
-const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Incidents', 'Letters / Docket']
+const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Payroll', 'Incidents', 'Letters / Docket']
 
 export default function HrOffice({ userName, role, isAdmin, company }) {
   const [tab, setTab] = useState('Employees')
@@ -14,7 +15,7 @@ export default function HrOffice({ userName, role, isAdmin, company }) {
     <div className="space-y-5">
       <div>
         <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><Users className="text-forest" /> HR & Office</h1>
-        <p className="text-sm text-pine/60">Employee records, attendance, leave, incidents and the office document register.</p>
+        <p className="text-sm text-pine/60">Employee records, attendance, leave, payroll, incidents and the office document register.</p>
       </div>
       {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
       <div className="flex gap-1 border-b border-leaf flex-wrap">
@@ -24,6 +25,7 @@ export default function HrOffice({ userName, role, isAdmin, company }) {
       {tab === 'Attendance' && <AttendanceTab flash={flash} />}
       {tab === 'Leave' && <LeaveTab flash={flash} userName={userName} canApprove={canApprove} />}
       {tab === 'Comp Leave' && <CompLeaveTab flash={flash} />}
+      {tab === 'Payroll' && <PayrollTab flash={flash} userName={userName} canApprove={canApprove} isAdmin={isAdmin} company={company} />}
       {tab === 'Incidents' && <IncidentsTab flash={flash} userName={userName} />}
       {tab === 'Letters / Docket' && <DocketTab flash={flash} userName={userName} />}
     </div>
@@ -185,6 +187,266 @@ function CompLeaveTab({ flash }) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  PAYROLL TAB — generate a monthly run, review/edit payslips, print  */
+/* ------------------------------------------------------------------ */
+// Salary-head split mirrors the gazette-compliant structure used for
+// Novem's salary workbook: Basic 60% / House Rent 25% / Medical 10% /
+// Conveyance 5% of gross. This is a sensible default split, not a legal
+// requirement — adjust the percentages below if your structure differs.
+const SPLIT = { basic: 0.60, house_rent: 0.25, medical: 0.10, conveyance: 0.05 }
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
+  const now = new Date()
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [year, setYear] = useState(now.getFullYear())
+  const [runs, setRuns] = useState([])
+  const [active, setActive] = useState(null)
+  const [slips, setSlips] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [printSlip, setPrintSlip] = useState(null)
+
+  const loadRuns = async () => {
+    const { data } = await supabase.from('payroll_runs').select('*').order('period_year', { ascending: false }).order('period_month', { ascending: false })
+    setRuns(data || [])
+  }
+  useEffect(() => { loadRuns() }, [])
+
+  const loadSlips = async (runId) => {
+    const { data } = await supabase.from('payslips').select('*').eq('payroll_run_id', runId).order('full_name')
+    setSlips(data || [])
+  }
+  const openRun = async (run) => { setActive(run); await loadSlips(run.id) }
+
+  // Builds payslip snapshots for every ACTIVE employee for the chosen month,
+  // pulling absent-day counts from attendance_records to apply a simple
+  // per-day deduction (gross / 30 per absent day beyond what's already
+  // reflected as unpaid leave).
+  const generateRun = async () => {
+    setBusy(true)
+    try {
+      const { data: existing } = await supabase.from('payroll_runs').select('id').eq('period_month', month).eq('period_year', year).maybeSingle()
+      if (existing) { flash(`Payroll for ${MONTH_NAMES[month - 1]} ${year} already exists — open it below to review.`); setBusy(false); return }
+
+      const { data: run, error: re } = await supabase.from('payroll_runs')
+        .insert({ period_month: month, period_year: year, generated_by: userName })
+        .select().single()
+      if (re) throw re
+
+      const { data: emps } = await supabase.from('employees').select('*').eq('status', 'ACTIVE')
+      const periodStart = `${year}-${String(month).padStart(2, '0')}-01`
+      const periodEnd = `${year}-${String(month).padStart(2, '0')}-31`
+
+      const slipsToInsert = []
+      for (const e of emps || []) {
+        const { count } = await supabase.from('attendance_records').select('*', { count: 'exact', head: true })
+          .eq('employee_id', e.id).eq('status', 'A').gte('att_date', periodStart).lte('att_date', periodEnd)
+        const absentDays = count || 0
+        const gross = +e.gross_salary || 0
+        const basic = +(gross * SPLIT.basic).toFixed(2)
+        const houseRent = +(gross * SPLIT.house_rent).toFixed(2)
+        const medical = +(gross * SPLIT.medical).toFixed(2)
+        const conveyance = +(gross * SPLIT.conveyance).toFixed(2)
+        const perDay = gross / 30
+        const absentDeduction = +(perDay * absentDays).toFixed(2)
+        const netPayable = +(gross - absentDeduction).toFixed(2)
+
+        slipsToInsert.push({
+          payroll_run_id: run.id, employee_id: e.id,
+          emp_code: e.emp_code, full_name: e.full_name, designation: e.designation, department: e.department,
+          gross_salary: gross, basic, house_rent: houseRent, medical, conveyance, other_allowance: 0,
+          absent_days: absentDays, absent_deduction: absentDeduction, advance_deduction: 0, other_deduction: 0,
+          net_payable: netPayable,
+        })
+      }
+      if (slipsToInsert.length === 0) { flash('No active employees to run payroll for.'); setBusy(false); return }
+      const { error: se } = await supabase.from('payslips').insert(slipsToInsert)
+      if (se) throw se
+
+      await loadRuns()
+      await openRun(run)
+      flash(`Payroll generated for ${MONTH_NAMES[month - 1]} ${year} — ${slipsToInsert.length} payslip(s).`)
+    } catch (e) { flash(e.message) }
+    setBusy(false)
+  }
+
+  const updateSlip = async (slip, field, value) => {
+    const n = { ...slip, [field]: value }
+    n.net_payable = +(
+      (+n.gross_salary) - (+n.absent_deduction) - (+n.advance_deduction || 0) - (+n.other_deduction || 0) + (+n.other_allowance || 0)
+    ).toFixed(2)
+    setSlips((prev) => prev.map((s) => s.id === slip.id ? n : s))
+    const { error } = await supabase.from('payslips').update({
+      [field]: value, net_payable: n.net_payable,
+    }).eq('id', slip.id)
+    if (error) flash(error.message)
+  }
+
+  const approveRun = async () => {
+    if (!window.confirm(`Approve payroll for ${MONTH_NAMES[active.period_month - 1]} ${active.period_year}? Net amounts will be locked for payout.`)) return
+    const { error } = await supabase.from('payroll_runs').update({ status: 'APPROVED', approved_by: userName, approved_at: new Date().toISOString() }).eq('id', active.id)
+    if (error) flash(error.message); else { await loadRuns(); setActive((a) => ({ ...a, status: 'APPROVED' })) }
+  }
+
+  const markPaid = async () => {
+    if (!window.confirm('Mark this payroll run as PAID? This should only be done once salaries are actually disbursed.')) return
+    const { error } = await supabase.from('payroll_runs').update({ status: 'PAID', paid_at: new Date().toISOString() }).eq('id', active.id)
+    if (error) { flash(error.message); return }
+    await supabase.from('payslips').update({ paid_at: new Date().toISOString() }).eq('payroll_run_id', active.id)
+    await loadRuns(); setActive((a) => ({ ...a, status: 'PAID' }))
+    flash('Payroll marked as paid.')
+  }
+
+  const totalNet = slips.reduce((a, s) => a + (+s.net_payable || 0), 0)
+
+  if (active) {
+    const locked = active.status !== 'DRAFT'
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <button className="btn-ghost !py-1" onClick={() => setActive(null)}>← All runs</button>
+            <h3 className="font-display font-semibold text-pine flex items-center gap-2"><Wallet size={16} className="text-forest" /> {MONTH_NAMES[active.period_month - 1]} {active.period_year}</h3>
+            <span className={`status-chip ${active.status === 'PAID' ? 'bg-forest/15 text-forest' : active.status === 'APPROVED' ? 'bg-amber/20 text-amber' : 'bg-stone-200 text-stone-700'}`}>{active.status}</span>
+          </div>
+          <div className="flex gap-2">
+            {canApprove && active.status === 'DRAFT' && <button className="btn-primary !py-1.5" onClick={approveRun}><Check size={14} /> Approve</button>}
+            {isAdmin && active.status === 'APPROVED' && <button className="btn-amber !py-1.5" onClick={markPaid}><Wallet size={14} /> Mark paid</button>}
+          </div>
+        </div>
+        {locked && <div className="px-4 py-2 rounded-lg bg-amber/10 text-amber text-sm">This run is {active.status.toLowerCase()} — amounts are locked. Contact an administrator to make changes.</div>}
+        <div className="card overflow-hidden">
+          <table className="w-full">
+            <thead><tr>
+              <th className="th">Employee</th><th className="th text-right">Gross</th><th className="th text-right">Absent days</th>
+              <th className="th text-right">Absent ded.</th><th className="th text-right">Advance ded.</th><th className="th text-right">Other ded.</th>
+              <th className="th text-right">Net payable</th><th className="th text-right">Print</th>
+            </tr></thead>
+            <tbody>
+              {slips.map((s) => (
+                <tr key={s.id}>
+                  <td className="td text-sm font-medium">{s.full_name}<div className="text-xs text-pine/40">{s.emp_code} · {s.designation}</div></td>
+                  <td className="td money text-right">{fmtBDT(s.gross_salary)}</td>
+                  <td className="td money text-right">{s.absent_days}</td>
+                  <td className="td money text-right">{fmtBDT(s.absent_deduction)}</td>
+                  <td className="td text-right">
+                    {locked ? fmtBDT(s.advance_deduction) : (
+                      <input type="number" className="input !w-24 !py-1 money text-right" defaultValue={s.advance_deduction}
+                        onBlur={(e) => updateSlip(s, 'advance_deduction', +e.target.value || 0)} />
+                    )}
+                  </td>
+                  <td className="td text-right">
+                    {locked ? fmtBDT(s.other_deduction) : (
+                      <input type="number" className="input !w-24 !py-1 money text-right" defaultValue={s.other_deduction}
+                        onBlur={(e) => updateSlip(s, 'other_deduction', +e.target.value || 0)} />
+                    )}
+                  </td>
+                  <td className="td money text-right font-bold text-forest">{fmtBDT(s.net_payable)}</td>
+                  <td className="td text-right"><button className="btn-ghost !py-1" onClick={() => setPrintSlip(s)}><Printer size={13} /></button></td>
+                </tr>
+              ))}
+              {slips.length === 0 && <tr><td className="td text-pine/40" colSpan={8}>No payslips in this run.</td></tr>}
+            </tbody>
+            {slips.length > 0 && (
+              <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={6}>Total net payable</td><td className="td text-right">{fmtBDT(totalNet)}</td><td className="td"></td></tr></tfoot>
+            )}
+          </table>
+        </div>
+        {printSlip && (
+          <PrintPortal title={`Payslip — ${printSlip.full_name}`} onClose={() => setPrintSlip(null)}>
+            <PayslipDoc slip={printSlip} run={active} company={company} />
+          </PrintPortal>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-4 flex items-end gap-3 flex-wrap">
+        <div>
+          <label className="label">Month</label>
+          <select className="input !w-40" value={month} onChange={(e) => setMonth(+e.target.value)}>
+            {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Year</label>
+          <input type="number" className="input !w-28 money" value={year} onChange={(e) => setYear(+e.target.value)} />
+        </div>
+        {canApprove && <button className="btn-primary" disabled={busy} onClick={generateRun}><Wallet size={15} /> {busy ? 'Generating…' : 'Generate payroll'}</button>}
+      </div>
+      <p className="text-xs text-pine/50">Generates a payslip for every active employee using gross salary split into Basic 60% / House Rent 25% / Medical 10% / Conveyance 5%, with absent-day deductions pulled automatically from Attendance. Existing months won't be regenerated — open the run below to edit instead.</p>
+      <div className="card overflow-hidden">
+        <table className="w-full">
+          <thead><tr><th className="th">Period</th><th className="th">Status</th><th className="th">Generated by</th><th className="th text-right">Open</th></tr></thead>
+          <tbody>
+            {runs.map((r) => (
+              <tr key={r.id} className="hover:bg-leaf/20 cursor-pointer" onClick={() => openRun(r)}>
+                <td className="td text-sm font-medium">{MONTH_NAMES[r.period_month - 1]} {r.period_year}</td>
+                <td className="td"><span className={`status-chip ${r.status === 'PAID' ? 'bg-forest/15 text-forest' : r.status === 'APPROVED' ? 'bg-amber/20 text-amber' : 'bg-stone-200 text-stone-700'}`}>{r.status}</span></td>
+                <td className="td text-xs">{r.generated_by || '—'}</td>
+                <td className="td text-right"><button className="btn-ghost !py-1" onClick={() => openRun(r)}>Open →</button></td>
+              </tr>
+            ))}
+            {runs.length === 0 && <tr><td className="td text-pine/40" colSpan={4}>No payroll runs yet — generate one above.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- A4 Payslip (print) ---------------- */
+function PayslipDoc({ slip, run, company }) {
+  const cell = { border: '1px solid #000', padding: '6px 8px', fontSize: 11, verticalAlign: 'top' }
+  const rt = { ...cell, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
+  return (
+    <div style={{ maxWidth: 600, margin: '0 auto', color: '#000' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '2px solid #1B4D2E', paddingBottom: 8, marginBottom: 12 }}>
+        {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 50, width: 50, objectFit: 'contain' }} />}
+        <div style={{ flex: 1, textAlign: company?.logo_url ? 'left' : 'center' }}>
+          <div style={{ fontSize: 19, fontWeight: 700, fontFamily: 'Fraunces, serif', color: '#1B4D2E' }}>{company?.name || 'Resort'}</div>
+          <div style={{ fontSize: 10.5 }}>{company?.address}</div>
+        </div>
+      </div>
+      <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, letterSpacing: 1, marginBottom: 10, textDecoration: 'underline' }}>
+        PAYSLIP — {String(run.period_month).padStart(2, '0')}/{run.period_year}
+      </div>
+      <table style={{ width: '100%', fontSize: 11, marginBottom: 10 }}>
+        <tbody>
+          <tr><td><b>Employee:</b> {slip.full_name}</td><td style={{ textAlign: 'right' }}><b>Code:</b> {slip.emp_code}</td></tr>
+          <tr><td><b>Designation:</b> {slip.designation || '—'}</td><td style={{ textAlign: 'right' }}><b>Department:</b> {slip.department || '—'}</td></tr>
+        </tbody>
+      </table>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr style={{ background: '#eee' }}><th style={cell}>Earnings</th><th style={{ ...cell, textAlign: 'right' }}>Amount</th><th style={cell}>Deductions</th><th style={{ ...cell, textAlign: 'right' }}>Amount</th></tr></thead>
+        <tbody>
+          <tr><td style={cell}>Basic</td><td style={rt}>{fmtBDT(slip.basic)}</td><td style={cell}>Absent ({slip.absent_days} day(s))</td><td style={rt}>{fmtBDT(slip.absent_deduction)}</td></tr>
+          <tr><td style={cell}>House Rent</td><td style={rt}>{fmtBDT(slip.house_rent)}</td><td style={cell}>Advance</td><td style={rt}>{fmtBDT(slip.advance_deduction)}</td></tr>
+          <tr><td style={cell}>Medical</td><td style={rt}>{fmtBDT(slip.medical)}</td><td style={cell}>Other</td><td style={rt}>{fmtBDT(slip.other_deduction)}</td></tr>
+          <tr><td style={cell}>Conveyance</td><td style={rt}>{fmtBDT(slip.conveyance)}</td><td style={cell}></td><td style={rt}></td></tr>
+          {+slip.other_allowance > 0 && <tr><td style={cell}>Other allowance</td><td style={rt}>{fmtBDT(slip.other_allowance)}</td><td style={cell}></td><td style={rt}></td></tr>}
+        </tbody>
+        <tfoot>
+          <tr style={{ fontWeight: 700, background: '#f5f5f5' }}><td style={cell}>Gross</td><td style={rt}>{fmtBDT(slip.gross_salary)}</td><td style={cell}>Total deduction</td><td style={rt}>{fmtBDT(+slip.absent_deduction + +slip.advance_deduction + +slip.other_deduction)}</td></tr>
+        </tfoot>
+      </table>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#fff', background: '#2E7D32', padding: '8px 12px', borderRadius: 6, margin: '10px 0' }}>
+        <span>NET PAYABLE</span><span>{fmtBDT(slip.net_payable)}</span>
+      </div>
+      <table style={{ width: '100%', marginTop: 40, fontSize: 11 }}>
+        <tbody><tr>
+          <td style={{ width: '45%', borderTop: '1px solid #000', paddingTop: 6, textAlign: 'center' }}>Employee Signature</td>
+          <td style={{ width: '10%' }}></td>
+          <td style={{ width: '45%', borderTop: '1px solid #000', paddingTop: 6, textAlign: 'center' }}>Authorized Signature</td>
+        </tr></tbody>
+      </table>
     </div>
   )
 }
