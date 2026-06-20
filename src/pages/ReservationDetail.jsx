@@ -1584,7 +1584,7 @@ function BillingsAndCheckOutTab({
 }) {
   const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status)
   const editable     = isAdmin || !['CHECKED_OUT', 'SETTLED', 'CANCELLED'].includes(res.status)
-
+  const uncleanRooms = resRooms.filter((rr) => rr.rooms?.hk_status && rr.rooms.hk_status !== 'Clean')
   const [c, setC]           = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
   const [discAmt, setDiscAmt]     = useState('')
   const [discReason, setDiscReason] = useState('')
@@ -1774,7 +1774,18 @@ function BillingsAndCheckOutTab({
   // Checkout handler — saves full invoice snapshot
   // ----------------------------------------------------------------
   const handleCheckOut = async () => {
-    if (due > 0) {
+  // NEW — HK gate, admin can override with confirm()
+  if (uncleanRooms.length > 0) {
+    const names = uncleanRooms.map((rr) => `${rr.rooms?.room_no} (${rr.rooms?.hk_status})`).join(', ')
+    if (isAdmin) {
+      const ok = window.confirm(`Room(s) not housekeeping-cleared: ${names}.\n\nOverride and check out anyway?`)
+      if (!ok) return
+    } else {
+      flash(`Cannot check out — room(s) pending housekeeping clearance: ${names}. Ask an administrator to override.`)
+      return
+    }
+  }
+  if (due > 0) {
       const ok = window.confirm(
         `Guest has an outstanding balance of ${fmtBDT(due)}.\n\nCheck out anyway? The invoice will be marked PARTIAL.`
       )
@@ -1844,9 +1855,14 @@ function BillingsAndCheckOutTab({
             <button className="btn-ghost" onClick={() => printLiveInvoice('MUSHAK')}><Receipt size={16} /> Mushak Print</button>
             <div className="h-6 w-px bg-leaf/60 mx-2 hidden sm:block" />
             {!isCheckedOut ? (
-              <button className="btn-primary" onClick={handleCheckOut}>
-                <CheckCircle2 size={16} /> Check Out
-              </button>
+              <>
+                {uncleanRooms.length > 0 && (
+                  <span className="text-xs text-amber font-semibold mr-1">⚠ HK pending: {uncleanRooms.map(rr => rr.rooms?.room_no).join(', ')}</span>
+                )}
+                <button className="btn-primary" onClick={handleCheckOut}>
+                  <CheckCircle2 size={16} /> Check Out
+                </button>
+              </>
             ) : (
               isAdmin && (
                 <button className="btn-amber" onClick={handleReCheckIn}>
@@ -2070,7 +2086,28 @@ function PartnerAccounts({ res, reload, flash, userName }) {
   const shareholder = res.shareholders
 
   const [redeemAmt, setRedeemAmt] = useState('')
-
+  const [agencies, setAgencies] = useState([])
+  const [shareholders, setShareholders] = useState([])
+  const [showAgencyPicker, setShowAgencyPicker] = useState(false)
+  const [showSharePicker, setShowSharePicker] = useState(false)
+  
+  useEffect(() => {
+    if (showAgencyPicker) supabase.from('agencies').select('id,name').order('name').then(({ data }) => setAgencies(data || []))
+  }, [showAgencyPicker])
+  useEffect(() => {
+    if (showSharePicker) supabase.from('shareholders').select('id,name').order('name').then(({ data }) => setShareholders(data || []))
+  }, [showSharePicker])
+  
+  const assignAgency = async (agencyId) => {
+    const { error } = await supabase.from('reservations').update({ agency_id: agencyId }).eq('id', res.id)
+    if (error) flash(error.message)
+    else { setShowAgencyPicker(false); reload(); flash('Agency assigned.') }
+  }
+  const assignShareholder = async (shareholderId) => {
+    const { error } = await supabase.from('reservations').update({ shareholder_id: shareholderId }).eq('id', res.id)
+    if (error) flash(error.message)
+    else { setShowSharePicker(false); reload(); flash('Shareholder assigned.') }
+  }
   const addAgencyDue = async () => {
     const amt = window.prompt('Enter amount to add to Agency Due:')
     if (!amt || isNaN(Number(amt))) return
@@ -2111,6 +2148,18 @@ function PartnerAccounts({ res, reload, flash, userName }) {
         <h3 className="font-display font-semibold text-pine mb-3">Agency Due Management</h3>
         <p className="text-lg font-bold">{agency?.name || 'No Agency Assigned'}</p>
         <p className="text-sm text-pine/60 mb-4">Current Due: {fmtBDT(agency?.due_balance || 0)}</p>
+            {!agency && (
+              <button onClick={() => setShowAgencyPicker(true)} className="btn-ghost w-full mb-2">Assign Agency</button>
+            )}
+            {showAgencyPicker && (
+              <div className="border border-leaf rounded-lg p-2 mb-2 max-h-40 overflow-y-auto">
+                {agencies.length === 0 && <p className="text-xs text-pine/40 p-2">No agencies found.</p>}
+                {agencies.map((a) => (
+                  <button key={a.id} onClick={() => assignAgency(a.id)} className="block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-leaf/40">{a.name}</button>
+                ))}
+          </div>
+        )}
+        <button onClick={addAgencyDue} className="btn-primary w-full" disabled={!agency}>Add Due</button>
         <button onClick={addAgencyDue} className="btn-primary w-full" disabled={!agency}>Add Due</button>
       </div>
       <div className="card p-5">
@@ -2119,15 +2168,18 @@ function PartnerAccounts({ res, reload, flash, userName }) {
         <p className="text-sm text-forest mb-4">
           Redeemable Balance: <span className="font-bold">{fmtBDT(shareholder?.free_stay_balance || 0)}</span>
         </p>
-        <div className="space-y-3">
-          <input
-            type="number"
-            className="input w-full"
-            placeholder="Amount to redeem"
-            value={redeemAmt}
-            onChange={(e) => setRedeemAmt(e.target.value)}
-            max={shareholder?.free_stay_balance || 0}
-          />
+        {!shareholder && (
+          <button onClick={() => setShowSharePicker(true)} className="btn-ghost w-full mb-2">Assign Shareholder</button>
+        )}
+        {showSharePicker && (
+          <div className="border border-leaf rounded-lg p-2 mb-2 max-h-40 overflow-y-auto">
+            {shareholders.length === 0 && <p className="text-xs text-pine/40 p-2">No shareholders found.</p>}
+            {shareholders.map((s) => (
+              <button key={s.id} onClick={() => assignShareholder(s.id)} className="block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-leaf/40">{s.name}</button>
+            ))}
+          </div>
+        )}
+        <div className="space-y-3">          
           <button
             onClick={redeemShareholderBalance}
             disabled={!shareholder || (shareholder?.free_stay_balance || 0) <= 0}
