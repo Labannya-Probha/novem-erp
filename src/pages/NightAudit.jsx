@@ -7,7 +7,8 @@ import { MoonStar, BedDouble, UserX, CheckCircle2, FileDown, BookOpenCheck, Prin
 const CASH_ACC = { CASH: '1010', BKASH: '1020', NAGAD: '1020', CARD: '1030', BANK: '1030', OTHER: '1030' }
 const REV_ACC = { ROOM: '4100', RESTAURANT: '4200', TEA: '4300', PICKLE: '4300', SPORTS: '4300', LAUNDRY: '4400', OTHER: '4400' }
 
-export default function NightAudit({ userName, isAdmin }) {
+export default function NightAudit({ userName, isAdmin, role }) {
+  const canCloseDay = isAdmin || role === 'SUPERUSER'
   const [auditDate, setAuditDate] = useState(todayISO())
   const [inHouse, setInHouse] = useState([])
   const [noShows, setNoShows] = useState([])
@@ -104,6 +105,7 @@ export default function NightAudit({ userName, isAdmin }) {
   }
 
   const closeDay = async () => {
+    if (!canCloseDay) { flash('Only Admin or SUPERUSER can close the day.'); return }
     if (!summary) return
     setBusy(true)
     let jvId = null
@@ -241,7 +243,11 @@ export default function NightAudit({ userName, isAdmin }) {
                 <input type="checkbox" checked={makeJV} onChange={(e) => setMakeJV(e.target.checked)} className="accent-forest" />
                 Also post a balanced journal voucher into Accounting
               </label>
-              <button className="btn-primary mt-3" disabled={busy} onClick={closeDay}><MoonStar size={15} /> {existing ? 'Re-close day' : 'Close the day'}</button>
+              {canCloseDay ? (
+                <button className="btn-primary mt-3" disabled={busy} onClick={closeDay}><MoonStar size={15} /> {existing ? 'Re-close day' : 'Close the day'}</button>
+              ) : (
+                <p className="text-xs text-pine/50 mt-3">Day-close requires Admin or SUPERUSER access.</p>
+              )}
             </div>
           </div>
         </div>
