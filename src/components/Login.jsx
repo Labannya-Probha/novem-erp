@@ -152,9 +152,10 @@ export default function Login({ slug }) {
             <LogIn size={16} /> {busy ? 'Signing in…' : 'Sign in'}
           </button>
 
-          <p className="text-xs text-pine/40 text-center pt-1">
-            Staff accounts are created by the administrator in Settings → Staff &amp; roles.
-          </p>
+          <div className="pt-1 flex items-center justify-between text-xs text-pine/40">
+            <div>© {new Date().getFullYear()} Aura Stay</div>
+            <div>Powered by <span className="font-semibold text-pine/60">Aura Stay</span></div>
+          </div>
         </div>
       </div>
     </div>
