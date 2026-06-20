@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
-import { fmtBDT, fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
+import { fmtBDT, fmtDate, todayISO, nightsBetween, rateFor, computeCharge, STATUS_COLORS } from '../lib/helpers'
 import { Plus, Search, Trash2 } from 'lucide-react'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 
@@ -113,17 +113,6 @@ export default function Reservations({ openReservation, userName, prefill, clear
 
 const SALUTATIONS = ['Mr.', 'Ms.', 'Mrs.', 'Dr.', 'Prof.', 'Engr.']
 
-const ADDON_DEFS = [
-  { key: 'BB', label: 'Bed & Breakfast' },
-  { key: 'PICKUP', label: 'Pick & Drop' },
-  { key: 'LUNCH', label: 'Lunch' },
-  { key: 'DINNER', label: 'Dinner' },
-  { key: 'DECOR', label: 'Room Decoration' },
-  { key: 'CAKE', label: 'Cake' },
-  { key: 'BOUQUET', label: 'Flower Bouquet' },
-  { key: 'SIGHTSEEING', label: 'Sight Seeing' },
-]
-
 function NewReservation({ close, openReservation, userName }) {
   const t = todayISO()
   const tomorrow = (d) => { const dt = new Date(d); dt.setDate(dt.getDate() + 1); return dt.toISOString().slice(0, 10) }
@@ -139,10 +128,13 @@ function NewReservation({ close, openReservation, userName }) {
   const [companies, setCompanies] = useState([])
   const [booked, setBooked] = useState([]) // {room_id, ci, co}
   const [roomRows, setRoomRows] = useState([]) // {room_id, from_date, to_date}
-  // addons: { [item_key]: { selected: bool, label, price, qty } }
-  const [addons, setAddons] = useState(() =>
-    Object.fromEntries(ADDON_DEFS.map((a) => [a.key, { selected: false, label: a.label, price: '', qty: 1 }]))
-  )
+  const [taxConfig, setTaxConfig] = useState([])
+
+  // ── Including Items — now sourced from Facility Items (Settings → Facilities) ──
+  const [facilityItems, setFacilityItems] = useState([])
+  // addons keyed by facility_items.id: { [facilityItemId]: { selected, label, price, qty, category } }
+  const [addons, setAddons] = useState({})
+
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
@@ -168,6 +160,17 @@ function NewReservation({ close, openReservation, userName }) {
 
   useEffect(() => {
     supabase.from('companies').select('id,name').eq('is_active', true).order('name').then(({ data }) => setCompanies(data || []))
+    supabase.from('tax_config').select('*').then(({ data }) => setTaxConfig(data || []))
+    // Facility Items — drives the "Including Items" picker. Only active items, grouped by category.
+    supabase.from('facility_items').select('*').eq('is_active', true).order('category').order('name')
+      .then(({ data }) => {
+        const items = data || []
+        setFacilityItems(items)
+        setAddons(Object.fromEntries(items.map((it) => [
+          it.id,
+          { selected: false, label: it.name, price: String(it.default_price ?? ''), qty: 1, category: it.category, unit: it.unit },
+        ])))
+      })
   }, [])
 
   const createCompany = async (name) => {
@@ -200,6 +203,12 @@ function NewReservation({ close, openReservation, userName }) {
   const validRows = roomRows.filter((r) => r.room_id && r.from_date && r.to_date && r.to_date > r.from_date)
   const overallCI = validRows.length ? validRows.reduce((m, r) => r.from_date < m ? r.from_date : m, validRows[0].from_date) : f.check_in
   const overallCO = validRows.length ? validRows.reduce((m, r) => r.to_date > m ? r.to_date : m, validRows[0].to_date) : f.check_out
+
+  // Group facility items by category for a cleaner picker
+  const groupedFacilityItems = facilityItems.reduce((acc, it) => {
+    (acc[it.category] = acc[it.category] || []).push(it)
+    return acc
+  }, {})
 
   const save = async () => {
     setBusy(true); setErr('')
@@ -240,17 +249,48 @@ function NewReservation({ close, openReservation, userName }) {
           return { reservation_id: r.id, room_id: row.room_id, rate: rm?.base_rate || 0, from_date: row.from_date, to_date: row.to_date }
         }))
       }
-      const selectedAddons = ADDON_DEFS
-        .filter((a) => addons[a.key].selected)
-        .map((a) => ({
-          reservation_id: r.id, item_key: a.key, label: addons[a.key].label || a.label,
-          price: +addons[a.key].price || 0, qty: +addons[a.key].qty || 1,
+
+      // Including Items — selected facility items become reservation_addons rows.
+      // item_key stores the facility_items.id so it traces back to the source item.
+      const selectedAddons = facilityItems
+        .filter((it) => addons[it.id]?.selected)
+        .map((it) => ({
+          reservation_id: r.id, item_key: it.id, label: addons[it.id].label || it.name,
+          price: +addons[it.id].price || 0, qty: +addons[it.id].qty || 1,
           posted: false, created_by: userName,
         }))
       if (selectedAddons.length > 0) {
         const { error: ae } = await supabase.from('reservation_addons').insert(selectedAddons)
         if (ae) throw ae
       }
+
+      // ── Auto-save a quotation for this new query (best-effort — reservation
+      // is already saved at this point, so a quotation failure shouldn't block
+      // the user; they can still create one manually from ReservationDetail). ──
+      try {
+        const qRate = rateFor(taxConfig, 'ROOM', overallCI)
+        const roomTotal = firstRoom ? Number(firstRoom.base_rate) : 0
+        const nightsCount = nightsBetween(overallCI, overallCO) || 1
+        const discDescriptor = f.discount_type === 'fixed'
+          ? { type: 'fixed', value: +f.discount_val || 0 }
+          : (+f.discount_val || 0)
+        const perNight = computeCharge(roomTotal, discDescriptor, qRate)
+        const grandTotal = +(perNight.total * nightsCount).toFixed(2)
+        const validUntil = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+        await supabase.from('quotations').insert({
+          reservation_id: r.id,
+          total_amount: grandTotal,
+          valid_until: validUntil,
+          room_rate: roomTotal,
+          room_count: validRows.length,
+          discount_pct: f.discount_type === 'percentage' ? (+f.discount_val || 0) : 0,
+          status: 'DRAFT',
+          message: '',
+        })
+      } catch (qErr) {
+        console.error('Auto-quotation failed (non-fatal):', qErr)
+      }
+
       close(); openReservation(r.id)
     } catch (e) { setErr(e.message) }
     setBusy(false)
@@ -364,23 +404,31 @@ function NewReservation({ close, openReservation, userName }) {
 
           <div className="col-span-2">
             <label className="label">Including Items</label>
-            <p className="text-xs text-pine/50 mb-2">Select any items included with this booking. Prices entered here are saved against the reservation but only posted to the bill when you choose to (Overview tab → Post addon charges).</p>
-            <div className="grid grid-cols-2 gap-2">
-              {ADDON_DEFS.map((a) => (
-                <div key={a.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${addons[a.key].selected ? 'border-forest bg-forest/5' : 'border-leaf'}`}>
-                  <input type="checkbox" checked={addons[a.key].selected} onChange={() => toggleAddon(a.key)} />
-                  <span className="text-sm flex-1">{a.label}</span>
-                  {addons[a.key].selected && (
-                    <>
-                      <input type="number" min="0" step="0.01" className="input !w-24 !py-1 money text-right" placeholder="Price ৳"
-                        value={addons[a.key].price} onChange={(e) => updAddon(a.key, 'price', e.target.value)} />
-                      <input type="number" min="1" className="input !w-14 !py-1 money text-right" placeholder="Qty"
-                        value={addons[a.key].qty} onChange={(e) => updAddon(a.key, 'qty', e.target.value)} />
-                    </>
-                  )}
+            <p className="text-xs text-pine/50 mb-2">Select from your Facility Items (Settings → Facilities). Prices are pulled from the item's default price but can be edited here for this booking — only posted to the bill when you choose to (Overview tab → Post addon charges).</p>
+            {facilityItems.length === 0 && (
+              <p className="text-xs text-amber py-2">No active Facility Items found — add some in Settings → Facilities to make them selectable here.</p>
+            )}
+            {Object.entries(groupedFacilityItems).map(([category, catItems]) => (
+              <div key={category} className="mb-3">
+                <div className="text-[10px] uppercase tracking-wide font-bold text-pine/40 mb-1.5">{category}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {catItems.map((it) => (
+                    <div key={it.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${addons[it.id]?.selected ? 'border-forest bg-forest/5' : 'border-leaf'}`}>
+                      <input type="checkbox" checked={!!addons[it.id]?.selected} onChange={() => toggleAddon(it.id)} />
+                      <span className="text-sm flex-1">{it.name} <span className="text-pine/40 text-xs">/{it.unit}</span></span>
+                      {addons[it.id]?.selected && (
+                        <>
+                          <input type="number" min="0" step="0.01" className="input !w-24 !py-1 money text-right" placeholder="Price ৳"
+                            value={addons[it.id].price} onChange={(e) => updAddon(it.id, 'price', e.target.value)} />
+                          <input type="number" min="1" className="input !w-14 !py-1 money text-right" placeholder="Qty"
+                            value={addons[it.id].qty} onChange={(e) => updAddon(it.id, 'qty', e.target.value)} />
+                        </>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
           <div><label className="label">Adults</label><input type="number" min="1" className="input" value={f.pax_adults} onChange={(e) => set('pax_adults', e.target.value)} /></div>
