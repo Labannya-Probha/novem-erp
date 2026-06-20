@@ -309,7 +309,7 @@ function AppRoot() {
   if (!session) return <Login />
 
   const role     = profile?.role || 'FRONT_OFFICE'
-  const isAdmin  = role === 'ADMIN'
+  const isAdmin  = role === 'ADMIN' || role === 'SUPERUSER'
   const userName = profile?.full_name || session.user?.email?.split('@')[0] || 'User'
 
   return <AppShell company={company} role={role} isAdmin={isAdmin} userName={userName} loadCompany={loadCompany} />
