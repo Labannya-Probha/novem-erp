@@ -8,7 +8,7 @@ import GuestPicker from '../components/GuestPicker.jsx'
 import { Plus, Minus, Trash2, Printer, ChefHat, Banknote, BedDouble, Search, Save, XCircle, RotateCcw, Receipt, Clock, FileText } from 'lucide-react'
 
 const TABS = ['New Order', 'Orders', 'Menu', 'Day Close']
-const MENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
+const PAYMENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
 
 // Cash rounding logic: >= 0.50 round up, < 0.50 round down
 const applyCashRounding = (amount) => {
