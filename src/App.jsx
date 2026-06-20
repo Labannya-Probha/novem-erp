@@ -281,10 +281,12 @@ function AppRoot() {
 
   if (session === undefined) return <div className="min-h-screen flex items-center justify-center text-pine/60">Loading…</div>
 
-  // /novemecoresort — named login path
-  // If not logged in: show Login; if already logged in: redirect to dashboard
-  if (location.pathname === '/novemecoresort') {
-    if (!session) return <Login />
+  // /{slug}/login — per-property login path
+  // If not logged in: show Login with that property's branding
+  // If already logged in: redirect to dashboard regardless of slug
+  if (location.pathname.endsWith('/login')) {
+    const slug = location.pathname.split('/').filter(Boolean)[0]
+    if (!session) return <Login slug={slug} />
     return <Navigate to="/dashboard" replace />
   }
 
