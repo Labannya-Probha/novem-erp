@@ -81,7 +81,7 @@ export default function Dashboard({ openReservation }) {
       <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${accent}`}><Icon size={20} /></div>
       <div>
         <div className="text-xs uppercase tracking-wider text-pine/60 font-semibold">{label}</div>
-        <div className="text-2xl font-display font-bold text-pine money">{value}</div>
+        <div className="text-xl sm:text-2xl font-display font-bold text-pine money truncate">{value}</div>
       </div>
     </div>
   )
@@ -92,12 +92,12 @@ export default function Dashboard({ openReservation }) {
       <div className="space-y-2">
         {rows.map((r) => (
           <button key={r.id} onClick={() => openReservation(r.id)}
-            className="w-full flex items-center justify-between p-3 rounded-lg border border-leaf hover:bg-leaf/40 text-left">
-            <div>
-              <div className="font-semibold text-sm">{r.reservation_name || r.guests?.full_name || '—'}</div>
-              <div className="text-xs text-pine/60 money">{r.res_no} · {fmtDate(r.check_in)} → {fmtDate(r.check_out)}</div>
+            className="w-full flex items-center justify-between gap-2 p-3 rounded-lg border border-leaf hover:bg-leaf/40 text-left">
+            <div className="min-w-0">
+              <div className="font-semibold text-sm truncate">{r.reservation_name || r.guests?.full_name || '—'}</div>
+              <div className="text-xs text-pine/60 money truncate">{r.res_no} · {fmtDate(r.check_in)} → {fmtDate(r.check_out)}</div>
             </div>
-            <span className={`status-chip ${STATUS_COLORS[r.status]}`}>{r.status.replace('_', ' ')}</span>
+            <span className={`status-chip shrink-0 whitespace-nowrap ${STATUS_COLORS[r.status]}`}>{r.status.replace('_', ' ')}</span>
           </button>
         ))}
       </div>
@@ -110,21 +110,21 @@ export default function Dashboard({ openReservation }) {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold text-pine mb-1">Front Office — {fmtDate(today)}</h1>
+      <h1 className="font-display text-xl sm:text-2xl font-bold text-pine mb-1">Front Office — {fmtDate(today)}</h1>
       <p className="text-sm text-pine/60 mb-6">The day at a glance.</p>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Stat icon={LogIn} label="Arrivals today" value={arrivals.length} accent="bg-forest/15 text-forest" />
         <Stat icon={LogOut} label="Departures today" value={departures.length} accent="bg-amber/15 text-amber" />
         <Stat icon={BedDouble} label="In-house" value={inHouse} accent="bg-pine/10 text-pine" />
         <Stat icon={Wallet} label="Outstanding dues" value={fmtBDT(dues)} accent="bg-red-50 text-red-600" />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <List title="Expected arrivals" rows={arrivals} empty="No arrivals expected today." />
         <List title="Due to check out" rows={departures} empty="No departures due today." />
       </div>
 
       {/* ---------------- ROOM STATUS BOARD ---------------- */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <h2 className="font-display text-lg font-bold text-pine flex items-center gap-2"><DoorOpen size={18} className="text-forest" /> Room Status Board</h2>
         <button className="btn-ghost !py-1" onClick={loadBoard} disabled={boardBusy}><RefreshCw size={14} className={boardBusy ? 'animate-spin' : ''} /> Refresh</button>
       </div>
