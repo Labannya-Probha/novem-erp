@@ -2,15 +2,20 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Printer, Download } from 'lucide-react'
 
-export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
+export default function PrintPortal({ title, onClose, children, type = 'A4', primaryColor, accentColor }) {
   const [portalNode, setPortalNode] = useState(null)
+
+  // Tenant brand colors — falls back to the original hardcoded Novem pine/forest
+  // if no company-specific colors are passed in (so nothing breaks for callers
+  // that haven't been updated yet).
+  const brandPrimary = primaryColor || '#1B4D2E'
+  const brandAccent = accentColor || '#2E7D32'
 
   useEffect(() => {
     const node = document.createElement('div')
     node.id = 'print-portal-container'
     document.body.appendChild(node)
     setPortalNode(node)
-
     const style = document.createElement('style')
     style.id = '__print-portal-page-style__'
     style.innerHTML = `
@@ -18,6 +23,10 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
       @page {
         size: ${type === 'thermal' ? '80mm auto' : 'A4'};
         margin: ${type === 'thermal' ? '0' : '10mm'};
+      }
+      #print-root {
+        --print-primary: ${brandPrimary};
+        --print-accent: ${brandAccent};
       }
       @media print {
         body > div:not(#print-portal-container) { display: none !important; }
@@ -36,7 +45,6 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
           color: #111 !important;
           box-shadow: none !important;
         }
-
         #print-footer {
           display: block !important;
           position: ${type === 'thermal' ? 'relative' : 'fixed'} !important;
@@ -55,24 +63,22 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
       document.getElementById('__print-portal-page-style__')?.remove()
       if (node.parentNode) node.parentNode.removeChild(node)
     }
-  }, [type])
+  }, [type, brandPrimary, brandAccent])
 
   const handleExportPDF = () => {
     window.print();
   }
 
   if (!portalNode) return null
-
   return createPortal(
     <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto p-6">
-      {/* বর্ডার ও শ্যাডো রিমুভ করা হয়েছে */}
       <div className="bg-white max-w-3xl w-full my-4 relative overflow-hidden">
         
         {/* Toolbar */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-300 sticky top-0 bg-white z-10 no-print">
           <h3 className="font-semibold text-gray-800 font-sans">{title}</h3>
           <div className="flex gap-2">
-            <button className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700" onClick={handleExportPDF}>
+            <button className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandPrimary }} onClick={handleExportPDF}>
               <Download size={14} /> Export PDF
             </button>
             <button className="flex items-center gap-1 bg-gray-800 text-white px-3 py-1.5 rounded text-sm hover:bg-black" onClick={() => window.print()}>
@@ -83,12 +89,10 @@ export default function PrintPortal({ title, onClose, children, type = 'A4' }) {
             </button>
           </div>
         </div>
-
         {/* Print Content Wrapper */}
         <div id="print-root" className={`p-8 ${type === 'thermal' ? 'epos-receipt' : 'print-doc'}`}>
           {children}
         </div>
-
       </div>
     </div>,
     portalNode
