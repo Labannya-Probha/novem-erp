@@ -43,7 +43,7 @@ export default function Reservations({ openReservation, userName, prefill, clear
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div>
           <h1 className="font-display text-2xl font-bold text-pine">Reservations</h1>          
         </div>
@@ -51,9 +51,9 @@ export default function Reservations({ openReservation, userName, prefill, clear
       </div>
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative">
+        <div className="relative w-full sm:w-64">
           <Search size={15} className="absolute left-3 top-2.5 text-pine/40" />
-          <input className="input pl-9 w-64" placeholder="Search name, phone, RES no…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input pl-9 w-full" placeholder="Search name, phone, RES no…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         {STATUSES.map((s) => (
           <button key={s} onClick={() => setFilter(s)}
@@ -67,41 +67,81 @@ export default function Reservations({ openReservation, userName, prefill, clear
         {loading ? (
           <div className="p-8 text-center text-pine/40 text-sm">Loading reservations…</div>
         ) : (
-        <table className="w-full">
-          <thead><tr>
-            <th className="th">Res No.</th><th className="th">Guest / Reservation name</th><th className="th">Stay</th>
-            <th className="th">Rooms</th><th className="th">Pax</th><th className="th">Source</th><th className="th">Status</th>
-          </tr></thead>
-          <tbody>
-            {filtered.map((r) => (
-              <tr key={r.id} className="hover:bg-leaf/30 cursor-pointer" onClick={() => openReservation(r.id)}>
-                <td className="td money font-medium">{r.res_no}</td>
-                <td className="td">
-                  <div className="font-semibold">{r.reservation_name || r.guests?.full_name || '—'}</div>
-                  <div className="text-xs text-pine/50">{r.guests?.full_name} {r.guests?.phone && `· ${r.guests.phone}`}</div>
-                </td>
-                <td className="td money text-xs">{fmtDate(r.check_in)} → {fmtDate(r.check_out)}</td>
-                <td className="td money text-xs font-semibold">{(r.reservation_rooms || []).map((x) => x.rooms ? `${x.rooms.room_no}${x.rooms.room_name ? ' ('+x.rooms.room_name+')' : ''}` : null).filter(Boolean).join(', ') || '—'}</td>
-                <td className="td money">{(r.pax_adults || 0) + (r.pax_children || 0)}</td>
-                <td className="td text-xs">{r.source || '—'}</td>
-                <td className="td">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openReservation(r.id, STATUS_TO_TAB[r.status] || 'Overview') }}
-                    className={`status-chip ${STATUS_COLORS[r.status]} hover:ring-2 hover:ring-offset-1 hover:ring-pine/30 transition-shadow`}
-                    title={`Open ${STATUS_TO_TAB[r.status] || 'Overview'} tab`}
-                  >
-                    {r.status.replace('_', ' ')}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td className="td text-pine/50 text-center py-8" colSpan={7}>
-                No reservations yet. Click <span className="font-semibold">+ New reservation query</span> to begin.
-              </td></tr>
-            )}
-          </tbody>
-        </table>
+          <>
+            {/* Tablet / desktop — full table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead><tr>
+                  <th className="th">Res No.</th><th className="th">Guest / Reservation name</th><th className="th">Stay</th>
+                  <th className="th">Rooms</th><th className="th">Pax</th><th className="th">Source</th><th className="th">Status</th>
+                </tr></thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr key={r.id} className="hover:bg-leaf/30 cursor-pointer" onClick={() => openReservation(r.id)}>
+                      <td className="td money font-medium">{r.res_no}</td>
+                      <td className="td">
+                        <div className="font-semibold">{r.reservation_name || r.guests?.full_name || '—'}</div>
+                        <div className="text-xs text-pine/50">{r.guests?.full_name} {r.guests?.phone && `· ${r.guests.phone}`}</div>
+                      </td>
+                      <td className="td money text-xs">{fmtDate(r.check_in)} → {fmtDate(r.check_out)}</td>
+                      <td className="td money text-xs font-semibold">{(r.reservation_rooms || []).map((x) => x.rooms ? `${x.rooms.room_no}${x.rooms.room_name ? ' ('+x.rooms.room_name+')' : ''}` : null).filter(Boolean).join(', ') || '—'}</td>
+                      <td className="td money">{(r.pax_adults || 0) + (r.pax_children || 0)}</td>
+                      <td className="td text-xs">{r.source || '—'}</td>
+                      <td className="td">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openReservation(r.id, STATUS_TO_TAB[r.status] || 'Overview') }}
+                          className={`status-chip ${STATUS_COLORS[r.status]} hover:ring-2 hover:ring-offset-1 hover:ring-pine/30 transition-shadow`}
+                          title={`Open ${STATUS_TO_TAB[r.status] || 'Overview'} tab`}
+                        >
+                          {r.status.replace('_', ' ')}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr><td className="td text-pine/50 text-center py-8" colSpan={7}>
+                      No reservations yet. Click <span className="font-semibold">+ New reservation query</span> to begin.
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+      
+            {/* Mobile — card list */}
+            <div className="md:hidden divide-y divide-leaf">
+              {filtered.map((r) => (
+                <div key={r.id} onClick={() => openReservation(r.id)} className="p-4 active:bg-leaf/30 cursor-pointer">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm truncate">{r.reservation_name || r.guests?.full_name || '—'}</div>
+                      <div className="text-xs text-pine/50 truncate">{r.guests?.full_name} {r.guests?.phone && `· ${r.guests.phone}`}</div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openReservation(r.id, STATUS_TO_TAB[r.status] || 'Overview') }}
+                      className={`status-chip shrink-0 whitespace-nowrap ${STATUS_COLORS[r.status]}`}
+                      title={`Open ${STATUS_TO_TAB[r.status] || 'Overview'} tab`}
+                    >
+                      {r.status.replace('_', ' ')}
+                    </button>
+                  </div>
+                  <div className="text-xs text-pine/70 money mb-1">{r.res_no} · {fmtDate(r.check_in)} → {fmtDate(r.check_out)}</div>
+                  <div className="text-xs text-pine/60 money mb-1">
+                    {(r.reservation_rooms || []).map((x) => x.rooms ? `${x.rooms.room_no}${x.rooms.room_name ? ' ('+x.rooms.room_name+')' : ''}` : null).filter(Boolean).join(', ') || 'No rooms assigned'}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-pine/50">
+                    <span>{(r.pax_adults || 0) + (r.pax_children || 0)} pax</span>
+                    <span>·</span>
+                    <span>{r.source || '—'}</span>
+                  </div>
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div className="text-pine/50 text-center py-8 text-sm px-4">
+                  No reservations yet. Tap <span className="font-semibold">+ New reservation query</span> to begin.
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -296,10 +336,10 @@ function NewReservation({ close, openReservation, userName }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-ink/60 z-40 flex items-start justify-center overflow-auto p-6">
-      <div className="card max-w-2xl w-full p-6 my-6">
+    <div className="fixed inset-0 bg-ink/60 z-40 flex items-start justify-center overflow-auto p-3 sm:p-6">
+      <div className="card max-w-2xl w-full p-4 sm:p-6 my-3 sm:my-6">
         <h2 className="font-display text-lg font-bold text-pine mb-4">New reservation query</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className="label">Salutation</label>
             <SearchableSelect
               options={SALUTATIONS.map((s) => ({ value: s, label: s }))}
@@ -357,7 +397,7 @@ function NewReservation({ close, openReservation, userName }) {
           )}
 
           {f.guest_type === 'Company' && (
-            <div className="col-span-2 grid grid-cols-3 gap-4 p-3 rounded-lg bg-leaf/30 border border-leaf">
+            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 rounded-lg bg-leaf/30 border border-leaf">
               <div><label className="label">Commission Rate %</label><input type="number" min="0" max="100" className="input money" value={f.commission_pct} onChange={(e) => set('commission_pct', e.target.value)} /></div>
               <div><label className="label">Vat/VDS %</label><input type="number" min="0" max="100" className="input money" value={f.vat_vds_pct} onChange={(e) => set('vat_vds_pct', e.target.value)} /></div>
               <div><label className="label">Tax/TDS %</label><input type="number" min="0" max="100" className="input money" value={f.tax_tds_pct} onChange={(e) => set('tax_tds_pct', e.target.value)} /></div>
@@ -375,9 +415,9 @@ function NewReservation({ close, openReservation, userName }) {
               {roomRows.map((row, i) => {
                 const taken = isBusy(row.room_id, row.from_date, row.to_date)
                 return (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                  <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                     <SearchableSelect
-                      className={`col-span-5 ${taken ? 'ring-1 ring-red-400 rounded-lg' : ''}`}
+                      className={`sm:col-span-5 ${taken ? 'ring-1 ring-red-400 rounded-lg' : ''}`}
                       options={rooms.map((rm) => ({
                         value: rm.id,
                         label: `${rm.room_no}${rm.room_name ? ` · ${rm.room_name}` : ''}`,
@@ -388,10 +428,10 @@ function NewReservation({ close, openReservation, userName }) {
                       placeholder="Select room…"
                       clearable
                     />
-                    <input type="date" className="input col-span-3" value={row.from_date} onChange={(e) => updRow(i, 'from_date', e.target.value)} />
-                    <input type="date" className="input col-span-3" value={row.to_date} onChange={(e) => updRow(i, 'to_date', e.target.value)} />
-                    <button type="button" className="text-red-400 hover:text-red-600 col-span-1" onClick={() => delRow(i)}><Trash2 size={15} /></button>
-                    {taken && <p className="col-span-12 text-xs text-red-600 -mt-1">This room is already booked for the selected dates.</p>}
+                    <input type="date" className="input sm:col-span-3" value={row.from_date} onChange={(e) => updRow(i, 'from_date', e.target.value)} />
+                    <input type="date" className="input sm:col-span-3" value={row.to_date} onChange={(e) => updRow(i, 'to_date', e.target.value)} />
+                    <button type="button" className="text-red-400 hover:text-red-600 sm:col-span-1 justify-self-end sm:justify-self-auto" onClick={() => delRow(i)}><Trash2 size={15} /></button>
+                    {taken && <p className="sm:col-span-12 text-xs text-red-600 -mt-1">This room is already booked for the selected dates.</p>}
                   </div>
                 )
               })}
@@ -410,7 +450,7 @@ function NewReservation({ close, openReservation, userName }) {
             {Object.entries(groupedFacilityItems).map(([category, catItems]) => (
               <div key={category} className="mb-3">
                 <div className="text-[10px] uppercase tracking-wide font-bold text-pine/40 mb-1.5">{category}</div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">  
                   {catItems.map((it) => (
                     <div key={it.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${addons[it.id]?.selected ? 'border-forest bg-forest/5' : 'border-leaf'}`}>
                       <input type="checkbox" checked={!!addons[it.id]?.selected} onChange={() => toggleAddon(it.id)} />
