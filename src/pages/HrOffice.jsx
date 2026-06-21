@@ -3,8 +3,9 @@ import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
 import { Users, Plus, Check, X, CalendarDays, FileText, Wallet, Printer } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
+import ComplianceTab from '../components/ComplianceTab'
 
-const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Payroll', 'Incidents', 'Letters / Docket']
+const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Payroll', 'Incidents', 'Letters / Docket', 'Compliance']
 
 export default function HrOffice({ userName, role, isAdmin, company }) {
   const [tab, setTab] = useState('Employees')
@@ -28,6 +29,7 @@ export default function HrOffice({ userName, role, isAdmin, company }) {
       {tab === 'Payroll' && <PayrollTab flash={flash} userName={userName} canApprove={canApprove} isAdmin={isAdmin} company={company} />}
       {tab === 'Incidents' && <IncidentsTab flash={flash} userName={userName} />}
       {tab === 'Letters / Docket' && <DocketTab flash={flash} userName={userName} />}
+      {tab === 'Compliance' && <ComplianceTab role={role} />}
     </div>
   )
 }
