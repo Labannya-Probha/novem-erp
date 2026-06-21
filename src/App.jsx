@@ -162,12 +162,11 @@ function AppShell({ company, role, isAdmin, userName, loadCompany }) {
               <BookingCalendar openReservation={openReservation} onNewReservation={startReservation} />
             </GuardedRoute>
           } />
-
           <Route path="/nightaudit" element={
             <GuardedRoute role={role} navId="nightaudit">
-              <NightAudit userName={userName} isAdmin={isAdmin} />
+              <NightAudit userName={userName} isAdmin={isAdmin} role={role} />
             </GuardedRoute>
-          } />
+          } />          
           <Route path="/housekeeping" element={
             <GuardedRoute role={role} navId="housekeeping">
               <HousekeepingHub userName={userName} role={role} isAdmin={isAdmin} />
