@@ -44,10 +44,6 @@ export const rateFor = (taxConfig, chargeType, onDate) => {
 }
 
 // Hotel practice: discount on base → SC on net → VAT on (net + SC)
-// `discount` accepts either:
-//   - a plain number (legacy/default) — treated as a PERCENTAGE, e.g. 10 = 10%
-//   - { type: 'fixed', value }        — a flat amount subtracted from base (capped at base)
-//   - { type: 'percentage', value }   — same as passing a plain number
 export const computeCharge = (base, discount, rate) => {
   const b = Number(base) || 0
   let discountAmt
@@ -122,9 +118,6 @@ export const STATUS_COLORS = {
   NO_SHOW: 'bg-red-100 text-red-600',
 }
 
-// ---- Bill rounding (auto) ----
-// Rounds the GRAND TOTAL only; taxable value, SC, SD & VAT stay exact for the NBR register.
-// The difference is exposed as `rounding` so a "Rounding adjustment" line can be shown.
 export const roundGrand = (amount, mode = 'NEAREST_1') => {
   const a = Number(amount) || 0
   switch (mode) {
@@ -140,4 +133,28 @@ export const applyRounding = (totals, mode = 'NEAREST_1') => {
   const raw = +(Number(totals.grand_total) || 0).toFixed(2)
   const rounded = roundGrand(raw, mode)
   return { ...totals, grand_total_raw: raw, rounding: +(rounded - raw).toFixed(2), grand_total: rounded }
+}
+
+// Helper to auto-generate a full Quotation snapshot
+export const createQuoteSnapshot = (res, rooms, taxConfig) => {
+  const nights = nightsBetween(res.check_in, res.check_out)
+  const qRate = rateFor(taxConfig, 'ROOM', res.check_in)
+  
+  const roomTotal = rooms.reduce((sum, rm) => sum + Number(rm.rate), 0)
+  
+  const disc = res.discount_type === 'fixed' 
+    ? { type: 'fixed', value: Number(res.discount_val) || 0 } 
+    : Number(res.discount_pct) || 0
+
+  const perNight = computeCharge(roomTotal, disc, qRate)
+  
+  return {
+    reservation_id: res.id,
+    total_amount: +(perNight.total * (nights || 1)).toFixed(2),
+    valid_until: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    room_rate: rooms.length > 0 ? rooms[0].rate : 0,
+    room_count: rooms.length,
+    discount_pct: res.discount_type === 'percentage' ? Number(res.discount_pct) : 0,
+    status: 'DRAFT'
+  }
 }
