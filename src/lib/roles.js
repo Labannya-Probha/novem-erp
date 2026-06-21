@@ -1,105 +1,67 @@
-/* ------------------------------------------------------------------ */
-/*  ROLE PERMISSIONS MATRIX — role × module × (view/create/edit/delete) */
-/*  Admin & Superuser only. Drives can()/canCreate()/canEdit()/canDelete()*/
-/*  in lib/roles.js at runtime — changes here take effect on next page    */
-/*  load / role switch, no code deploy needed.                            */
-/* ------------------------------------------------------------------ */
-const PRIV_ROLES = ['SUPERUSER', 'ADMIN', 'MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR', 'HOUSEKEEPING']
-const PRIV_MODULES = [
-  'dashboard', 'reservations', 'calendar', 'nightaudit', 'housekeeping', 'pos',
-  'facilities', 'inventory', 'vat', 'accounting', 'hr', 'reports', 'settings', 'cms',
-]
-const MODULE_LABELS = {
-  dashboard: 'Dashboard', reservations: 'Reservations', calendar: 'Booking Calendar',
-  nightaudit: 'Night Audit', housekeeping: 'Housekeeping', pos: 'Restaurant POS',
-  facilities: 'Facilities', inventory: 'Inventory', vat: 'VAT Center',
-  accounting: 'Accounting', hr: 'HR & Office', reports: 'Reports',
-  settings: 'Settings', cms: 'Client Management',
+export const ROLES = ['SUPERUSER', 'ADMIN', 'MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR', 'HOUSEKEEPING']
+
+export const ROLE_LABELS = {
+  SUPERUSER: 'Superuser Admin', ADMIN: 'Administrator', MANAGER: 'Manager',
+  FRONT_OFFICE: 'Front Office', RESTAURANT: 'Restaurant', STORE: 'Store',
+  ACCOUNTS: 'Accounts', HR: 'HR & Admin', HOUSEKEEPING: 'Housekeeping',
 }
 
-function RolePrivilegesCard() {
-  const [rows, setRows]             = useState([])
-  const [activeRole, setActiveRole] = useState('MANAGER')
-  const [msg, setMsg]               = useState('')
-  const [busy, setBusy]             = useState(false)
-  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
+// Fallback map — used ONLY if role_privileges hasn't loaded yet (brief window
+// right after login) or a module has no row for some reason. Mirrors what the
+// hardcoded system used to allow, so there's never a moment of "blank page"
+// while the real DB-driven privileges are still being fetched.
+const NAV_ACCESS_FALLBACK = {
+  dashboard:    ['MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR', 'HOUSEKEEPING'],
+  reservations: ['MANAGER', 'FRONT_OFFICE'],
+  calendar:     ['MANAGER', 'FRONT_OFFICE'],
+  nightaudit:   ['MANAGER', 'FRONT_OFFICE'],
+  housekeeping: ['MANAGER', 'FRONT_OFFICE', 'HOUSEKEEPING'],
+  pos:          ['MANAGER', 'RESTAURANT', 'FRONT_OFFICE'],
+  facilities:   ['MANAGER', 'FRONT_OFFICE', 'RESTAURANT'],
+  inventory:    ['MANAGER', 'STORE'],
+  vat:          ['MANAGER', 'ACCOUNTS'],
+  accounting:   ['MANAGER', 'ACCOUNTS'],
+  hr:           ['MANAGER', 'HR'],
+  reports:      ['MANAGER', 'ACCOUNTS'],
+  settings:     ['ADMIN', 'SUPERUSER'],
+  cms:          ['ADMIN', 'SUPERUSER'],
+}
 
-  const load = async () => {
-    const { data } = await supabase.from('role_privileges').select('*').order('role').order('module')
-    setRows(data || [])
+// can(role, pageId, privileges?)
+// - SUPERUSER/ADMIN always pass (matches their DB rows, which are always
+//   full-access, and avoids any lockout risk if their rows are ever edited).
+// - If `privileges` (the array loaded from role_privileges for the current
+//   user's role+tenant) is provided, look up can_view for this module there.
+// - If `privileges` is not yet loaded (undefined/null), fall back to the
+//   static map above so navigation never goes blank during the load.
+export const can = (role, pageId, privileges) => {
+  if (role === 'SUPERUSER' || role === 'ADMIN') return true
+  if (privileges) {
+    const row = privileges.find((p) => p.module === pageId)
+    if (row) return !!row.can_view
+    return false // module has an explicit row set but this one is missing — deny, don't guess
   }
-  useEffect(() => { load() }, [])
+  return (NAV_ACCESS_FALLBACK[pageId] || []).includes(role)
+}
 
-  // SUPERUSER and ADMIN always have full access everywhere in the app
-  // (can() in lib/roles.js short-circuits for them) — editing their rows
-  // here wouldn't change actual behaviour, so don't offer them as a tab.
-  const editableRoles = PRIV_ROLES.filter((r) => r !== 'SUPERUSER' && r !== 'ADMIN')
-
-  const rowFor = (role, module) => rows.find((r) => r.role === role && r.module === module)
-
-  const toggle = async (role, module, field, current) => {
-    const r = rowFor(role, module)
-    if (!r) { flash(`No row found for ${role} / ${module} — this shouldn't happen, contact support.`); return }
-    setBusy(true)
-    const next = !current
-    setRows((prev) => prev.map((row) => row.id === r.id ? { ...row, [field]: next } : row))
-    const { error } = await supabase.from('role_privileges').update({ [field]: next, updated_at: new Date().toISOString() }).eq('id', r.id)
-    setBusy(false)
-    if (error) { flash(error.message); load() } // revert from DB on failure
-  }
-
-  const Check = ({ on, onClick, disabled }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-6 h-6 rounded flex items-center justify-center border transition-colors ${
-        on ? 'bg-forest border-forest text-white' : 'bg-white border-leaf text-transparent hover:border-forest/40'
-      } ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      ✓
-    </button>
-  )
-
-  return (
-    <div className="card p-5">
-      <h2 className="font-display font-semibold text-pine flex items-center gap-2 mb-1"><ShieldCheck size={18} className="text-forest" /> Role permissions</h2>
-      <p className="text-xs text-pine/50 mb-4">Controls which modules each role can view, and whether they can create, edit, or delete within that module. Superuser and Administrator always have full access everywhere, so they're not listed here. Changes apply immediately — no redeploy needed.</p>
-      {msg && <div className="mb-3 px-3 py-2 rounded-lg bg-forest/10 text-forest text-sm">{msg}</div>}
-
-      <div className="flex gap-1 border-b border-leaf flex-wrap mb-4">
-        {editableRoles.map((r) => (
-          <button key={r} onClick={() => setActiveRole(r)} className={`px-3 py-1.5 text-xs font-semibold rounded-t-lg ${activeRole === r ? 'bg-forest/10 border border-leaf border-b-white text-forest -mb-px' : 'text-pine/50 hover:text-pine'}`}>
-            {ROLE_LABELS[r] || r}
-          </button>
-        ))}
-      </div>
-
-      <table className="w-full">
-        <thead><tr>
-          <th className="th">Module</th>
-          <th className="th text-center">View</th>
-          <th className="th text-center">Create</th>
-          <th className="th text-center">Edit</th>
-          <th className="th text-center">Delete</th>
-        </tr></thead>
-        <tbody>
-          {PRIV_MODULES.map((m) => {
-            const r = rowFor(activeRole, m)
-            if (!r) return (
-              <tr key={m}><td className="td text-sm text-pine/40" colSpan={5}>{MODULE_LABELS[m]} — no row (contact support to backfill).</td></tr>
-            )
-            return (
-              <tr key={m}>
-                <td className="td text-sm font-medium">{MODULE_LABELS[m]}</td>
-                <td className="td text-center"><Check on={r.can_view} disabled={busy} onClick={() => toggle(activeRole, m, 'can_view', r.can_view)} /></td>
-                <td className="td text-center"><Check on={r.can_create} disabled={busy} onClick={() => toggle(activeRole, m, 'can_create', r.can_create)} /></td>
-                <td className="td text-center"><Check on={r.can_edit} disabled={busy} onClick={() => toggle(activeRole, m, 'can_edit', r.can_edit)} /></td>
-                <td className="td text-center"><Check on={r.can_delete} disabled={busy} onClick={() => toggle(activeRole, m, 'can_delete', r.can_delete)} /></td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
+// Convenience helpers for the other three actions, same fallback behaviour.
+// Used inside pages that want fine-grained create/edit/delete gating beyond
+// just "can this role see the page" (e.g. hiding an Add/Delete button).
+export const canCreate = (role, pageId, privileges) => {
+  if (role === 'SUPERUSER' || role === 'ADMIN') return true
+  if (!privileges) return can(role, pageId, privileges) // fallback has no create granularity — tie to view
+  const row = privileges.find((p) => p.module === pageId)
+  return !!row?.can_create
+}
+export const canEdit = (role, pageId, privileges) => {
+  if (role === 'SUPERUSER' || role === 'ADMIN') return true
+  if (!privileges) return can(role, pageId, privileges)
+  const row = privileges.find((p) => p.module === pageId)
+  return !!row?.can_edit
+}
+export const canDelete = (role, pageId, privileges) => {
+  if (role === 'SUPERUSER' || role === 'ADMIN') return true
+  if (!privileges) return false // never assume delete access during the fallback window
+  const row = privileges.find((p) => p.module === pageId)
+  return !!row?.can_delete
 }
