@@ -97,7 +97,7 @@ export default function Login({ slug }) {
         />
       )}
 
-      <div className="card w-full max-w-sm p-8 relative shadow-2xl">
+      <div className="card w-full max-w-sm p-8 relative shadow-2xl" style={{ backgroundColor: '#ffffff', opacity: 1 }}>
 
         {/* Logo */}
         <div className="flex flex-col items-center text-center mb-7">
