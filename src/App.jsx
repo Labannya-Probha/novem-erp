@@ -60,7 +60,7 @@ const NAV_GROUPS = [
     { id: 'reports', label: 'Reports', icon: BarChart3 },
   ]},
   { title: 'System', items: [
-    { id: 'cms', label: 'Client Management', icon: Building2 },
+    { id: 'cms', label: 'Configuration', icon: Building2 },
     { id: 'settings', label: 'Settings', icon: Settings2 },
   ]},
 ]
