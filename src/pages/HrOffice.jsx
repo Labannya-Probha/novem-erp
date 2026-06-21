@@ -4,6 +4,7 @@ import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
 import { Users, Plus, Check, X, CalendarDays, FileText, Wallet, Printer } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 import ComplianceTab from '../components/ComplianceTab'
+import EmployeeProfile from '../components/EmployeeProfile.jsx'
 
 const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Payroll', 'Incidents', 'Letters / Docket', 'Compliance']
 
@@ -22,7 +23,7 @@ export default function HrOffice({ userName, role, isAdmin, company }) {
       <div className="flex gap-1 border-b border-leaf flex-wrap">
         {TABS.map((t) => (<button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-semibold rounded-t-lg ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>{t}</button>))}
       </div>
-      {tab === 'Employees' && <EmployeesTab flash={flash} isAdmin={isAdmin} />}
+      {tab === 'Employees' && <EmployeesTab flash={flash} isAdmin={isAdmin} userName={userName} company={company} />}
       {tab === 'Attendance' && <AttendanceTab flash={flash} />}
       {tab === 'Leave' && <LeaveTab flash={flash} userName={userName} canApprove={canApprove} />}
       {tab === 'Comp Leave' && <CompLeaveTab flash={flash} />}
@@ -34,13 +35,19 @@ export default function HrOffice({ userName, role, isAdmin, company }) {
   )
 }
 
-function EmployeesTab({ flash, isAdmin }) {
+function EmployeesTab({ flash, isAdmin, userName, company }) {
   const [rows, setRows] = useState([])
+  const [viewing, setViewing] = useState(null)
   const [f, setF] = useState({ full_name: '', designation: '', department: '', join_date: todayISO(), phone: '', gross_salary: '' })
   const load = async () => { const { data } = await supabase.from('employees').select('*').order('created_at'); setRows(data || []) }
   useEffect(() => { load() }, [])
   const add = async () => { if (!f.full_name) return; const { error } = await supabase.from('employees').insert({ ...f, gross_salary: +f.gross_salary || 0 }); if (error) flash(error.message); else { setF({ full_name: '', designation: '', department: '', join_date: todayISO(), phone: '', gross_salary: '' }); load() } }
   const setStatus = async (id, status) => { await supabase.from('employees').update({ status }).eq('id', id); load() }
+
+  if (viewing) {
+    return <EmployeeProfile employee={viewing} company={company} userName={userName} back={() => setViewing(null)} />
+  }
+
   return (
     <div className="space-y-4">
       <div className="card p-4 grid grid-cols-6 gap-2">
@@ -55,11 +62,11 @@ function EmployeesTab({ flash, isAdmin }) {
           <thead><tr><th className="th">Code</th><th className="th">Name</th><th className="th">Designation</th><th className="th">Dept</th><th className="th text-right">Gross</th><th className="th">Status</th></tr></thead>
           <tbody>
             {rows.map((e) => (
-              <tr key={e.id}>
+              <tr key={e.id} className="hover:bg-leaf/20 cursor-pointer" onClick={() => setViewing(e)}>
                 <td className="td money text-xs">{e.emp_code}</td><td className="td text-sm font-medium">{e.full_name}</td>
                 <td className="td text-sm">{e.designation || '—'}</td><td className="td text-xs">{e.department || '—'}</td>
                 <td className="td money text-right">{fmtBDT(e.gross_salary)}</td>
-                <td className="td">{isAdmin ? <select className="input !py-1 !w-32" value={e.status} onChange={(ev) => setStatus(e.id, ev.target.value)}>{['ACTIVE', 'RESIGNED', 'TERMINATED'].map((s) => <option key={s}>{s}</option>)}</select> : <span className={`status-chip ${e.status === 'ACTIVE' ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-700'}`}>{e.status}</span>}</td>
+                <td className="td" onClick={(ev) => ev.stopPropagation()}>{isAdmin ? <select className="input !py-1 !w-32" value={e.status} onChange={(ev) => setStatus(e.id, ev.target.value)}>{['ACTIVE', 'RESIGNED', 'TERMINATED'].map((s) => <option key={s}>{s}</option>)}</select> : <span className={`status-chip ${e.status === 'ACTIVE' ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-700'}`}>{e.status}</span>}</td>
               </tr>
             ))}
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={6}>No employees yet.</td></tr>}
