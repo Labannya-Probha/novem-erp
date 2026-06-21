@@ -26,7 +26,6 @@ export default function VatCenter({ userName, company }) {
     <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><FileSpreadsheet className="text-forest" /> VAT Center</h1>
-          <p className="text-sm text-pine/60">NBR Mushak registers: 6.2 sales, 6.1 purchase, 6.6 VDS, and the 9.1 monthly position.</p>
         </div>
         <div className="flex items-center gap-2"><span className="label !mb-0">Month</span><input type="month" className="input !w-44" value={ym} onChange={(e) => setYm(e.target.value)} /></div>
       </div>
@@ -51,7 +50,7 @@ function SalesReg({ ym, company }) {
   const xls = () => exportXLSX(`Mushak_6.2_${ym}.xlsx`, [{ name: '6.2 Sales', rows: [[`${company?.name || ''} — Mushak-6.2 Sales Register`], [`Month: ${ym}`, `BIN: ${company?.bin || ''}`], [], ['Date', 'Invoice', 'Buyer', 'Buyer BIN', 'Taxable Value', 'SD', 'VAT', 'Total'], ...rows.map((r) => [r.issue_date, r.invoice_no, r.buyer_name, r.buyer_bin, +r.taxable_value, +r.sd, +r.vat, +r.total]), [], ['', '', '', 'TOTAL', tot.tv, tot.sd, tot.vat, tot.total]] }])
   return (
     <div className="card overflow-hidden">
-      <div className="px-4 py-3 border-b border-leaf flex items-center justify-between"><span className="font-display font-semibold text-pine">Sales Register (Mushak-6.2) — voided invoices excluded</span><button className="btn-ghost !py-1" onClick={xls}><FileDown size={14} /> Excel</button></div>
+      <div className="px-4 py-3 border-b border-leaf flex items-center justify-between"><span className="font-display font-semibold text-pine">Sales Register (Mushak-6.2)</span><button className="btn-ghost !py-1" onClick={xls}><FileDown size={14} /> Excel</button></div>
       <table className="w-full">
         <thead><tr><th className="th">Date</th><th className="th">Invoice</th><th className="th">Buyer</th><th className="th text-right">Taxable</th><th className="th text-right">SD</th><th className="th text-right">VAT</th><th className="th text-right">Total</th></tr></thead>
         <tbody>
