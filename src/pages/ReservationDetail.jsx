@@ -229,7 +229,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
         />
       )}
       {tab === 'Partners' && (
-        <PartnerAccounts res={res} reload={loadAll} flash={flash} userName={userName} />
+        <PartnerAccounts res={res} charges={charges} reload={loadAll} flash={flash} userName={userName} />
       )}
 
       {/* ================================================================
@@ -2082,7 +2082,7 @@ function BillingsAndCheckOutTab({
 /* ------------------------------------------------------------------ */
 /*  PARTNERS TAB                                                        */
 /* ------------------------------------------------------------------ */
-function PartnerAccounts({ res, reload, flash, userName }) {
+function PartnerAccounts({ res, charges = [], reload, flash, userName }) {
   const agency      = res.agencies
   const shareholder = res.shareholders
 
@@ -2091,24 +2091,45 @@ function PartnerAccounts({ res, reload, flash, userName }) {
   const [shareholders, setShareholders] = useState([])
   const [showAgencyPicker, setShowAgencyPicker] = useState(false)
   const [showSharePicker, setShowSharePicker] = useState(false)
-  
+
+  // Manual balance-correction state — since due_balance/free_stay_balance are
+  // single running totals (no ledger table), "edit" means directly setting
+  // the number, with the current value pre-filled so a mistaken entry can be corrected.
+  const [editingDue, setEditingDue] = useState(false)
+  const [dueVal, setDueVal] = useState('')
+  const [editingBalance, setEditingBalance] = useState(false)
+  const [balanceVal, setBalanceVal] = useState('')
+
   useEffect(() => {
     if (showAgencyPicker) supabase.from('agencies').select('id,name').order('name').then(({ data }) => setAgencies(data || []))
   }, [showAgencyPicker])
   useEffect(() => {
     if (showSharePicker) supabase.from('shareholders').select('id,name').order('name').then(({ data }) => setShareholders(data || []))
   }, [showSharePicker])
-  
+
   const assignAgency = async (agencyId) => {
     const { error } = await supabase.from('reservations').update({ agency_id: agencyId }).eq('id', res.id)
     if (error) flash(error.message)
     else { setShowAgencyPicker(false); reload(); flash('Agency assigned.') }
+  }
+  const unassignAgency = async () => {
+    if (!window.confirm(`Remove ${agency?.name || 'this agency'} from this reservation?`)) return
+    const { error } = await supabase.from('reservations').update({ agency_id: null }).eq('id', res.id)
+    if (error) flash(error.message)
+    else { reload(); flash('Agency unassigned.') }
   }
   const assignShareholder = async (shareholderId) => {
     const { error } = await supabase.from('reservations').update({ shareholder_id: shareholderId }).eq('id', res.id)
     if (error) flash(error.message)
     else { setShowSharePicker(false); reload(); flash('Shareholder assigned.') }
   }
+  const unassignShareholder = async () => {
+    if (!window.confirm(`Remove ${shareholder?.name || 'this shareholder'} from this reservation?`)) return
+    const { error } = await supabase.from('reservations').update({ shareholder_id: null }).eq('id', res.id)
+    if (error) flash(error.message)
+    else { reload(); flash('Shareholder unassigned.') }
+  }
+
   const addAgencyDue = async () => {
     const amt = window.prompt('Enter amount to add to Agency Due:')
     if (!amt || isNaN(Number(amt))) return
@@ -2119,15 +2140,48 @@ function PartnerAccounts({ res, reload, flash, userName }) {
     else { reload(); flash('Agency due updated successfully.') }
   }
 
+  // Direct correction of the Agency Due figure — for fixing a mistaken
+  // assignment/amount, since there's no per-transaction ledger to edit/delete from.
+  const saveAgencyDue = async () => {
+    if (dueVal === '' || isNaN(Number(dueVal))) { flash('Enter a valid amount.'); return }
+    const { error } = await supabase.from('agencies').update({ due_balance: Number(dueVal) }).eq('id', res.agency_id)
+    if (error) flash(error.message)
+    else { setEditingDue(false); reload(); flash('Agency due corrected.') }
+  }
+
+  // Direct correction of the Shareholder redeemable balance — same reasoning as above.
+  const saveShareholderBalance = async () => {
+    if (balanceVal === '' || isNaN(Number(balanceVal))) { flash('Enter a valid amount.'); return }
+    const { error } = await supabase.from('shareholders').update({ free_stay_balance: Number(balanceVal) }).eq('id', res.shareholder_id)
+    if (error) flash(error.message)
+    else { setEditingBalance(false); reload(); flash('Shareholder balance corrected.') }
+  }
+
+  // Room charges posted so far on this reservation — redemption is only
+  // meaningful against room revenue, and is capped at that total so a
+  // shareholder can't redeem more than the room charges actually cover.
+  const roomChargeTotal = charges.filter((c) => c.charge_type === 'ROOM').reduce((a, c) => a + (+c.total || 0), 0)
+  const alreadyRedeemed = charges.filter((c) => c.charge_type === 'SHAREHOLDER_REDEEM').reduce((a, c) => a + Math.abs(+c.total || 0), 0)
+  const roomRedeemableLeft = Math.max(0, +(roomChargeTotal - alreadyRedeemed).toFixed(2))
+  const hasRoomCharge = roomChargeTotal > 0
+
   const redeemShareholderBalance = async () => {
     const amount = Number(redeemAmt)
     if (!amount || amount <= 0)                              { flash('Please enter a valid amount to redeem.'); return }
-    if ((shareholder?.free_stay_balance || 0) < amount)     { flash('Insufficient shareholder balance.'); return }
+    if (!hasRoomCharge)                                       { flash('Redemption requires a posted room charge on this reservation.'); return }
+    if (amount > roomRedeemableLeft)                          { flash(`Cannot redeem more than the remaining room charge (${fmtBDT(roomRedeemableLeft)}).`); return }
+    if ((shareholder?.free_stay_balance || 0) < amount)        { flash('Insufficient shareholder balance.'); return }
 
+    // Pure ৳ deduction against the ROOM charge only — no VAT/service charge
+    // component, matching the rule that shareholder redemption never carries VAT.
     const { error: chErr } = await supabase.from('folio_charges').insert({
       reservation_id: res.id,
       charge_type:    'SHAREHOLDER_REDEEM',
-      description:    `Redeemed ${fmtBDT(amount)} by ${shareholder?.name}`,
+      description:    `Redeemed ${fmtBDT(amount)} by ${shareholder?.name} (against room charge)`,
+      base_amount:    -amount,
+      discount:       0,
+      service_charge: 0,
+      vat:            0,
       total:          -amount,
       status:         'PAID',
       charge_date:    todayISO(),
@@ -2146,28 +2200,90 @@ function PartnerAccounts({ res, reload, flash, userName }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div className="card p-5">
-        <h3 className="font-display font-semibold text-pine mb-3">Agency Due Management</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display font-semibold text-pine">Agency Due Management</h3>
+          {agency && (
+            <div className="flex gap-1">
+              <button onClick={() => { setShowAgencyPicker(true) }} className="text-xs text-pine/50 hover:text-forest underline">Change</button>
+              <span className="text-pine/30 text-xs">·</span>
+              <button onClick={unassignAgency} className="text-xs text-red-400 hover:text-red-600 underline">Unassign</button>
+            </div>
+          )}
+        </div>
         <p className="text-lg font-bold">{agency?.name || 'No Agency Assigned'}</p>
-        <p className="text-sm text-pine/60 mb-4">Current Due: {fmtBDT(agency?.due_balance || 0)}</p>
-            {!agency && (
-              <button onClick={() => setShowAgencyPicker(true)} className="btn-ghost w-full mb-2">Assign Agency</button>
+
+        {!editingDue ? (
+          <div className="flex items-center gap-2 mb-4">
+            <p className="text-sm text-pine/60">Current Due: {fmtBDT(agency?.due_balance || 0)}</p>
+            {agency && (
+              <button onClick={() => { setDueVal(String(agency?.due_balance || 0)); setEditingDue(true) }} className="text-xs text-pine/40 hover:text-forest underline">
+                Edit
+              </button>
             )}
-            {showAgencyPicker && (
-              <div className="border border-leaf rounded-lg p-2 mb-2 max-h-40 overflow-y-auto">
-                {agencies.length === 0 && <p className="text-xs text-pine/40 p-2">No agencies found.</p>}
-                {agencies.map((a) => (
-                  <button key={a.id} onClick={() => assignAgency(a.id)} className="block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-leaf/40">{a.name}</button>
-                ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mb-4">
+            <input type="number" className="input money !w-32 !py-1" value={dueVal} onChange={(e) => setDueVal(e.target.value)} />
+            <button onClick={saveAgencyDue} className="text-xs text-forest font-semibold underline">Save</button>
+            <button onClick={() => setEditingDue(false)} className="text-xs text-pine/40 underline">Cancel</button>
+          </div>
+        )}
+
+        {!agency && (
+          <button onClick={() => setShowAgencyPicker(true)} className="btn-ghost w-full mb-2">Assign Agency</button>
+        )}
+        {showAgencyPicker && (
+          <div className="border border-leaf rounded-lg p-2 mb-2 max-h-40 overflow-y-auto">
+            {agencies.length === 0 && <p className="text-xs text-pine/40 p-2">No agencies found.</p>}
+            {agencies.map((a) => (
+              <button key={a.id} onClick={() => assignAgency(a.id)} className="block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-leaf/40">{a.name}</button>
+            ))}
+            <button onClick={() => setShowAgencyPicker(false)} className="block w-full text-left px-2 py-1.5 text-xs rounded hover:bg-leaf/40 text-pine/40">Cancel</button>
           </div>
         )}
         <button onClick={addAgencyDue} className="btn-primary w-full" disabled={!agency}>Add Due</button>
       </div>
+
       <div className="card p-5">
-        <h3 className="font-display font-semibold text-pine mb-3">Shareholder Redemption</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display font-semibold text-pine">Shareholder Redemption</h3>
+          {shareholder && (
+            <div className="flex gap-1">
+              <button onClick={() => { setShowSharePicker(true) }} className="text-xs text-pine/50 hover:text-forest underline">Change</button>
+              <span className="text-pine/30 text-xs">·</span>
+              <button onClick={unassignShareholder} className="text-xs text-red-400 hover:text-red-600 underline">Unassign</button>
+            </div>
+          )}
+        </div>
         <p className="text-lg font-bold">{shareholder?.name || 'No Shareholder Assigned'}</p>
-        <p className="text-sm text-forest mb-4">
-          Redeemable Balance: <span className="font-bold">{fmtBDT(shareholder?.free_stay_balance || 0)}</span>
-        </p>
+
+        {!editingBalance ? (
+          <div className="flex items-center gap-2 mb-2">
+            <p className="text-sm text-forest">
+              Redeemable Balance: <span className="font-bold">{fmtBDT(shareholder?.free_stay_balance || 0)}</span>
+            </p>
+            {shareholder && (
+              <button onClick={() => { setBalanceVal(String(shareholder?.free_stay_balance || 0)); setEditingBalance(true) }} className="text-xs text-pine/40 hover:text-forest underline">
+                Edit
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mb-2">
+            <input type="number" className="input money !w-32 !py-1" value={balanceVal} onChange={(e) => setBalanceVal(e.target.value)} />
+            <button onClick={saveShareholderBalance} className="text-xs text-forest font-semibold underline">Save</button>
+            <button onClick={() => setEditingBalance(false)} className="text-xs text-pine/40 underline">Cancel</button>
+          </div>
+        )}
+
+        {shareholder && (
+          <p className="text-xs text-pine/50 mb-4">
+            {hasRoomCharge
+              ? `Redeemable against this stay's room charge: ${fmtBDT(roomRedeemableLeft)} remaining.`
+              : 'No room charge posted yet on this reservation — redemption is only allowed against room charges.'}
+          </p>
+        )}
+
         {!shareholder && (
           <button onClick={() => setShowSharePicker(true)} className="btn-ghost w-full mb-2">Assign Shareholder</button>
         )}
@@ -2177,12 +2293,23 @@ function PartnerAccounts({ res, reload, flash, userName }) {
             {shareholders.map((s) => (
               <button key={s.id} onClick={() => assignShareholder(s.id)} className="block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-leaf/40">{s.name}</button>
             ))}
+            <button onClick={() => setShowSharePicker(false)} className="block w-full text-left px-2 py-1.5 text-xs rounded hover:bg-leaf/40 text-pine/40">Cancel</button>
           </div>
         )}
-        <div className="space-y-3">          
+
+        <div className="space-y-3">
+          <input
+            type="number"
+            min="0"
+            className="input money w-full"
+            placeholder="Amount to redeem"
+            value={redeemAmt}
+            onChange={(e) => setRedeemAmt(e.target.value)}
+            disabled={!shareholder || !hasRoomCharge}
+          />
           <button
             onClick={redeemShareholderBalance}
-            disabled={!shareholder || (shareholder?.free_stay_balance || 0) <= 0}
+            disabled={!shareholder || (shareholder?.free_stay_balance || 0) <= 0 || !hasRoomCharge || roomRedeemableLeft <= 0}
             className="btn-amber w-full"
           >
             Redeem for Room
