@@ -31,7 +31,7 @@ export default function Login({ slug }) {
           setProperty(prop)
           return supabase
             .from('company_settings')
-            .select('logo_url, name, software_name')
+            .select('logo_url, name, software_name, login_background_video_url')
             .eq('tenant_id', prop.id)
             .maybeSingle()
         })
@@ -40,7 +40,7 @@ export default function Login({ slug }) {
       // No slug in the URL — fall back to the single default property lookup
       supabase
         .from('company_settings')
-        .select('logo_url, name, software_name')
+        .select('logo_url, name, software_name, login_background_video_url')
         .eq('id', 1)
         .single()
         .then(({ data }) => { if (data) setCompany(data) })
@@ -80,10 +80,22 @@ export default function Login({ slug }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-pine relative overflow-hidden">
-      <div
-        className="absolute inset-0 opacity-[0.06]"
-        style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 27px, #fff 28px)' }}
-      />
+      {company?.login_background_video_url ? (
+        <>
+          <video
+            autoPlay loop muted playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          >
+            <source src={company.login_background_video_url} type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-black/55" />
+        </>
+      ) : (
+        <div
+          className="absolute inset-0 opacity-[0.06]"
+          style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 27px, #fff 28px)' }}
+        />
+      )}
 
       <div className="card w-full max-w-sm p-8 relative shadow-2xl">
 
