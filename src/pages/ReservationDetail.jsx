@@ -181,12 +181,12 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
     <div>
       <button className="btn-ghost mb-4" onClick={back}><ArrowLeft size={15} /> All reservations</button>
 
-      <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold text-pine">{res.reservation_name || guest?.full_name}</h1>
           <span className={`status-chip ${STATUS_COLORS[res.status]}`}>{res.status.replace('_', ' ')}</span>
         </div>
-        <div className="text-right">
+        <div className="sm:text-right">
           <div className="text-xs uppercase text-pine/50">Balance due</div>
           <div className={`font-display text-2xl font-bold money ${due > 0 ? 'text-red-600' : 'text-forest'}`}>{fmtBDT(due)}</div>
         </div>
@@ -194,10 +194,10 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
 
       {msg && <div className="mb-4 px-4 py-2 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
 
-      <div className="flex gap-1 border-b border-leaf mb-6">
+      <div className="flex gap-1 border-b border-leaf mb-6 overflow-x-auto">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-semibold rounded-t-lg ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>
+            className={`px-3 sm:px-4 py-2 text-sm font-semibold rounded-t-lg whitespace-nowrap ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>
             {t}
           </button>
         ))}
@@ -851,7 +851,7 @@ function Overview({
       {/* Guest & stay */}
       <div className="card p-5 lg:col-span-2">
         <h3 className="font-display font-semibold text-pine mb-3">Guest & stay</h3>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div><dt className="label">Primary guest</dt><dd className="font-semibold">{res.salutation ? `${res.salutation} ` : ''}{guest?.full_name || '—'}</dd></div>
           <div><dt className="label">Contact</dt><dd>{guest?.phone || '—'}{guest?.email ? ` · ${guest.email}` : ''}</dd></div>
           <div><dt className="label">Address</dt><dd>{guest?.address || '—'}</dd></div>
@@ -864,13 +864,13 @@ function Overview({
               : (Number(res.discount_pct) > 0 ? `${res.discount_pct}%` : '—')
           }</dd></div>
           <div><dt className="label">Rooms assigned</dt><dd>{resRooms.length ? resRooms.map((r) => r.rooms?.room_no).join(', ') : 'Not yet assigned'}</dd></div>
-          <div className="col-span-2"><dt className="label">Notes</dt><dd>{res.notes || '—'}</dd></div>
+          <div className="col-span-1 sm:col-span-2"><dt className="label">Notes</dt><dd>{res.notes || '—'}</dd></div>
         </dl>
 
         {isCompany && (
           <>
             <h3 className="font-display font-semibold text-pine mb-3 mt-5">Company / OTA terms</h3>
-            <dl className="grid grid-cols-3 gap-x-6 gap-y-3 text-sm">
+            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
               <div><dt className="label">Commission rate</dt><dd className="font-semibold money">{Number(res.commission_pct) || 0}%</dd></div>
               <div><dt className="label">Vat/VDS</dt><dd className="font-semibold money">{Number(res.vat_vds_pct) || 0}%</dd></div>
               <div><dt className="label">Tax/TDS</dt><dd className="font-semibold money">{Number(res.tax_tds_pct) || 0}%</dd></div>
@@ -888,7 +888,7 @@ function Overview({
         </div>
         {addons.length === 0 && <p className="text-sm text-pine/50">No additional items selected for this booking.</p>}
         {addons.length > 0 && (
-          <div className="border border-leaf rounded-lg overflow-hidden">
+          <div className="border border-leaf rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="bg-leaf/30">
                 <th className="th">Item</th><th className="th text-right">Price</th><th className="th text-right">Qty</th>
@@ -1038,8 +1038,8 @@ function Overview({
 
       {/* QUOTATION EDIT MODAL — New Reservation Query clone */}
       {quoteEditorOpen && (
-        <div className="fixed inset-0 bg-ink/60 z-50 flex items-start justify-center overflow-auto p-6">
-          <div className="card max-w-lg w-full p-6 my-6">
+        <div className="fixed inset-0 bg-ink/60 z-50 flex items-start justify-center overflow-auto p-3 sm:p-6">
+          <div className="card max-w-lg w-full p-4 sm:p-6 my-3 sm:my-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-display text-lg font-bold text-pine">
                 {editing ? 'Edit Quotation' : 'New Quotation'}
@@ -1050,7 +1050,7 @@ function Overview({
             {/* Primary Guest */}
             <fieldset className="border border-leaf rounded-xl p-4 mb-4">
               <legend className="text-xs font-bold text-pine/60 px-2 uppercase tracking-wide">Primary Guest</legend>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="label">Salutation</label>
                   <SearchableSelect
                     value={editForm.salutation}
@@ -1068,7 +1068,7 @@ function Overview({
                 <div><label className="label">Email</label>
                   <input className="input" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} />
                 </div>
-                <div className="col-span-2"><label className="label">Address</label>
+                <div className="col-span-1 sm:col-span-2"><label className="label">Address</label>
                   <textarea className="input" rows={2} value={editForm.address} onChange={e => setEditForm({...editForm, address: e.target.value})} />
                 </div>
               </div>
@@ -1077,7 +1077,7 @@ function Overview({
             {/* Stay */}
             <fieldset className="border border-leaf rounded-xl p-4 mb-4">
               <legend className="text-xs font-bold text-pine/60 px-2 uppercase tracking-wide">Stay Details</legend>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="label">Default Check-in *</label>
                   <input type="date" className="input" value={editForm.check_in} onChange={e => setEditForm({...editForm, check_in: e.target.value})} />
                 </div>
@@ -1107,14 +1107,14 @@ function Overview({
                     placeholder="Select source…"
                   />
                 </div>
-                <div className="col-span-2"><label className="label">Reservation Name</label>
+                <div className="col-span-1 sm:col-span-2"><label className="label">Reservation Name</label>
                   <input className="input" value={editForm.reservation_name} onChange={e => setEditForm({...editForm, reservation_name: e.target.value})} />
                   <div className="flex items-center gap-2 mt-1">
                     <input type="checkbox" id="useResName" checked={editForm.use_reservation_name_only} onChange={e => setEditForm({...editForm, use_reservation_name_only: e.target.checked})} />
                     <label htmlFor="useResName" className="text-xs text-pine/60">Same as Reservation Name</label>
                   </div>
                 </div>
-                <div className="col-span-2"><label className="label">Notes / Special Requests</label>
+                <div className="col-span-1 sm:col-span-2"><label className="label">Notes / Special Requests</label>
                   <textarea className="input" rows={2} value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} />
                 </div>
               </div>
@@ -1139,12 +1139,14 @@ function Overview({
               </div>
               {roomList.length === 0 && <p className="text-xs text-pine/50">No rooms added yet — click "+ Add room". You can add the same or different rooms with different date ranges.</p>}
               {roomList.map((rm, idx) => (
-                <div key={idx} className="flex items-center gap-2 border-b border-leaf/30 py-2">
+                <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2 border-b border-leaf/30 py-2">
                   <span className="text-sm font-semibold flex-1">{rm.room_no}{rm.room_name ? ` · ${rm.room_name}` : ''}</span>
-                  <input type="date" className="input !py-1 !w-36" value={rm.from_date || editForm.check_in} onChange={e => setRoomList(prev => prev.map((r, i) => i === idx ? {...r, from_date: e.target.value} : r))} />
-                  <input type="date" className="input !py-1 !w-36" value={rm.to_date || editForm.check_out} onChange={e => setRoomList(prev => prev.map((r, i) => i === idx ? {...r, to_date: e.target.value} : r))} />
-                  <input type="number" className="input !w-20 !py-1 money" value={rm.rate} onChange={e => updateRoomRateInModal(idx, e.target.value)} />
-                  <button onClick={() => removeRoomInModal(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input type="date" className="input !py-1 !w-36" value={rm.from_date || editForm.check_in} onChange={e => setRoomList(prev => prev.map((r, i) => i === idx ? {...r, from_date: e.target.value} : r))} />
+                    <input type="date" className="input !py-1 !w-36" value={rm.to_date || editForm.check_out} onChange={e => setRoomList(prev => prev.map((r, i) => i === idx ? {...r, to_date: e.target.value} : r))} />
+                    <input type="number" className="input !w-20 !py-1 money" value={rm.rate} onChange={e => updateRoomRateInModal(idx, e.target.value)} />
+                    <button onClick={() => removeRoomInModal(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                  </div>
                 </div>
               ))}
             </fieldset>
@@ -1153,8 +1155,8 @@ function Overview({
             <fieldset className="border border-leaf rounded-xl p-4 mb-4">
               <legend className="text-xs font-bold text-pine/60 px-2 uppercase tracking-wide">Including Items</legend>
               <p className="text-xs text-pine/50 mb-3">Select any items included with this booking. Prices entered here are saved against the reservation but only posted to the bill when you choose to (Overview tab → Post addon charges).</p>
-              <div className="flex gap-2 mb-2">
-                <input className="input flex-1" placeholder="Item label" value={newAddon.label} onChange={e => setNewAddon({...newAddon, label: e.target.value})} />
+              <div className="flex flex-wrap gap-2 mb-2">
+                <input className="input flex-1 min-w-[120px]" placeholder="Item label" value={newAddon.label} onChange={e => setNewAddon({...newAddon, label: e.target.value})} />
                 <input type="number" className="input !w-24" placeholder="Price" value={newAddon.price} onChange={e => setNewAddon({...newAddon, price: e.target.value})} />
                 <input type="number" className="input !w-16" placeholder="Qty" min="1" value={newAddon.qty} onChange={e => setNewAddon({...newAddon, qty: e.target.value})} />
                 <button className="btn-ghost !py-1" onClick={addAddonItem}><Plus size={14} /></button>
@@ -1174,7 +1176,7 @@ function Overview({
             {/* Discount */}
             <fieldset className="border border-leaf rounded-xl p-4 mb-4">
               <legend className="text-xs font-bold text-pine/60 px-2 uppercase tracking-wide">Discount</legend>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button type="button"
                   className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${editForm.discount_type === 'percentage' ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`}
                   onClick={() => setEditForm({...editForm, discount_type: 'percentage'})}>%</button>
@@ -1182,9 +1184,9 @@ function Overview({
                   className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${editForm.discount_type === 'fixed' ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`}
                   onClick={() => setEditForm({...editForm, discount_type: 'fixed'})}>৳ Fixed</button>
                 {editForm.discount_type === 'percentage' ? (
-                  <input type="number" min="0" max="100" className="input money flex-1" value={editForm.discount_pct} onChange={e => setEditForm({...editForm, discount_pct: e.target.value})} />
+                  <input type="number" min="0" max="100" className="input money flex-1 min-w-[100px]" value={editForm.discount_pct} onChange={e => setEditForm({...editForm, discount_pct: e.target.value})} />
                 ) : (
-                  <input type="number" min="0" className="input money flex-1" value={editForm.discount_val} onChange={e => setEditForm({...editForm, discount_val: e.target.value})} />
+                  <input type="number" min="0" className="input money flex-1 min-w-[100px]" value={editForm.discount_val} onChange={e => setEditForm({...editForm, discount_val: e.target.value})} />
                 )}
               </div>
             </fieldset>
@@ -1196,7 +1198,7 @@ function Overview({
               <p className="text-xs text-pine/50 mt-1">Default from company Settings. Edits apply to this reservation only.</p>
             </fieldset>
 
-            <div className="flex gap-3 justify-end border-t border-leaf pt-4">
+            <div className="flex flex-wrap gap-3 justify-end border-t border-leaf pt-4">
               <button className="btn-ghost" onClick={() => setQuoteEditorOpen(false)}>Cancel</button>
               <button className="btn-primary" onClick={handleUpdateQuotation}>
                 <Save size={16} /> {editing ? 'Update Quotation' : 'Save Quotation'}
@@ -1205,990 +1207,6 @@ function Overview({
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-function GuestIdManager({ reservationId, resGuests, guestIds, locked, reload, flash }) {
-  const [adding, setAdding]     = useState(false)
-  const [editId, setEditId]     = useState(null)
-  const [form, setForm]         = useState({ guest_name: '', id_type: 'NID', id_number: '', notes: '' })
-  const [busy, setBusy]         = useState(false)
-
-  const ID_TYPES = ['NID', 'Passport', 'Driving License', 'Birth Certificate', 'Other']
-
-  const startAdd = (guestName = '') => {
-    setForm({ guest_name: guestName, id_type: 'NID', id_number: '', notes: '' })
-    setEditId(null)
-    setAdding(true)
-  }
-
-  const startEdit = (idRow) => {
-    setForm({ guest_name: idRow.guest_name || '', id_type: idRow.id_type, id_number: idRow.id_number, notes: idRow.notes || '' })
-    setEditId(idRow.id)
-    setAdding(true)
-  }
-
-  const cancel = () => { setAdding(false); setEditId(null) }
-
-  const save = async () => {
-    if (!form.id_number.trim()) { flash('ID number is required.'); return }
-    setBusy(true)
-    if (editId) {
-      const { error } = await supabase.from('guest_ids').update({
-        guest_name: form.guest_name, id_type: form.id_type,
-        id_number: form.id_number.trim(), notes: form.notes,
-      }).eq('id', editId)
-      if (error) { flash(error.message); setBusy(false); return }
-    } else {
-      const { error } = await supabase.from('guest_ids').insert({
-        reservation_id: reservationId,
-        guest_name: form.guest_name, id_type: form.id_type,
-        id_number: form.id_number.trim(), notes: form.notes,
-      })
-      if (error) { flash(error.message); setBusy(false); return }
-    }
-    setBusy(false)
-    setAdding(false)
-    setEditId(null)
-    await reload()
-  }
-
-  const remove = async (id) => {
-    if (locked) { flash('Administrator access required after check-in.'); return }
-    await supabase.from('guest_ids').delete().eq('id', id)
-    await reload()
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="label !mb-0">Photo ID / Valid Documents</label>
-        {!locked && (
-          <button
-            type="button"
-            className="btn-ghost !py-1 text-xs"
-            onClick={() => startAdd()}
-          >
-            <Plus size={12} /> Add ID
-          </button>
-        )}
-      </div>
-
-      {/* Existing IDs list */}
-      {guestIds.length === 0 && !adding && (
-        <p className="text-xs text-pine/40 py-2">No ID documents recorded yet. Click "+ Add ID" to add NID, Passport, or other documents.</p>
-      )}
-
-      {guestIds.length > 0 && (
-        <div className="space-y-1.5 mb-3">
-          {guestIds.map((id) => (
-            <div key={id.id} className="flex items-start justify-between gap-2 px-3 py-2 rounded-lg border border-leaf bg-leaf/10 text-sm">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="status-chip bg-forest/15 text-forest text-xs font-semibold">{id.id_type}</span>
-                  <span className="font-mono font-semibold text-pine">{id.id_number}</span>
-                  {id.guest_name && <span className="text-pine/50 text-xs">· {id.guest_name}</span>}
-                </div>
-                {id.notes && <div className="text-xs text-pine/50 mt-0.5 truncate">{id.notes}</div>}
-              </div>
-              {!locked && (
-                <div className="flex gap-1 shrink-0">
-                  <button
-                    onClick={() => startEdit(id)}
-                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-leaf text-pine/40 hover:text-forest"
-                    title="Edit"
-                  ><Pencil size={11} /></button>
-                  <button
-                    onClick={() => remove(id.id)}
-                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-50 text-red-300 hover:text-red-600"
-                    title="Delete"
-                  ><Trash2 size={11} /></button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Add / Edit form */}
-      {adding && (
-        <div className="rounded-xl border border-leaf bg-white p-3 space-y-3 mt-2">
-          <div className="text-xs font-semibold text-pine/60">{editId ? 'Edit ID document' : 'Add new ID document'}</div>
-
-          {/* Guest name selector — pick from resGuests or type freely */}
-          <div>
-            <label className="label !text-xs">Guest name (optional)</label>
-            <div className="flex gap-2">
-              <select
-                className="input flex-1"
-                value={form.guest_name}
-                onChange={(e) => setForm((p) => ({ ...p, guest_name: e.target.value }))}
-              >
-                <option value="">— Select guest or type below —</option>
-                {resGuests.map((g) => (
-                  <option key={g.id} value={g.guest_name}>{g.guest_name}{g.is_primary ? ' (Primary)' : ''}</option>
-                ))}
-              </select>
-            </div>
-            <input
-              className="input mt-1 text-xs"
-              placeholder="Or type guest name manually…"
-              value={form.guest_name}
-              onChange={(e) => setForm((p) => ({ ...p, guest_name: e.target.value }))}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label !text-xs">ID type *</label>
-              <SearchableSelect
-                value={form.id_type}
-                onChange={v => setForm((p) => ({ ...p, id_type: v }))}
-                options={ID_TYPES}
-                placeholder="Select ID type…"
-              />
-            </div>
-            <div>
-              <label className="label !text-xs">ID number *</label>
-              <input
-                className="input money"
-                placeholder="e.g. 1234567890123"
-                value={form.id_number}
-                onChange={(e) => setForm((p) => ({ ...p, id_number: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && save()}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="label !text-xs">Notes (optional)</label>
-            <input
-              className="input text-xs"
-              placeholder="e.g. Copy attached, Expired — renewal submitted, etc."
-              value={form.notes}
-              onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button className="btn-primary !py-1.5 text-xs" onClick={save} disabled={busy || !form.id_number.trim()}>
-              <Save size={12} /> {busy ? 'Saving…' : editId ? 'Update ID' : 'Save ID'}
-            </button>
-            <button className="btn-ghost !py-1.5 text-xs" onClick={cancel}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {/* Quick-add buttons per guest */}
-      {!locked && !adding && resGuests.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {resGuests.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => startAdd(g.guest_name)}
-              className="text-xs px-2 py-1 rounded-lg border border-leaf hover:bg-leaf text-pine/60 hover:text-pine transition-colors"
-            >
-              <Plus size={10} className="inline mr-0.5" /> Add ID for {g.guest_name?.split(' ')[0] || 'guest'}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  CHECK-IN TAB                                                        */
-/* ------------------------------------------------------------------ */
-function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus, userName, openCard, payments, flash, isAdmin, guestIds = [] }) {
-  const locked = !isAdmin && ['CHECKED_IN', 'CHECKED_OUT', 'SETTLED'].includes(res.status)
-  const [f, setF] = useState({
-    extra_pax: res.extra_pax, extra_pax_rate: res.extra_pax_rate,
-    driver_accommodation: res.driver_accommodation, driver_count: res.driver_count, driver_rate: res.driver_rate,
-    special_instructions: res.special_instructions || '',
-  })
-  const [newGuest, setNewGuest] = useState('')
-  const [roomSel, setRoomSel]   = useState('')
-  const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
-
-  const assignRoom = async () => {
-    if (locked) { flash('After check-in, only an administrator can change room assignment.'); return }
-    if (!roomSel) return
-    const room = rooms.find((r) => r.id === roomSel)
-    await supabase.from('reservation_rooms').insert({ reservation_id: res.id, room_id: room.id, rate: res.room_rate || room.base_rate, from_date: res.check_in, to_date: res.check_out })
-    setRoomSel(''); await reload()
-  }
-  const removeRoom = async (rrId) => {
-    if (locked) { flash('Administrator access required after check-in.'); return }
-    await supabase.from('reservation_rooms').delete().eq('id', rrId); await reload()
-  }
-  const updateRoomRate = async (rrId, rate) => {
-    if (locked) { flash('Administrator access required after check-in.'); return }
-    if (rate === '' || isNaN(+rate)) return
-    await supabase.from('reservation_rooms').update({ rate: +rate }).eq('id', rrId); await reload()
-  }
-  const updateRoomDates = async (rrId, field, val) => {
-    if (locked) { flash('Administrator access required after check-in.'); return }
-    if (!val) return
-    await supabase.from('reservation_rooms').update({ [field]: val }).eq('id', rrId); await reload()
-  }
-  const addGuest = async () => {
-    if (locked) { flash('Administrator access required after check-in.'); return }
-    if (!newGuest.trim()) return
-    await supabase.from('reservation_guests').insert({ reservation_id: res.id, guest_name: newGuest.trim() })
-    setNewGuest(''); await reload()
-  }
-  const removeGuest = async (gid) => {
-    if (locked) { flash('Administrator access required after check-in.'); return }
-    await supabase.from('reservation_guests').delete().eq('id', gid); await reload()
-  }
-
-  const doCheckIn = async () => {
-    if (resRooms.length === 0) { flash('Assign at least one room before check-in.'); return }
-    await setStatus('CHECKED_IN', {
-      extra_pax: +f.extra_pax, extra_pax_rate: +f.extra_pax_rate,
-      driver_accommodation: f.driver_accommodation, driver_count: +f.driver_count, driver_rate: +f.driver_rate,
-      special_instructions: f.special_instructions,
-      checked_in_at: new Date().toISOString(), checkin_by: userName,
-    })
-    flash('Guest checked in. Print the Registration Card for signatures.')
-  }
-
-  const assignedIds = new Set(resRooms.map((r) => r.room_id))
-
-  return (
-    <>
-      {locked && (
-        <div className="mb-4 px-4 py-2 rounded-lg bg-amber/10 text-amber text-sm font-medium">
-          This reservation is checked in — room assignment and guest details are locked. Only an administrator can change them.
-        </div>
-      )}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card p-5 space-y-4">
-          <h3 className="font-display font-semibold text-pine">Room assignment</h3>
-          <div className="flex gap-2">
-            <SearchableSelect
-              className="flex-1"
-              value={roomSel}
-              onChange={setRoomSel}
-              options={rooms.filter((r) => !assignedIds.has(r.id)).map((r) => ({
-                value: r.id,
-                label: `${r.room_no}${r.room_name ? ` — ${r.room_name}` : ''} · ${r.room_type} (${fmtBDT(r.base_rate)})`
-              }))}
-              placeholder="Select room…"
-            />
-            <button className="btn-primary" onClick={assignRoom}><BedDouble size={15} /> Assign</button>
-          </div>
-          {resRooms.map((rr) => (
-            <div key={rr.id} className="text-sm border border-leaf rounded-lg px-3 py-2 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold">Room {rr.rooms?.room_no}{rr.rooms?.room_name ? ` · ${rr.rooms.room_name}` : ''} <span className="text-pine/50 font-normal">· {rr.rooms?.room_type}</span></span>
-                <span className="flex items-center gap-2 money">
-                  {locked ? (
-                    <>{fmtBDT(rr.rate)}/night</>
-                  ) : (
-                    <>
-                      <input type="number" defaultValue={rr.rate} onBlur={(e) => updateRoomRate(rr.id, e.target.value)} className="input !w-28 !py-1 money text-right" title="Edit rate — then Repost room charges in Folio" />/night
-                      <button onClick={() => removeRoom(rr.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14} /></button>
-                    </>
-                  )}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-pine/60">
-                <span>Stay:</span>
-                {locked ? (
-                  <span className="money">{fmtDate(rr.from_date || res.check_in)} → {fmtDate(rr.to_date || res.check_out)}</span>
-                ) : (
-                  <>
-                    <input type="date" defaultValue={rr.from_date || res.check_in} onBlur={(e) => updateRoomDates(rr.id, 'from_date', e.target.value)} className="input !py-1 !w-36" />
-                    <span>→</span>
-                    <input type="date" defaultValue={rr.to_date || res.check_out} onBlur={(e) => updateRoomDates(rr.id, 'to_date', e.target.value)} className="input !py-1 !w-36" />
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-          {rooms.length === 0 && <p className="text-xs text-amber">No rooms defined yet — add your room inventory in Settings → Rooms.</p>}
-
-          <h3 className="font-display font-semibold text-pine pt-2">All guest names (for Registration Card)</h3>
-          <div className="flex gap-2">
-            <input className="input flex-1" placeholder="Add accompanying guest name" value={newGuest} onChange={(e) => setNewGuest(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addGuest()} />
-            <button className="btn-ghost" onClick={addGuest}><Plus size={15} /></button>
-          </div>
-          {resGuests.map((g) => (
-            <div key={g.id} className="flex justify-between items-center text-sm px-3 py-1.5 border-b border-leaf/60">
-              <span>{g.guest_name} {g.is_primary && <span className="status-chip bg-forest/15 text-forest ml-2">Primary</span>}</span>
-              {!g.is_primary && <button onClick={() => removeGuest(g.id)} className="text-red-400 hover:text-red-600"><Trash2 size={13} /></button>}
-            </div>
-          ))}
-        </div>
-
-        <div className="card p-5 space-y-4">
-          <h3 className="font-display font-semibold text-pine">Check-in details</h3>
-
-          {/* ── Multi-ID Section ── */}
-          <GuestIdManager
-            reservationId={res.id}
-            resGuests={resGuests}
-            guestIds={guestIds}
-            locked={locked}
-            reload={reload}
-            flash={flash}
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">Extra pax</label><input type="number" min="0" className="input money" value={f.extra_pax} onChange={(e) => set('extra_pax', e.target.value)} /></div>
-            <div><label className="label">Extra pax rate / night</label><input type="number" className="input money" value={f.extra_pax_rate} onChange={(e) => set('extra_pax_rate', e.target.value)} /></div>
-            <div className="col-span-2 flex items-center gap-2 pt-1">
-              <input type="checkbox" id="drv" checked={f.driver_accommodation} onChange={(e) => set('driver_accommodation', e.target.checked)} />
-              <label htmlFor="drv" className="text-sm font-medium">Driver accommodation needed</label>
-            </div>
-            {f.driver_accommodation && (
-              <>
-                <div><label className="label">No. of drivers</label><input type="number" min="0" className="input money" value={f.driver_count} onChange={(e) => set('driver_count', e.target.value)} /></div>
-                <div><label className="label">Driver rate / night</label><input type="number" className="input money" value={f.driver_rate} onChange={(e) => set('driver_rate', e.target.value)} /></div>
-              </>
-            )}
-            <div className="col-span-2">
-              <label className="label">Notes / special instructions</label>
-              <textarea className="input" rows={2} value={f.special_instructions} onChange={(e) => set('special_instructions', e.target.value)} />
-            </div>
-          </div>
-          <div className="flex gap-2 pt-1">
-            {!['CHECKED_IN', 'CHECKED_OUT', 'SETTLED'].includes(res.status) ? (
-              <button className="btn-primary flex-1 justify-center" onClick={doCheckIn}><LogIn size={16} /> Check in guest</button>
-            ) : (
-              <div className="text-sm text-forest font-semibold flex items-center gap-2">
-                <BadgeCheck size={16} /> Checked in {res.checked_in_at && `· ${fmtDate(res.checked_in_at)}`} {res.checkin_by && `by ${res.checkin_by}`}
-              </div>
-            )}
-            <button className="btn-amber flex-1 justify-center" onClick={openCard}><Printer size={16} /> Registration Card</button>
-          </div>
-          <p className="text-xs text-pine/50">
-            Advance on record: <span className="money font-semibold">{fmtBDT(payments.filter((p) => p.payment_class === 'ADVANCE').reduce((a, p) => a + +p.amount, 0))}</span> — shown on the card.
-          </p>
-        </div>
-      </div>
-    </>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  BILLINGS & CHECK-OUT TAB                                            */
-/* ------------------------------------------------------------------ */
-function BillingsAndCheckOutTab({
-  res, guest, charges, payments, resRooms, taxConfig, invoices, company,
-  reload, userName, setStatus, setPrintDoc, totals, paid, due, flash, isAdmin,
-}) {
-  const isCheckedOut = ['CHECKED_OUT', 'SETTLED'].includes(res.status)
-  const editable     = isAdmin || !['CHECKED_OUT', 'SETTLED', 'CANCELLED'].includes(res.status)
-  const uncleanRooms = resRooms.filter((rr) => rr.rooms?.hk_status && rr.rooms.hk_status !== 'Clean')
-  const [c, setC]           = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
-  const [discAmt, setDiscAmt]     = useState('')
-  const [discReason, setDiscReason] = useState('')
-  const [discType, setDiscType]   = useState('ROOM')
-  const [p, setP]           = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
-
-  const printLiveInvoice = (type) => {
-    setPrintDoc({
-      type,
-      invoiceData: {
-        charges,
-        totals,
-        paid,
-        due,
-        invoice_no: undefined,
-        issued_at:  new Date().toISOString(),
-      },
-    })
-  }
-
-  const printHistoryInvoice = (inv, type) => {
-    setPrintDoc({
-      type,
-      invoiceData: {
-        charges:    inv.charges?.length ? inv.charges : charges,
-        totals:     inv.totals  ?? totals,
-        paid:       inv.paid    ?? paid,
-        due:        inv.due     ?? due,
-        invoice_no: inv.invoice_no,
-        issued_at:  inv.issued_at,
-      },
-    })
-  }
-
-  // ----------------------------------------------------------------
-  // Folio actions
-  // ----------------------------------------------------------------
-  const buildRoomRows = () => {
-    const rows = []
-    const discDescriptor = resDiscount(res)
-    const totalRoomNights = resRooms.reduce((sum, rr) => {
-      const ci = rr.from_date || res.check_in
-      const co = rr.to_date   || res.check_out
-      return sum + eachNight(ci, co).length
-    }, 0)
-    const perNightDiscount = discDescriptor && typeof discDescriptor === 'object' && totalRoomNights > 0
-      ? { type: 'fixed', value: discDescriptor.value / totalRoomNights }
-      : discDescriptor
-
-    for (const rr of resRooms) {
-      const ci = rr.from_date || res.check_in
-      const co = rr.to_date   || res.check_out
-      for (const night of eachNight(ci, co)) {
-        const rate = rateFor(taxConfig, 'ROOM', night)
-        rows.push({
-          reservation_id: res.id, charge_date: night, charge_type: 'ROOM',
-          description: `Room ${rr.rooms?.room_no}${rr.rooms?.room_name ? ` (${rr.rooms.room_name})` : ''} — Night of ${fmtDate(night)}`,
-          ...computeCharge(rr.rate, perNightDiscount, rate), created_by: userName,
-        })
-      }
-    }
-    const addonDiscount = discDescriptor && typeof discDescriptor === 'object' ? 0 : discDescriptor
-    for (const night of eachNight(res.check_in, res.check_out)) {
-      const rate = rateFor(taxConfig, 'ROOM', night)
-      if (res.extra_pax > 0 && res.extra_pax_rate > 0)
-        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Extra pax × ${res.extra_pax} — ${fmtDate(night)}`, ...computeCharge(res.extra_pax * res.extra_pax_rate, addonDiscount, rate), created_by: userName })
-      if (res.driver_accommodation && res.driver_count > 0 && res.driver_rate > 0)
-        rows.push({ reservation_id: res.id, charge_date: night, charge_type: 'ROOM', description: `Driver accommodation × ${res.driver_count} — ${fmtDate(night)}`, ...computeCharge(res.driver_count * res.driver_rate, addonDiscount, rate), created_by: userName })
-    }
-    return rows
-  }
-
-  const postRoomCharges = async () => {
-    if (resRooms.length === 0)                             { flash('Assign rooms first (Check-In tab).'); return }
-    if (charges.some((ch) => ch.charge_type === 'ROOM'))   { flash('Room charges already posted — use "Repost" to replace them.'); return }
-    const rows = buildRoomRows()
-    const { error } = await supabase.from('folio_charges').insert(rows)
-    if (error) flash(error.message); else { await reload(); flash(`${rows.length} room charge line(s) posted.`) }
-  }
-
-  const repostRoomCharges = async () => {
-    if (!editable)             { flash('Room bill can only be edited before check-out (administrator override available).'); return }
-    if (resRooms.length === 0) { flash('Assign rooms first (Check-In tab).'); return }
-    const { error: de } = await supabase.from('folio_charges').delete().eq('reservation_id', res.id).eq('charge_type', 'ROOM')
-    if (de) { flash(de.message); return }
-    const rows = buildRoomRows()
-    const { error } = await supabase.from('folio_charges').insert(rows)
-    if (error) flash(error.message); else { await reload(); flash(`Room bill reposted — ${rows.length} line(s).`) }
-  }
-
-  const addCharge = async () => {
-    if (!c.description || !c.base_amount) return
-    const rate = rateFor(taxConfig, c.charge_type, c.charge_date)
-    const { error } = await supabase.from('folio_charges').insert({
-      reservation_id: res.id, charge_date: c.charge_date, charge_type: c.charge_type,
-      description: c.description, ...computeCharge(c.base_amount, c.discount_pct, rate), created_by: userName,
-    })
-    if (error) flash(error.message)
-    else { setC({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() }); await reload() }
-  }
-
-  const toggleStatus = async (ch) => { await supabase.from('folio_charges').update({ status: ch.status === 'PAID' ? 'DUE' : 'PAID' }).eq('id', ch.id); await reload() }
-  const delCharge    = async (chId) => { await supabase.from('folio_charges').delete().eq('id', chId); await reload() }
-
-  // ----------------------------------------------------------------
-  // Payment actions
-  // ----------------------------------------------------------------
-  const syncInvoiceStatus = async () => {
-    const { data: freshPayments } = await supabase
-      .from('payments').select('amount').eq('reservation_id', res.id)
-    const { data: activeInv } = await supabase
-      .from('invoices').select('id, totals')
-      .eq('reservation_id', res.id).eq('is_void', false).single()
-
-    if (!activeInv) return
-
-    const totalPaid = (freshPayments || []).reduce((a, p) => a + Number(p.amount), 0)
-    const snapGrandTotal = activeInv.totals?.grand_total ?? totals.grand_total
-    const newDue    = +(snapGrandTotal - totalPaid).toFixed(2)
-    const newStatus = newDue <= 0 ? 'PAID' : 'PARTIAL'
-
-    await supabase.from('invoices').update({ paid: totalPaid, due: newDue, status: newStatus }).eq('id', activeInv.id)
-
-    if (newDue <= 0 && res.status === 'CHECKED_OUT') {
-      await supabase.from('reservations').update({ status: 'SETTLED' }).eq('id', res.id)
-      await reload()
-      flash('Balance cleared — reservation marked SETTLED.')
-    }
-  }
-
-  const addPayment = async () => {
-    if (!p.amount || +p.amount <= 0) return
-    const { error } = await supabase.from('payments').insert({ reservation_id: res.id, ...p, amount: +p.amount })
-    if (error) { flash(error.message); return }
-    setP({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
-    await reload()
-    if (isCheckedOut) await syncInvoiceStatus()
-    else flash('Payment recorded.')
-  }
-
-  const delPayment = async (pm) => {
-    const { error } = await supabase.from('payments').delete().eq('id', pm.id)
-    if (error) flash('Administrator access required to delete payments.')
-    else {
-      await reload()
-      if (isCheckedOut) await syncInvoiceStatus()
-      else flash('Payment deleted.')
-    }
-  }
-
-  // ----------------------------------------------------------------
-  // Discount action — FIXED: pure ৳ deduction, no VAT/Service Charge applied
-  // ----------------------------------------------------------------
-  const addDiscount = async () => {
-    const amt = +discAmt
-    if (!amt || amt <= 0) { flash('Enter a positive discount amount.'); return }
-
-    // Previously this ran computeCharge(-amt, 0, rate), which re-applied the
-    // tax-config VAT/service-charge rate on top of the negative amount —
-    // meaning the discount line itself was carrying VAT/SC, distorting the
-    // folio totals. An "Additional discount" must be a pure ৳ deduction with
-    // no tax component, so VAT and service_charge are hardcoded to 0 here.
-    const calc = {
-      base_amount: -amt,
-      discount: 0,
-      service_charge: 0,
-      vat: 0,
-      total: -amt,
-    }
-
-    const { error } = await supabase.from('folio_charges').insert({
-      reservation_id: res.id, charge_date: todayISO(), charge_type: 'DISCOUNT', status: 'PAID',
-      description: `Additional discount (${discType})${discReason ? ' — ' + discReason : ''}`,
-      ...calc, created_by: userName,
-    })
-    if (error) { flash(error.message); return }
-    await supabase.from('audit_log').insert({
-      actor: userName, action: 'ADD_DISCOUNT', entity: 'reservation',
-      entity_id: res.res_no, details: { amount: amt, type: discType, reason: discReason },
-    })
-    setDiscAmt(''); setDiscReason('')
-    await reload()
-    flash(`Additional discount of ${fmtBDT(amt)} applied.`)
-  }
-
-  // ----------------------------------------------------------------
-  // Checkout handler — saves full invoice snapshot
-  // ----------------------------------------------------------------
-  const handleCheckOut = async () => {
-  // NEW — HK gate, admin can override with confirm()
-  if (uncleanRooms.length > 0) {
-    const names = uncleanRooms.map((rr) => `${rr.rooms?.room_no} (${rr.rooms?.hk_status})`).join(', ')
-    if (isAdmin) {
-      const ok = window.confirm(`Room(s) not housekeeping-cleared: ${names}.\n\nOverride and check out anyway?`)
-      if (!ok) return
-    } else {
-      flash(`Cannot check out — room(s) pending housekeeping clearance: ${names}. Ask an administrator to override.`)
-      return
-    }
-  }
-  if (due > 0) {
-      const ok = window.confirm(
-        `Guest has an outstanding balance of ${fmtBDT(due)}.\n\nCheck out anyway? The invoice will be marked PARTIAL.`
-      )
-      if (!ok) return
-    }
-
-    const invoiceNo  = generateInvoiceNo(res.res_no)
-    const issuedAt   = new Date().toISOString()
-    const invStatus  = due <= 0 ? 'PAID' : 'PARTIAL'
-
-    const { error: invErr } = await supabase.from('invoices').insert({
-      reservation_id: res.id,
-      invoice_no:     invoiceNo,
-      issued_at:      issuedAt,
-      issued_by:      userName,
-      invoice_type:   'GUEST_BILL',
-      charges,
-      totals,
-      paid,
-      due,
-      status:         invStatus,
-      is_void:        false,
-    })
-
-    if (invErr) { flash(`Failed to generate invoice: ${invErr.message}`); return }
-
-    await setStatus('CHECKED_OUT', { checked_out_at: issuedAt })
-    await reload()
-    flash(
-      due > 0
-        ? `Checked out with ${fmtBDT(due)} outstanding. Invoice ${invoiceNo} marked PARTIAL.`
-        : `Checked out. Invoice ${invoiceNo} generated — fully paid.`
-    )
-  }
-
-  // ----------------------------------------------------------------
-  // Re-check-in (admin) — voids invoices + audit log
-  // ----------------------------------------------------------------
-  const handleReCheckIn = async () => {
-    const reason = window.prompt('Re-check-in will VOID the issued invoices. Reason:', 'Guest stay extended')
-    if (reason === null) return
-    await supabase.from('invoices')
-      .update({ is_void: true, void_reason: reason || 'Re-check-in', voided_by: userName, voided_at: new Date().toISOString() })
-      .eq('reservation_id', res.id)
-      .not('is_void', 'is', true)
-    await supabase.from('audit_log').insert({
-      actor: userName, action: 'RE_CHECKIN', entity: 'reservation',
-      entity_id: res.res_no, details: { reason },
-    })
-    await setStatus('CHECKED_IN', { checked_out_at: null })
-    await reload()
-    flash('Guest re-checked-in. Previous invoices voided; folio is editable again.')
-  }
-
-  return (
-    <div className="space-y-6">
-
-      {/* 1. Header & Check-out Actions */}
-      <div className="card p-5 border-l-4 border-l-pine">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h3 className="font-display font-semibold text-pine text-lg">Guest Billing & Check-out</h3>
-            <p className="text-sm text-pine/60 mt-1">Preview live bill before check-out or manage historical invoices.</p>
-          </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <button className="btn-ghost" onClick={() => printLiveInvoice('BILL')}><Printer size={16} /> Preview Bill</button>
-            <button className="btn-ghost" onClick={() => printLiveInvoice('MUSHAK')}><Receipt size={16} /> Mushak Print</button>
-            <div className="h-6 w-px bg-leaf/60 mx-2 hidden sm:block" />
-            {!isCheckedOut ? (
-              <>
-                {uncleanRooms.length > 0 && (
-                  <span className="text-xs text-amber font-semibold mr-1">⚠ HK pending: {uncleanRooms.map(rr => rr.rooms?.room_no).join(', ')}</span>
-                )}
-                <button className="btn-primary" onClick={handleCheckOut}>
-                  <CheckCircle2 size={16} /> Check Out
-                </button>
-              </>
-            ) : (
-              isAdmin && (
-                <button className="btn-amber" onClick={handleReCheckIn}>
-                  <LogIn size={16} /> Re-check-in (Admin)
-                </button>
-              )
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Add Charges and Payments */}
-      {editable && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="card p-4 lg:col-span-2">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-display font-semibold text-pine">Add charge</h3>
-              <div className="flex gap-2">
-                <button className="btn-ghost" onClick={postRoomCharges}><BedDouble size={15} /> Post room charges ({nightsBetween(res.check_in, res.check_out)} nights)</button>
-                {charges.some((ch) => ch.charge_type === 'ROOM') && (
-                  <button className="btn-amber !py-2" onClick={repostRoomCharges} title="Replace ROOM lines with current rates & discount">Repost</button>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-6 gap-2">
-              <SearchableSelect
-                value={c.charge_type}
-                onChange={v => setC({ ...c, charge_type: v })}
-                options={['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER']}
-                placeholder="Type…"
-              />
-              <input className="input col-span-2" placeholder="Description" value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
-              <input type="number" className="input money" placeholder="Base ৳" value={c.base_amount} onChange={(e) => setC({ ...c, base_amount: e.target.value })} />
-              <input type="number" min="0" max="100" className="input money" placeholder="Disc %" value={c.discount_pct} onChange={(e) => setC({ ...c, discount_pct: e.target.value })} />
-              <button className="btn-primary justify-center" onClick={addCharge}><Plus size={15} /> Add</button>
-            </div>
-          </div>
-          <div className="card p-4">
-            <h3 className="font-display font-semibold text-pine mb-3">Record payment</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="number" className="input money" placeholder="Amount ৳" value={p.amount} onChange={(e) => setP({ ...p, amount: e.target.value })} />
-              <SearchableSelect
-                value={p.method}
-                onChange={v => setP({ ...p, method: v })}
-                options={['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']}
-                placeholder="Method…"
-              />
-              <input type="date" className="input" value={p.received_date} onChange={(e) => setP({ ...p, received_date: e.target.value })} />
-              <input className="input" placeholder="Reference" value={p.reference} onChange={(e) => setP({ ...p, reference: e.target.value })} />
-            </div>
-            <button className="btn-primary w-full justify-center mt-2" onClick={addPayment}><Receipt size={15} /> Save payment</button>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Admin Discount */}
-      {isAdmin && editable && (
-        <div className="card p-4 border-amber/40 bg-amber/5">
-          <h3 className="font-display font-semibold text-pine flex items-center gap-2 mb-3"><BadgePercent size={16} className="text-amber" /> Additional discount (admin)</h3>
-          <div className="grid grid-cols-6 gap-2">
-            <input type="number" min="0" className="input money" placeholder="Discount ৳" value={discAmt} onChange={(e) => setDiscAmt(e.target.value)} />
-            <SearchableSelect
-              value={discType}
-              onChange={setDiscType}
-              options={['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER']}
-              placeholder="Type…"
-            />
-            <input className="input col-span-2" placeholder="Reason (loyal guest, goodwill...)" value={discReason} onChange={(e) => setDiscReason(e.target.value)} />
-            <button className="btn-amber justify-center col-span-2" onClick={addDiscount}><BadgePercent size={15} /> Apply discount</button>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Billing & Folio Table */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Guest Total Billing History</div>
-        <table className="w-full">
-          <thead><tr>
-            <th className="th">Date</th><th className="th">Type</th><th className="th">Description</th>
-            <th className="th text-right">Base</th><th className="th text-right">Disc.</th><th className="th text-right">SC</th>
-            <th className="th text-right">VAT</th><th className="th text-right">Total</th>
-            <th className="th">Status</th><th className="th"></th>
-          </tr></thead>
-          <tbody>
-            {charges.map((ch) => (
-              <tr key={ch.id} className="hover:bg-leaf/20">
-                <td className="td money text-xs">{fmtDate(ch.charge_date)}</td>
-                <td className="td text-xs">{ch.charge_type}</td>
-                <td className="td text-sm">{ch.description}</td>
-                <td className="td money text-right">{Number(ch.base_amount).toFixed(2)}</td>
-                <td className="td money text-right">{Number(ch.discount).toFixed(2)}</td>
-                <td className="td money text-right">{Number(ch.service_charge).toFixed(2)}</td>
-                <td className="td money text-right">{Number(ch.vat).toFixed(2)}</td>
-                <td className="td money text-right font-semibold">{Number(ch.total).toFixed(2)}</td>
-                <td className="td">
-                  <button
-                    onClick={() => editable ? toggleStatus(ch) : flash('Editing a checked-out folio requires administrator access.')}
-                    className={`status-chip ${ch.status === 'PAID' ? 'bg-forest/15 text-forest' : 'bg-red-100 text-red-600'} ${!editable ? 'opacity-60' : ''}`}
-                  >{ch.status}</button>
-                </td>
-                <td className="td">{editable && <button onClick={() => delCharge(ch.id)} className="text-red-300 hover:text-red-600"><Trash2 size={13} /></button>}</td>
-              </tr>
-            ))}
-            {charges.length === 0 && <tr><td className="td text-pine/50" colSpan={10}>No charges yet.</td></tr>}
-          </tbody>
-          {charges.length > 0 && (
-            <tfoot><tr className="bg-leaf/40 font-bold money">
-              <td className="td" colSpan={3}>Totals</td>
-              <td className="td text-right">{totals.base.toFixed(2)}</td>
-              <td className="td text-right">{totals.discount.toFixed(2)}</td>
-              <td className="td text-right">{totals.service_charge.toFixed(2)}</td>
-              <td className="td text-right">{totals.vat.toFixed(2)}</td>
-              <td className="td text-right">{(totals.grand_total_raw ?? totals.grand_total).toFixed(2)}</td>
-              <td className="td" colSpan={2}></td>
-            </tr></tfoot>
-          )}
-        </table>
-        {charges.length > 0 && (
-          <div className="px-4 py-3 border-t border-leaf flex justify-end">
-            <div className="w-72 text-sm money space-y-1">
-              <div className="flex justify-between text-pine/70"><span>Subtotal</span><span>{fmtBDT(totals.grand_total_raw ?? totals.grand_total)}</span></div>
-              {!!totals.rounding && (
-                <div className="flex justify-between text-pine/70">
-                  <span>Rounding adjustment</span>
-                  <span>{totals.rounding > 0 ? '+ ' : '− '}{fmtBDT(Math.abs(totals.rounding))}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold text-pine border-t border-leaf pt-1"><span>Grand total (payable)</span><span>{fmtBDT(totals.grand_total)}</span></div>
-              <div className="flex justify-between text-forest"><span>Paid</span><span>{fmtBDT(paid)}</span></div>
-              <div className={`flex justify-between font-bold text-lg border-t border-leaf pt-1 mt-1 ${due > 0 ? 'text-red-600' : 'text-forest'}`}>
-                <span>Balance due</span><span>{fmtBDT(due)}</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 5. Payments History */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Payments History</div>
-        <table className="w-full">
-          <thead><tr>
-            <th className="th">Date</th><th className="th">Class</th><th className="th">Method</th>
-            <th className="th">Reference</th><th className="th">Received by</th><th className="th text-right">Amount</th>
-          </tr></thead>
-          <tbody>
-            {payments.map((pm) => (
-              <tr key={pm.id}>
-                <td className="td money text-xs">
-                  {fmtDate(pm.received_date)}
-                  {isAdmin && (
-                    <button title="Delete payment (admin)" onClick={() => delPayment(pm)} className="ml-2 text-red-300 hover:text-red-600 align-middle">
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                </td>
-                <td className="td">
-                  <span className={`status-chip ${pm.payment_class === 'ADVANCE' ? 'bg-amber/20 text-amber' : 'bg-forest/15 text-forest'}`}>{pm.payment_class}</span>
-                </td>
-                <td className="td text-sm">{pm.method}</td>
-                <td className="td text-xs">{pm.reference || '—'}</td>
-                <td className="td text-xs">{pm.received_by || '—'}</td>
-                <td className="td money text-right font-semibold">{Number(pm.amount).toFixed(2)}</td>
-              </tr>
-            ))}
-            {payments.length === 0 && <tr><td className="td text-pine/50" colSpan={6}>No payments recorded.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 6. Historical Invoices */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Historical Invoices</div>
-        <table className="w-full">
-          <thead><tr>
-            <th className="th">Invoice No.</th>
-            <th className="th">Issued Date</th>
-            <th className="th text-right">Grand Total</th>
-            <th className="th text-right">Paid</th>
-            <th className="th text-right">Due</th>
-            <th className="th text-center">Status</th>
-            <th className="th text-right">Actions</th>
-          </tr></thead>
-          <tbody>
-            {invoices.map((inv) => (
-              <tr key={inv.id} className={inv.is_void ? 'opacity-60 bg-red-50' : ''}>
-                <td className="td font-semibold money">{inv.invoice_no}</td>
-                <td className="td text-xs">{fmtDate(inv.issued_at)}</td>
-                <td className="td text-right money font-semibold">{fmtBDT(inv.totals?.grand_total ?? 0)}</td>
-                <td className="td text-right money">{fmtBDT(inv.paid ?? 0)}</td>
-                <td className={`td text-right money font-semibold ${(inv.due ?? 0) > 0 ? 'text-red-600' : 'text-forest'}`}>{fmtBDT(inv.due ?? 0)}</td>
-                <td className="td text-center">
-                  {inv.is_void
-                    ? <span className="status-chip bg-red-100 text-red-600">VOID</span>
-                    : inv.status === 'PARTIAL'
-                      ? <span className="status-chip bg-amber/20 text-amber">PARTIAL</span>
-                      : <span className="status-chip bg-green-100 text-green-700">PAID</span>
-                  }
-                </td>
-                <td className="td text-right">
-                  <button className="btn-ghost !py-1 !px-2 text-xs mr-1" onClick={() => printHistoryInvoice(inv, 'BILL')}><Printer size={13} /> Bill</button>
-                  <button className="btn-ghost !py-1 !px-2 text-xs" onClick={() => printHistoryInvoice(inv, 'MUSHAK')}><Receipt size={13} /> Mushak</button>
-                </td>
-              </tr>
-            ))}
-            {invoices.length === 0 && (
-              <tr><td className="td text-pine/50 text-center" colSpan={7}>No historical invoices found.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  PARTNERS TAB                                                        */
-/* ------------------------------------------------------------------ */
-function PartnerAccounts({ res, reload, flash, userName }) {
-  const agency      = res.agencies
-  const shareholder = res.shareholders
-
-  const [redeemAmt, setRedeemAmt] = useState('')
-  const [agencies, setAgencies] = useState([])
-  const [shareholders, setShareholders] = useState([])
-  const [showAgencyPicker, setShowAgencyPicker] = useState(false)
-  const [showSharePicker, setShowSharePicker] = useState(false)
-  
-  useEffect(() => {
-    if (showAgencyPicker) supabase.from('agencies').select('id,name').order('name').then(({ data }) => setAgencies(data || []))
-  }, [showAgencyPicker])
-  useEffect(() => {
-    if (showSharePicker) supabase.from('shareholders').select('id,name').order('name').then(({ data }) => setShareholders(data || []))
-  }, [showSharePicker])
-  
-  const assignAgency = async (agencyId) => {
-    const { error } = await supabase.from('reservations').update({ agency_id: agencyId }).eq('id', res.id)
-    if (error) flash(error.message)
-    else { setShowAgencyPicker(false); reload(); flash('Agency assigned.') }
-  }
-  const assignShareholder = async (shareholderId) => {
-    const { error } = await supabase.from('reservations').update({ shareholder_id: shareholderId }).eq('id', res.id)
-    if (error) flash(error.message)
-    else { setShowSharePicker(false); reload(); flash('Shareholder assigned.') }
-  }
-  const addAgencyDue = async () => {
-    const amt = window.prompt('Enter amount to add to Agency Due:')
-    if (!amt || isNaN(Number(amt))) return
-    const { error } = await supabase.from('agencies')
-      .update({ due_balance: (agency?.due_balance || 0) + Number(amt) })
-      .eq('id', res.agency_id)
-    if (error) flash('Error updating agency due.')
-    else { reload(); flash('Agency due updated successfully.') }
-  }
-
-  const redeemShareholderBalance = async () => {
-    const amount = Number(redeemAmt)
-    if (!amount || amount <= 0)                              { flash('Please enter a valid amount to redeem.'); return }
-    if ((shareholder?.free_stay_balance || 0) < amount)     { flash('Insufficient shareholder balance.'); return }
-
-    const { error: chErr } = await supabase.from('folio_charges').insert({
-      reservation_id: res.id,
-      charge_type:    'SHAREHOLDER_REDEEM',
-      description:    `Redeemed ${fmtBDT(amount)} by ${shareholder?.name}`,
-      total:          -amount,
-      status:         'PAID',
-      charge_date:    todayISO(),
-      created_by:     userName || 'System',
-    })
-    if (chErr) { flash('Error recording redemption charge.'); return }
-
-    const { error: shErr } = await supabase.from('shareholders')
-      .update({ free_stay_balance: shareholder.free_stay_balance - amount })
-      .eq('id', res.shareholder_id)
-
-    if (shErr) flash('Error updating shareholder balance.')
-    else { setRedeemAmt(''); reload(); flash(`Successfully redeemed ${fmtBDT(amount)}.`) }
-  }
-
-  return (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="card p-5">
-        <h3 className="font-display font-semibold text-pine mb-3">Agency Due Management</h3>
-        <p className="text-lg font-bold">{agency?.name || 'No Agency Assigned'}</p>
-        <p className="text-sm text-pine/60 mb-4">Current Due: {fmtBDT(agency?.due_balance || 0)}</p>
-            {!agency && (
-              <button onClick={() => setShowAgencyPicker(true)} className="btn-ghost w-full mb-2">Assign Agency</button>
-            )}
-            {showAgencyPicker && (
-              <div className="border border-leaf rounded-lg p-2 mb-2 max-h-40 overflow-y-auto">
-                {agencies.length === 0 && <p className="text-xs text-pine/40 p-2">No agencies found.</p>}
-                {agencies.map((a) => (
-                  <button key={a.id} onClick={() => assignAgency(a.id)} className="block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-leaf/40">{a.name}</button>
-                ))}
-          </div>
-        )}
-        <button onClick={addAgencyDue} className="btn-primary w-full" disabled={!agency}>Add Due</button>
-        <button onClick={addAgencyDue} className="btn-primary w-full" disabled={!agency}>Add Due</button>
-      </div>
-      <div className="card p-5">
-        <h3 className="font-display font-semibold text-pine mb-3">Shareholder Redemption</h3>
-        <p className="text-lg font-bold">{shareholder?.name || 'No Shareholder Assigned'}</p>
-        <p className="text-sm text-forest mb-4">
-          Redeemable Balance: <span className="font-bold">{fmtBDT(shareholder?.free_stay_balance || 0)}</span>
-        </p>
-        {!shareholder && (
-          <button onClick={() => setShowSharePicker(true)} className="btn-ghost w-full mb-2">Assign Shareholder</button>
-        )}
-        {showSharePicker && (
-          <div className="border border-leaf rounded-lg p-2 mb-2 max-h-40 overflow-y-auto">
-            {shareholders.length === 0 && <p className="text-xs text-pine/40 p-2">No shareholders found.</p>}
-            {shareholders.map((s) => (
-              <button key={s.id} onClick={() => assignShareholder(s.id)} className="block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-leaf/40">{s.name}</button>
-            ))}
-          </div>
-        )}
-        <div className="space-y-3">          
-          <button
-            onClick={redeemShareholderBalance}
-            disabled={!shareholder || (shareholder?.free_stay_balance || 0) <= 0}
-            className="btn-amber w-full"
-          >
-            Redeem for Room
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
