@@ -115,7 +115,7 @@ export default function BookingCalendar({ openReservation, onNewReservation, onO
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button className="btn-ghost" onClick={() => onOpenReservations?.()}>Reservations</button>
-          <button className="btn-primary" onClick={() => onNewReservation?.()}><Plus size={16} /> New reservation query</button>
+          <button className="btn-primary" onClick={() => onNewReservation?.({ from_date: todayISO(), to_date: nextDay(todayISO()) })}><Plus size={16} /> New reservation query</button>
           <button className="btn-ghost !px-2" onClick={() => setYm(shiftMonth(ym, -1))}><ChevronLeft size={16} /></button>
           <input type="month" className="input !w-44" value={ym} onChange={(e) => setYm(e.target.value)} />
           <button className="btn-ghost !px-2" onClick={() => setYm(shiftMonth(ym, 1))}><ChevronRight size={16} /></button>
