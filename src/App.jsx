@@ -12,7 +12,7 @@ import Reservations from './pages/Reservations.jsx'
 import ReservationDetail from './pages/ReservationDetail.jsx'
 import BookingCalendar from './pages/BookingCalendar.jsx'
 import HousekeepingHub from './pages/HousekeepingHub.jsx'
-import RestaurantPOS from './pages/RestaurantPOS.jsx'
+import RestaurantPOS, { GuestPosKiosk } from './pages/RestaurantPOS.jsx'
 import Facilities from './pages/Facilities.jsx'
 import InventoryHub from './pages/InventoryHub.jsx'
 import VatCenter from './pages/VatCenter.jsx'
@@ -300,6 +300,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
               <RestaurantPOS userName={userName} role={role} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
+          <Route path="/kiosk/pos" element={<GuestPosKiosk />} />
           <Route path="/facilities" element={
             <GuardedRoute role={role} navId="facilities" privileges={privileges}>
               <Facilities userName={userName} isAdmin={isAdmin} />
@@ -444,6 +445,8 @@ function AppRoot() {
     if (!session) return <Login slug={slug} />
     return <Navigate to="/dashboard" replace />
   }
+
+  if (!session && location.pathname.startsWith('/kiosk/pos')) return <GuestPosKiosk />
 
   if (!session) return <Login />
 
