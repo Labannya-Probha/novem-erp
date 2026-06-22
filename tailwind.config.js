@@ -5,11 +5,11 @@ export default {
     extend: {
       colors: {
         forest: '#2E7D32',
-        pine: '#1B4D2E',
+        pine: '#1F1F1C',
         ink: '#20241F',
-        paper: '#FAFAF6',
-        leaf: '#E8F0E4',
-        amber: '#C9802D',
+        paper: '#F7F5F2',
+        leaf: '#E5DFD6',
+        amber: '#C89B5C',
       },
       fontFamily: {
         display: ['Fraunces', 'serif'],
