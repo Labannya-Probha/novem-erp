@@ -844,6 +844,7 @@ const WIPE_MODULES = [
       { id: 'quote_no_seq',      dependsOn: ['quotations'] },
       { id: 'guest_bill_seq',    dependsOn: ['invoices'] },
       { id: 'mushak_serial_seq', dependsOn: ['vat_sales_register'] },
+      { id: 'cust_id_seq',       dependsOn: ['guests'] },
     ],
   },
   {
