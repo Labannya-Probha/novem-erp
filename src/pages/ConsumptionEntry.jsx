@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
 import { Plus, Trash2, Save, RotateCcw, Search, ClipboardList } from 'lucide-react'
+import KPICards from '../components/KPICards.jsx'
 
 const LOCATIONS = ['KITCHEN', 'BAR', 'STORE', 'HOUSEKEEPING', 'MAINTENANCE', 'FRONT_OFFICE', 'OTHER']
 const REASONS = ['INTERNAL_USE', 'WASTAGE', 'COMPLIMENTARY', 'STAFF_MEAL', 'BREAKAGE', 'OTHER']
