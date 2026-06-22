@@ -63,7 +63,7 @@ export default function Login({ slug }) {
 
   if (slug && notFound) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-pine">
+      <div className="min-h-screen flex items-center justify-center bg-paper">
         <div className="card w-full max-w-sm p-8 text-center">
           <h1 className="font-display text-xl font-bold text-pine mb-2">Property not found</h1>
           <p className="text-sm text-pine/60">No active property matches this link. Please check the URL or contact your administrator.</p>
@@ -79,7 +79,7 @@ export default function Login({ slug }) {
   const logoUrl = (company?.logo_url || FALLBACK_LOGO)
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-pine relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-paper relative overflow-hidden">
       {company?.login_background_video_url ? (
         <>
           <video
@@ -88,20 +88,20 @@ export default function Login({ slug }) {
           >
             <source src={company.login_background_video_url} type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-black/55" />
+          <div className="absolute inset-0 bg-black/35" />
         </>
       ) : (
         <div
-          className="absolute inset-0 opacity-[0.06]"
-          style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 15px, #fff 28px)' }}
+          className="absolute inset-0 opacity-[0.35]"
+          style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(46,125,50,0.08), transparent 30%), linear-gradient(180deg, rgba(255,255,255,0.55), rgba(247,245,242,0.95))' }}
         />
       )}
 
-      <div className="card w-full max-w-sm p-8 relative shadow-2xl">
+      <div className="card w-full max-w-sm p-8 relative shadow-xl border border-leaf/80">
 
         {/* Logo */}
         <div className="flex flex-col items-center text-center mb-7">
-          <div className="w-24 h-24 rounded-2xl mb-4 overflow-hidden shadow-md bg-white flex items-center justify-center">
+          <div className="w-24 h-24 rounded-2xl mb-4 overflow-hidden shadow-sm bg-white flex items-center justify-center ring-1 ring-leaf/70">
             {!imgFailed ? (
               <img
                 src={logoUrl}
@@ -121,7 +121,7 @@ export default function Login({ slug }) {
           <p className="text-sm text-pine/60 mt-1">Welcome to {propertyName}</p>
         </div>
 
-        <div className="border-t border-leaf mb-6" />
+        <div className="border-t border-leaf/80 mb-6" />
 
         <div className="space-y-4">
           <div>
