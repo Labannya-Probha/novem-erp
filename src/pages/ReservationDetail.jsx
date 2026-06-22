@@ -1836,6 +1836,33 @@ function BillingsAndCheckOutTab({
     if (invErr) { flash(`Failed to generate invoice: ${invErr.message}`); return }
 
     await setStatus('CHECKED_OUT', { checked_out_at: issuedAt })
+
+    // ── Auto-earn loyalty points: 1 pt per ৳100 room charge ──
+    if (res.primary_guest_id) {
+      try {
+        const { data: earnedPts } = await supabase
+          .rpc('calculate_loyalty_points', { p_reservation_id: res.id })
+        if (earnedPts > 0) {
+          const { data: guestRow } = await supabase
+            .from('guests').select('loyalty_points').eq('id', res.primary_guest_id).single()
+          const currentPts  = Number(guestRow?.loyalty_points || 0)
+          const newBalance  = currentPts + Number(earnedPts)
+          await supabase.from('guests')
+            .update({ loyalty_points: newBalance }).eq('id', res.primary_guest_id)
+          await supabase.from('loyalty_ledger').insert({
+            guest_id:       res.primary_guest_id,
+            reservation_id: res.id,
+            change:         Number(earnedPts),
+            balance_after:  newBalance,
+            reason:         'STAY',
+            created_by:     userName,
+          })
+          await supabase.from('reservations')
+            .update({ loyalty_points_earned: Number(earnedPts) }).eq('id', res.id)
+        }
+      } catch(e) { console.error('Loyalty points earn failed (non-fatal):', e) }
+    }
+
     await reload()
     flash(
       due > 0
