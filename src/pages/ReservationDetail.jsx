@@ -1185,11 +1185,20 @@ function Overview({
               </div>
             </fieldset>
 
-            {/* Terms & Conditions */}
+            {/* Terms & Conditions — auto-pulled, read-only */}
             <fieldset className="border border-leaf rounded-xl p-4 mb-5">
               <legend className="text-xs font-bold text-pine/60 px-2 uppercase tracking-wide">Terms & Conditions</legend>
-              <textarea className="input" rows={4} value={editForm.terms_conditions} onChange={e => setEditForm({...editForm, terms_conditions: e.target.value})} placeholder="Default terms from Settings will be used if left blank." />
-              <p className="text-xs text-pine/50 mt-1">Default from company Settings. Edits apply to this reservation only.</p>
+              {(editForm.terms_conditions || company?.terms_conditions) ? (
+                <div className="text-sm text-pine/70 bg-leaf/20 rounded-lg p-3 min-h-[72px] max-h-48 overflow-y-auto">
+                  {/<[a-z][\s\S]*>/i.test(editForm.terms_conditions || company?.terms_conditions || '')
+                    ? <div dangerouslySetInnerHTML={{ __html: editForm.terms_conditions || company?.terms_conditions }} />
+                    : <div style={{ whiteSpace: 'pre-wrap' }}>{editForm.terms_conditions || company?.terms_conditions}</div>
+                  }
+                </div>
+              ) : (
+                <p className="text-sm text-pine/40 italic py-3">No terms configured. Go to Settings → Company to add default terms.</p>
+              )}
+              <p className="text-xs text-pine/45 mt-1.5">Auto-pulled from company Settings. To change, go to <b>Settings → Branding → Terms & Conditions</b>.</p>
             </fieldset>
 
             <div className="flex flex-wrap gap-3 justify-end border-t border-leaf pt-4">
