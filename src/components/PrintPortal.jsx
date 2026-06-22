@@ -89,14 +89,15 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         }
         #print-footer {
           display: block !important;
-          position: ${type === 'thermal' ? 'relative' : 'fixed'} !important;
-          bottom: ${type === 'thermal' ? '0' : '6mm'} !important;
+          position: relative !important;
+          bottom: unset !important;
           width: 100% !important;
           text-align: center !important;
           font-family: 'Inter', sans-serif !important;
           font-size: 8px !important;
           color: var(--print-muted) !important;
           page-break-after: avoid !important;
+          margin-top: 10mm !important;
         }
       }
     `
