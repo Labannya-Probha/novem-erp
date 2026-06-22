@@ -25,7 +25,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
   const [foCloseRow, setFoCloseRow] = useState(null)
   const [dayMsg, setDayMsg] = useState('')
   const today = todayISO()
-  const canCloseFrontDay = isAdmin || role === 'MANAGER' || role === 'FRONT_OFFICE'
+  const canCloseFrontDay = isAdmin || role === 'MANAGER' || role === 'FRONT_OFFICE' || role === 'ACCOUNTS'
   const canOpenDay = role === 'SUPERUSER'
   const flashDay = (m) => { setDayMsg(m); setTimeout(() => setDayMsg(''), 4000) }
 
@@ -82,7 +82,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
   }
 
   const closeFrontOfficeDay = async () => {
-    if (!canCloseFrontDay) { flashDay('Front Office day-close requires Front Office, Manager, Admin or SUPERUSER access.'); return }
+    if (!canCloseFrontDay) { flashDay('Front Office day-close requires Front Office, Accounts, Manager, Admin or SUPERUSER access.'); return }
     setDayBusy(true)
     const payload = { close_date: today, type: 'RESERVATION', closed_by: userName, closed_at: new Date().toISOString() }
     const { error: delErr } = await supabase.from('day_closes').delete().eq('close_date', today).eq('type', 'RESERVATION')
