@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase, SUPABASE_CONFIG } from '../supabase'
 import { fmtBDT, todayISO, setCurrency } from '../lib/helpers'
 import { ROLES, ROLE_LABELS } from '../lib/roles'
@@ -8,15 +9,24 @@ import {
   Eye, EyeOff, ChevronDown, ChevronUp, Pencil,
 } from 'lucide-react'
 
+export const SETTINGS_SECTIONS = [
+  { id: 'my-account', label: 'My Account' },
+  { id: 'branding', label: 'Branding', adminOnly: true },
+  { id: 'tax', label: 'Tax Rates' },
+  { id: 'allowance', label: 'Allowance Configuration', superuserOnly: true },
+  { id: 'role-permissions', label: 'Role Permissions', superuserOnly: true },
+  { id: 'staff', label: 'Staff Management' },
+  { id: 'data-system', label: 'Data & System', superuserOnly: true },
+]
+
 /* ------------------------------------------------------------------ */
 /*  COLLAPSIBLE SECTION wrapper — click header to expand/collapse       */
 /* ------------------------------------------------------------------ */
-function CollapsibleSection({ title, icon: Icon, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen)
+function CollapsibleSection({ title, icon: Icon, children, open, onToggle }) {
   return (
     <div>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={onToggle}
         className="w-full flex items-center justify-between py-2 px-1 mb-1 group"
       >
         <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-pine/50 group-hover:text-pine/80 transition-colors">
@@ -34,9 +44,12 @@ function CollapsibleSection({ title, icon: Icon, children, defaultOpen = false }
 /*  ROOT — role-gated entry point                                       */
 /* ------------------------------------------------------------------ */
 export default function Settings({ userName, role, isAdmin, reloadCompany }) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const isSuperuser = role === 'SUPERUSER'
   const isAdminPlus = isSuperuser || isAdmin          // Admin or above
   const canManage   = isAdminPlus || role === 'MANAGER'
+  const [activeSection, setActiveSection] = useState(null)
 
   if (!canManage) {
     return (
@@ -49,40 +62,48 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
     )
   }
 
+  const sections = [
+    { id: 'my-account', title: 'My Account', icon: KeyRound, visible: true, content: <MyAccountCard userName={userName} /> },
+    { id: 'branding', title: 'Branding', icon: Image, visible: isAdminPlus, content: <BrandingCard reloadCompany={reloadCompany} /> },
+    { id: 'tax', title: 'Tax Rates', visible: true, content: <TaxCard /> },
+    { id: 'allowance', title: 'Allowance Configuration', icon: Percent, visible: isSuperuser, content: <AllowanceCard /> },
+    { id: 'role-permissions', title: 'Role Permissions', icon: ShieldCheck, visible: isSuperuser, content: <RolePrivilegesCard /> },
+    { id: 'staff', title: 'Staff Management', icon: Users, visible: true, content: <StaffCard isAdminPlus={isAdminPlus} isSuperuser={isSuperuser} currentUserName={userName} /> },
+    { id: 'data-system', title: 'Data & System', icon: AlertTriangle, visible: isSuperuser, content: <DataWipeCard /> },
+  ].filter((s) => s.visible)
+
+  useEffect(() => {
+    const requested = new URLSearchParams(location.search).get('section')
+    if (requested && sections.some((s) => s.id === requested)) {
+      setActiveSection(requested)
+      return
+    }
+    if (!activeSection || !sections.some((s) => s.id === activeSection)) {
+      setActiveSection(sections[0]?.id || null)
+    }
+  }, [location.search, activeSection, isSuperuser, isAdminPlus])
+
+  const openSection = (sectionId) => {
+    setActiveSection(sectionId)
+    navigate(`/settings?section=${sectionId}`, { replace: true })
+  }
+
   return (
     <div>
       <h1 className="font-display text-2xl font-bold text-pine mb-1">Settings</h1>
       <p className="text-sm text-pine/60 mb-6">Branding, tax rates, staff and system configuration.</p>
       <div className="space-y-4">
-        <CollapsibleSection title="My Account" icon={KeyRound} defaultOpen>
-          <MyAccountCard userName={userName} />
-        </CollapsibleSection>
-        {isAdminPlus && (
-          <CollapsibleSection title="Branding" icon={Image} defaultOpen>
-            <BrandingCard reloadCompany={reloadCompany} />
+        {sections.map((section) => (
+          <CollapsibleSection
+            key={section.id}
+            title={section.title}
+            icon={section.icon}
+            open={activeSection === section.id}
+            onToggle={() => openSection(section.id)}
+          >
+            {section.content}
           </CollapsibleSection>
-        )}
-        <CollapsibleSection title="Tax Rates" defaultOpen>
-          <TaxCard />
-        </CollapsibleSection>
-        {isSuperuser && (
-          <CollapsibleSection title="Allowance Configuration" icon={Percent}>
-            <AllowanceCard />
-          </CollapsibleSection>
-        )}
-        {isSuperuser && (
-          <CollapsibleSection title="Role Permissions" icon={ShieldCheck}>
-            <RolePrivilegesCard />
-          </CollapsibleSection>
-        )}
-        <CollapsibleSection title="Staff Management" icon={Users} defaultOpen>
-          <StaffCard isAdminPlus={isAdminPlus} isSuperuser={isSuperuser} currentUserName={userName} />
-        </CollapsibleSection>
-        {isSuperuser && (
-          <CollapsibleSection title="Data & System" icon={AlertTriangle}>
-            <DataWipeCard />
-          </CollapsibleSection>
-        )}
+        ))}
       </div>
     </div>
   )
