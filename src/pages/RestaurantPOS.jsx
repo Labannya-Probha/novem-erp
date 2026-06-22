@@ -6,8 +6,8 @@ import { PosReceipt, KitchenTicket } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
 import GuestPicker from '../components/GuestPicker.jsx'
 import { Plus, Minus, Trash2, Printer, ChefHat, Banknote, BedDouble, Search, Save, XCircle, RotateCcw, Receipt, Clock, FileText } from 'lucide-react'
-import KPICards from '../components/KPICards.jsx'
-const TABS = ['New Order', 'Orders', 'Day Close']
+
+const TABS = ['Orders', 'Menu', 'Day Close']
 const PAYMENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
 
 // Cash rounding logic: >= 0.50 round up, < 0.50 round down
@@ -23,13 +23,14 @@ const applyCashRounding = (amount) => {
   }
 }
 
-export default function RestaurantPOS({ userName, isAdmin }) {
-  const [tab, setTab] = useState('New Order')
+export default function RestaurantPOS({ userName, isAdmin, role }) {
+  const [tab, setTab] = useState('Orders')
   const [taxConfig, setTaxConfig] = useState([])
   const [company, setCompany] = useState(null)
   const [cats, setCats] = useState([])
   const [items, setItems] = useState([])
   const [editOrder, setEditOrder] = useState(null)
+  const [showOrderBuilder, setShowOrderBuilder] = useState(false)
   const [printDoc, setPrintDoc] = useState(null)
   const [msg, setMsg] = useState('')
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
@@ -48,7 +49,8 @@ export default function RestaurantPOS({ userName, isAdmin }) {
   const resumeOrder = async (order) => {
     const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', order.id)
     setEditOrder({ order, items: oi || [] })
-    setTab('New Order')
+    setShowOrderBuilder(true)
+    setTab('Orders')
   }
 
   return (
@@ -62,18 +64,25 @@ export default function RestaurantPOS({ userName, isAdmin }) {
       {msg && <div className="mb-4 px-4 py-2 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
       <div className="flex gap-1 border-b border-leaf mb-6 overflow-x-auto">
         {TABS.map((t) => (
-          <button key={t} onClick={() => { setTab(t); if (t !== 'New Order') setEditOrder(null) }} className={`px-4 py-2 text-sm font-semibold rounded-t-lg whitespace-nowrap ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>
+          <button key={t} onClick={() => { setTab(t); if (t !== 'Orders') { setEditOrder(null); setShowOrderBuilder(false) } }} className={`px-4 py-2 text-sm font-semibold rounded-t-lg whitespace-nowrap ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>
             {t}
           </button>
         ))}
-        <span className="ml-auto text-xs text-pine/40 self-center pr-1 hidden sm:inline">Menu items &amp; recipes: Settings → Menu Management</span>
       </div>
-      {tab === 'New Order' && <OrderBuilder key={editOrder?.order?.id || 'new'} cats={cats} items={items} taxConfig={taxConfig} userName={userName} existing={editOrder} flash={flash} setPrintDoc={setPrintDoc} onDone={(doc) => { setEditOrder(null); if (doc) setPrintDoc(doc); setTab('Orders') }} />}
-      {tab === 'Orders' && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} isAdmin={isAdmin} userName={userName} />}
-      {tab === 'Day Close' && <DayClose flash={flash} isAdmin={isAdmin} userName={userName} />}
-      {printDoc?.type === 'RECEIPT' && (<PrintPortal title={`Restaurant Bill — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)}><PosReceipt order={printDoc.order} items={printDoc.items} company={company} mushakNo={printDoc.mushakNo} /></PrintPortal>)}
-      {printDoc?.type === 'KOT' && (<PrintPortal title={`Kitchen Order — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)}><KitchenTicket order={printDoc.order} items={printDoc.items} /></PrintPortal>)}
-      {printDoc?.type === 'MUSHAK' && (<PrintPortal title={`Mushak-6.3 — ${printDoc.invoice.invoice_no}`} onClose={() => setPrintDoc(null)}><Mushak63 invoice={printDoc.invoice} res={null} company={company} refNo={printDoc.refNo} /></PrintPortal>)}
+      {tab === 'Orders' && showOrderBuilder && (
+        <div className="mb-3">
+          <button className="btn-ghost !py-1" onClick={() => { setShowOrderBuilder(false); setEditOrder(null) }}>
+            <RotateCcw size={13} /> Back to orders
+          </button>
+        </div>
+      )}
+      {tab === 'Orders' && showOrderBuilder && <OrderBuilder key={editOrder?.order?.id || 'new'} cats={cats} items={items} taxConfig={taxConfig} userName={userName} existing={editOrder} flash={flash} setPrintDoc={setPrintDoc} onDone={(doc) => { setEditOrder(null); setShowOrderBuilder(false); if (doc) setPrintDoc(doc); setTab('Orders') }} />}
+      {tab === 'Orders' && !showOrderBuilder && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} isAdmin={isAdmin} userName={userName} onNewOrder={() => { setEditOrder(null); setShowOrderBuilder(true) }} />}
+      {tab === 'Menu' && <MenuManager cats={cats} items={items} reload={loadMenu} isAdmin={isAdmin} />}
+      {tab === 'Day Close' && <DayClose flash={flash} isAdmin={isAdmin} userName={userName} role={role} />}
+      {printDoc?.type === 'RECEIPT' && (<PrintPortal title={`Restaurant Bill — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}><PosReceipt order={printDoc.order} items={printDoc.items} company={company} mushakNo={printDoc.mushakNo} /></PrintPortal>)}
+      {printDoc?.type === 'KOT' && (<PrintPortal title={`Kitchen Order — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}><KitchenTicket order={printDoc.order} items={printDoc.items} /></PrintPortal>)}
+      {printDoc?.type === 'MUSHAK' && (<PrintPortal title={`Mushak-6.3 — ${printDoc.invoice.invoice_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}><Mushak63 invoice={printDoc.invoice} res={null} company={company} refNo={printDoc.refNo} /></PrintPortal>)}
     </div>
   )
 }
@@ -199,7 +208,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   try {
     const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
     
-    // folio_charges এ invoice_type যোগ করা হয়েছে
+    // folio_charges এ invoice_type যোগ করা হয়েছে
     const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ 
       reservation_id: order.reservation_id, 
       charge_date: todayISO(), 
@@ -244,7 +253,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
               <div className="money text-forest text-sm mt-1">{fmtBDT(mi.price)}</div>
             </button>
           ))}
-          {visible.length === 0 && (<div className="col-span-full card p-6 text-center text-sm text-pine/50">No menu items match — add or check dishes in <b>Settings → Menu Management</b>.</div>)}
+          {visible.length === 0 && (<div className="col-span-full card p-6 text-center text-sm text-pine/50">No menu items yet — add your dishes in the <b>Menu</b> tab.</div>)}
         </div>
       </div>
       <div className="xl:col-span-2 space-y-3">
@@ -327,7 +336,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   )
 }
 
-function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userName }) {
+function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userName, onNewOrder }) {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('TODAY')
 
@@ -377,7 +386,8 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
       </div>
       <div className="flex gap-2 mb-3">
         {['TODAY', 'OPEN', 'ALL'].map((f) => (<button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${filter === f ? 'bg-pine text-white' : 'bg-white border border-leaf text-pine/70'}`}>{f}</button>))}
-        <button className="btn-ghost !py-1 ml-auto" onClick={load}><RotateCcw size={13} /> Refresh</button>
+        <button className="btn-primary !py-1 ml-auto" onClick={() => onNewOrder?.()}><Plus size={14} /> New Order</button>
+        <button className="btn-ghost !py-1" onClick={load}><RotateCcw size={13} /> Refresh</button>
       </div>
       <div className="card overflow-hidden">
         <table className="w-full">
@@ -415,20 +425,91 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
   )
 }
 
-function DayClose({ flash, isAdmin, userName }) {
+function MenuManager({ cats, items, reload, isAdmin }) {
+  const [nc, setNc] = useState('')
+  const [ni, setNi] = useState({ category_id: '', name: '', price: '' })
+
+  const addCat = async () => {
+    if (!nc.trim()) return
+    await supabase.from('menu_categories').insert({ name: nc.trim(), sort_order: cats.length + 1 })
+    setNc(''); reload()
+  }
+  const toggleCat = async (c) => { await supabase.from('menu_categories').update({ is_active: !c.is_active }).eq('id', c.id); reload() }
+  const addItem = async () => {
+    if (!ni.name.trim() || ni.price === '' || !ni.category_id) return
+    await supabase.from('menu_items').insert({ category_id: ni.category_id, name: ni.name.trim(), price: +ni.price })
+    setNi({ category_id: ni.category_id, name: '', price: '' }); reload()
+  }
+  const updatePrice = async (it, price) => {
+    if (price === '' || +price === +it.price) return
+    await supabase.from('menu_items').update({ price: +price }).eq('id', it.id); reload()
+  }
+  const toggleItem = async (it) => { await supabase.from('menu_items').update({ is_active: !it.is_active }).eq('id', it.id); reload() }
+  const delItem = async (it) => { await supabase.from('menu_items').delete().eq('id', it.id); reload() }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="card p-5">
+        <h3 className="font-display font-semibold text-pine mb-3">Categories</h3>
+        {isAdmin ? (
+          <div className="flex gap-2 mb-3">
+            <input className="input flex-1" placeholder="New category" value={nc} onChange={(e) => setNc(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCat()} />
+            <button className="btn-primary" onClick={addCat}><Plus size={15} /></button>
+          </div>
+        ) : (
+          <p className="text-xs text-pine/50 mb-3">Menu changes require administrator access.</p>
+        )}
+        {cats.map((c) => (
+          <div key={c.id} className="flex justify-between items-center py-1.5 border-b border-leaf/60 text-sm">
+            <span className="font-medium">{c.name}</span>
+            <button onClick={() => isAdmin && toggleCat(c)} disabled={!isAdmin} className={`status-chip ${c.is_active ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-600'} ${!isAdmin ? 'cursor-default' : ''}`}>{c.is_active ? 'ACTIVE' : 'OFF'}</button>
+          </div>
+        ))}
+      </div>
+      <div className="card p-5 lg:col-span-2">
+        <h3 className="font-display font-semibold text-pine mb-3">Menu items</h3>
+        {!isAdmin && <p className="text-xs text-pine/50 mb-3">Read-only — ask an administrator to change items or prices.</p>}
+        {isAdmin && <div className="grid grid-cols-4 gap-2 mb-4 items-end">
+          <div><label className="label">Category</label><select className="input" value={ni.category_id} onChange={(e) => setNi({ ...ni, category_id: e.target.value })}><option value="">Select…</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+          <div><label className="label">Item name</label><input className="input" value={ni.name} onChange={(e) => setNi({ ...ni, name: e.target.value })} /></div>
+          <div><label className="label">Price ৳</label><input type="number" className="input money" value={ni.price} onChange={(e) => setNi({ ...ni, price: e.target.value })} /></div>
+          <button className="btn-primary justify-center" onClick={addItem}><Plus size={15} /> Add item</button>
+        </div>}
+        <table className="w-full">
+          <thead><tr><th className="th">Item</th><th className="th">Category</th><th className="th text-right">Price (editable)</th><th className="th">Status</th><th className="th"></th></tr></thead>
+          <tbody>
+            {items.map((it) => (
+              <tr key={it.id}>
+                <td className="td font-medium text-sm">{it.name}</td>
+                <td className="td text-xs text-pine/60">{cats.find((c) => c.id === it.category_id)?.name || '—'}</td>
+                <td className="td text-right">{isAdmin ? (<input type="number" defaultValue={it.price} onBlur={(e) => updatePrice(it, e.target.value)} className="input !w-28 !py-1 money text-right inline-block" />) : (<span className="money">{Number(it.price).toFixed(2)}</span>)}</td>
+                <td className="td"><button onClick={() => isAdmin && toggleItem(it)} disabled={!isAdmin} className={`status-chip ${it.is_active ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-600'} ${!isAdmin ? 'cursor-default' : ''}`}>{it.is_active ? 'ACTIVE' : 'OFF'}</button></td>
+                <td className="td text-right">{isAdmin && <button onClick={() => delItem(it)} className="text-red-300 hover:text-red-600"><Trash2 size={14} /></button>}</td>
+              </tr>
+            ))}
+            {items.length === 0 && <tr><td className="td text-pine/50" colSpan={5}>No items yet — add your menu above.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function DayClose({ flash, isAdmin, userName, role }) {
   const [day, setDay] = useState(todayISO())
   const [restOrders, setRestOrders] = useState([])
-  const [resOrders, setResOrders] = useState([])
+  const [closedRow, setClosedRow] = useState(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
+  const canOpenDay = role === 'SUPERUSER'
 
   const load = async () => {
     const dayStart = `${day}T00:00:00+06:00`
     const dayEnd = `${day}T23:59:59+06:00`
-    const { data: rest } = await supabase.from('pos_orders').select('*').is('reservation_id', true).gte('created_at', dayStart).lte('created_at', dayEnd)
-    const { data: res } = await supabase.from('pos_orders').select('*').not('reservation_id', 'is', null).gte('created_at', dayStart).lte('created_at', dayEnd)
+    const { data: rest } = await supabase.from('pos_orders').select('*').is('reservation_id', null).gte('created_at', dayStart).lte('created_at', dayEnd)
+    const { data: close } = await supabase.from('day_closes').select('*').eq('close_date', day).eq('type', 'RESTAURANT').maybeSingle()
     setRestOrders(rest || [])
-    setResOrders(res || [])
+    setClosedRow(close || null)
   }
   useEffect(() => { load() }, [day])
 
@@ -442,16 +523,23 @@ function DayClose({ flash, isAdmin, userName }) {
     try {
       const closeData = { close_date: day, closed_by: userName, closed_at: new Date().toISOString() }
       const restTotal = calcTotal(restOrders, 'SETTLED')
+      await supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'RESTAURANT')
       const { error: rError } = await supabase.from('day_closes').insert({ ...closeData, type: 'RESTAURANT', settled_amount: restTotal, settled_orders: restOrders.filter((o) => o.status === 'SETTLED').length })
       if (rError) throw rError
-      const resTotal = calcTotal(resOrders, 'CHARGED_TO_ROOM')
-      const { error: resError } = await supabase.from('day_closes').insert({ ...closeData, type: 'RESERVATION', charged_amount: resTotal, charged_orders: resOrders.filter((o) => o.status === 'CHARGED_TO_ROOM').length })
-      if (resError) throw resError
-      flash(`Day closed for ${day} — Restaurant ৳${restTotal.toFixed(2)} + Reservation ৳${resTotal.toFixed(2)}`)
+      flash(`Day closed for ${day} — Restaurant ৳${restTotal.toFixed(2)}`)
       setShowConfirm(false)
       load()
     } catch (e) { flash(e.message) }
     setBusy(false)
+  }
+
+  const openDay = async () => {
+    if (!canOpenDay) { flash('Only SUPERUSER can open a closed day.'); return }
+    setBusy(true)
+    const { error } = await supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'RESTAURANT')
+    setBusy(false)
+    if (error) flash(error.message)
+    else { flash(`Day opened for ${day} — Restaurant.`); load() }
   }
 
   return (
@@ -461,7 +549,7 @@ function DayClose({ flash, isAdmin, userName }) {
         <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className="input" />
         <button className="btn-ghost !py-1" onClick={load}><RotateCcw size={14} /> Refresh</button>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="card p-5">
           <h3 className="font-display font-semibold text-forest mb-3 flex items-center gap-2"><Receipt size={18} /> Restaurant Orders (Walk-in)</h3>
           <div className="space-y-2 text-sm mb-4">
@@ -480,39 +568,28 @@ function DayClose({ flash, isAdmin, userName }) {
             {restOrders.length === 0 && <p className="text-xs text-pine/50 py-4">No orders for this day.</p>}
           </div>
         </div>
-        <div className="card p-5">
-          <h3 className="font-display font-semibold text-pine mb-3 flex items-center gap-2"><BedDouble size={18} /> Reservation Orders (In-house)</h3>
-          <div className="space-y-2 text-sm mb-4">
-            <div className="flex justify-between"><span>Total charged to room:</span><span className="font-bold money">{fmtBDT(calcTotal(resOrders, 'CHARGED_TO_ROOM'))}</span></div>
-            <div className="flex justify-between"><span>Charged orders:</span><span>{resOrders.filter((o) => o.status === 'CHARGED_TO_ROOM').length}</span></div>
-            <div className="flex justify-between"><span>Settled (paid instantly):</span><span className="text-forest">{resOrders.filter((o) => o.status === 'SETTLED').length}</span></div>
-          </div>
-          <div className="max-h-64 overflow-auto space-y-1">
-            {resOrders.map((o) => (
-              <div key={o.id} className="flex justify-between text-xs py-1 border-b border-leaf/30">
-                <span className="font-medium">{o.order_no}</span>
-                <span className="money">{Number(o.total).toFixed(2)}</span>
-                <span className={`status-chip text-xs ${o.status === 'CHARGED_TO_ROOM' ? 'bg-pine/15 text-pine' : 'bg-forest/15 text-forest'}`}>{o.status}</span>
-              </div>
-            ))}
-            {resOrders.length === 0 && <p className="text-xs text-pine/50 py-4">No orders for this day.</p>}
-          </div>
-        </div>
       </div>
       {isAdmin && (
         <div className="card p-5 bg-amber/5 border border-amber/20">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="font-semibold text-amber">Close Day</h3>
-              <p className="text-xs text-pine/60 mt-1">This will create a day close record for both Restaurant and Reservation. Cannot be undone.</p>
+              <p className="text-xs text-pine/60 mt-1">This creates a day close record for Restaurant POS only.</p>
             </div>
             <button className="btn-amber" onClick={() => setShowConfirm(true)} disabled={busy}><Clock size={16} /> Close {day}</button>
           </div>
+          {closedRow && <p className="text-xs text-pine/60 mt-2">Closed by {closedRow.closed_by || '—'} at {fmtDate(closedRow.closed_at || closedRow.created_at || day)}.</p>}
+          {canOpenDay && closedRow && (
+            <div className="mt-3">
+              <button className="btn-ghost !py-1 text-red-600" onClick={openDay} disabled={busy}>
+                <XCircle size={14} /> Day Open (SUPERUSER)
+              </button>
+            </div>
+          )}
           {showConfirm && (
             <div className="mt-4 p-3 bg-white rounded border border-amber flex gap-3 items-center">
               <p className="text-sm flex-1">
-                <span className="font-bold">Restaurant:</span> {fmtBDT(calcTotal(restOrders, 'SETTLED'))} settled<br />
-                <span className="font-bold">Reservation:</span> {fmtBDT(calcTotal(resOrders, 'CHARGED_TO_ROOM'))} charged to room
+                <span className="font-bold">Restaurant:</span> {fmtBDT(calcTotal(restOrders, 'SETTLED'))} settled
               </p>
               <button className="btn-primary !py-1" onClick={closeDay} disabled={busy}>Confirm</button>
               <button className="btn-ghost !py-1" onClick={() => setShowConfirm(false)} disabled={busy}>Cancel</button>
