@@ -23,10 +23,12 @@ import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
+import MenuManagement from './pages/MenuManagement.jsx'
+import ConsumptionEntry from './pages/ConsumptionEntry.jsx'
 import {
   Leaf, LayoutDashboard, CalendarRange, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
   FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, Building2,
-  Menu, X, ListChecks,
+  Menu, X, ListChecks, ChefHat, ClipboardList,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -58,6 +60,7 @@ const NAV_GROUPS = [
   ]},
   { title: 'Inventory', items: [
     { id: 'inventory', label: 'Inventory', icon: Boxes },
+    { id: 'consumption', label: 'Consumption Entry', icon: ClipboardList },
   ]},
   { title: 'HR & Admin', items: [
     { id: 'hr', label: 'HR & Office', icon: Users },
@@ -68,6 +71,7 @@ const NAV_GROUPS = [
   { title: 'System', items: [
     { id: 'cms', label: 'Configuration', icon: Building2 },
     { id: 'settings', label: 'Settings', icon: Settings2 },
+    { id: 'menu-management', label: 'Menu Management', icon: ChefHat },
   ]},
 ]
 
@@ -249,6 +253,16 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
           <Route path="/tasks" element={
             <GuardedRoute role={role} navId="tasks" privileges={privileges}>
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} />
+            </GuardedRoute>
+          } />
+          <Route path="/consumption" element={
+            <GuardedRoute role={role} navId="consumption" privileges={privileges}>
+              <ConsumptionEntry userName={userName} isAdmin={isAdmin} />
+            </GuardedRoute>
+          } />
+          <Route path="/menu-management" element={
+            <GuardedRoute role={role} navId="menu-management" privileges={privileges}>
+              <MenuManagement isAdmin={isAdmin} />
             </GuardedRoute>
           } />
           <Route path="/cms" element={
