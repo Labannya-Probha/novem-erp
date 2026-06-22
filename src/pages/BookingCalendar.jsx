@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, todayISO } from '../lib/helpers'
 import { CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react'
+import KPICards from '../components/KPICards.jsx'
 
 const DAY_W = 34
 const monthDays = (ym) => {
