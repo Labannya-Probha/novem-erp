@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, rateFor, computeCharge, exportXLSX } from '../lib/helpers'
+import KPICards from '../components/KPICards.jsx'
 import PrintPortal from '../components/PrintPortal.jsx'
 import { MoonStar, BedDouble, UserX, CheckCircle2, FileDown, BookOpenCheck, Printer, XCircle } from 'lucide-react'
 
@@ -38,19 +39,30 @@ export default function NightAudit({ userName, isAdmin, role }) {
       supabase.from('night_audits').select('*').eq('audit_date', auditDate).maybeSingle(),
       supabase.from('day_closes').select('*').eq('close_date', auditDate).in('type', ['RESERVATION', 'RESTAURANT']),
     ])
-    setInHouse(ih.data || []); setNoShows(ns.data || []); setPostedToday(fc.data || [])
+    const inHouseRows = ih.data || []
+    setInHouse(inHouseRows); setNoShows(ns.data || []); setPostedToday(fc.data || [])
     setTaxConfig(tc.data || []); setAudits(na.data || []); setExisting(ex.data || null)
     setCloseMarks(dc.data || [])
-    await buildSummary()
+    await buildSummary(inHouseRows)
   }
 
-  const buildSummary = async () => {
-    const [fc, pay, posWalk, facWalk] = await Promise.all([
+  const buildSummary = async (inHouseRows = inHouse) => {
+    const inHouseIds = (inHouseRows || []).map((r) => r.id)
+    const [fc, pay, posWalk, facWalk, invAll, folioAll, payAll] = await Promise.all([
       supabase.from('folio_charges').select('*').eq('charge_date', auditDate),
       supabase.from('payments').select('*').eq('received_date', auditDate),
       supabase.from('pos_orders').select('*').eq('status', 'SETTLED').is('reservation_id', null)
         .gte('settled_at', auditDate + 'T00:00:00').lte('settled_at', auditDate + 'T23:59:59'),
       supabase.from('facility_sales').select('*').eq('status', 'SETTLED').is('reservation_id', null).eq('sale_date', auditDate),
+      inHouseIds.length > 0
+        ? supabase.from('invoices').select('id,reservation_id,invoice_no,issued_at,totals,due,paid,status,is_void').in('reservation_id', inHouseIds).eq('is_void', false).order('issued_at', { ascending: false })
+        : Promise.resolve({ data: [] }),
+      inHouseIds.length > 0
+        ? supabase.from('folio_charges').select('reservation_id,total').in('reservation_id', inHouseIds)
+        : Promise.resolve({ data: [] }),
+      inHouseIds.length > 0
+        ? supabase.from('payments').select('reservation_id,amount').in('reservation_id', inHouseIds)
+        : Promise.resolve({ data: [] }),
     ])
     const revenue = {}
     const add = (type, net, sc, vat, total) => {
@@ -69,7 +81,47 @@ export default function NightAudit({ userName, isAdmin, role }) {
 
     const tot = Object.values(revenue).reduce((a, r) => ({ net: a.net + r.net, sc: a.sc + r.sc, vat: a.vat + r.vat, total: a.total + r.total }), { net: 0, sc: 0, vat: 0, total: 0 })
     const recTotal = Object.values(receipts).reduce((a, v) => a + v, 0)
-    setSummary({ revenue, totals: tot, receipts, recTotal, inHouseCount: inHouse.length })
+
+    const activeInvoiceByRes = {}
+    for (const inv of invAll.data || []) {
+      if (!activeInvoiceByRes[inv.reservation_id]) activeInvoiceByRes[inv.reservation_id] = inv
+    }
+    const folioByRes = {}
+    for (const c of folioAll.data || []) {
+      folioByRes[c.reservation_id] = (folioByRes[c.reservation_id] || 0) + Number(c.total || 0)
+    }
+    const paidByRes = {}
+    for (const p of payAll.data || []) {
+      paidByRes[p.reservation_id] = (paidByRes[p.reservation_id] || 0) + Number(p.amount || 0)
+    }
+    const postedSet = new Set((fc.data || []).filter((c) => c.charge_type === 'ROOM').map((c) => c.reservation_id))
+    const invoiceRows = (inHouseRows || []).map((r) => {
+      const inv = activeInvoiceByRes[r.id]
+      const folioTotal = folioByRes[r.id] || 0
+      const paidTotal = paidByRes[r.id] || 0
+      const invoiceTotal = Number(inv?.totals?.grand_total ?? folioTotal)
+      const dueAmount = Number(inv?.due ?? (invoiceTotal - paidTotal))
+      const roomList = (r.reservation_rooms || []).map((x) => x.rooms?.room_no).filter(Boolean).join(', ')
+      return {
+        reservation_id: r.id,
+        res_no: r.res_no,
+        guest: r.reservation_name || r.guests?.full_name || '—',
+        rooms: roomList || '—',
+        invoice_no: inv?.invoice_no || 'Not issued',
+        invoice_total: invoiceTotal,
+        paid: Number(inv?.paid ?? paidTotal),
+        due: dueAmount,
+        invoice_status: inv?.status || 'PENDING_INVOICE',
+        room_posted_today: postedSet.has(r.id),
+      }
+    })
+    const invoiceTotals = invoiceRows.reduce((a, r) => ({
+      invoice_total: a.invoice_total + r.invoice_total,
+      paid: a.paid + r.paid,
+      due: a.due + r.due,
+    }), { invoice_total: 0, paid: 0, due: 0 })
+
+    setSummary({ revenue, totals: tot, receipts, recTotal, inHouseCount: (inHouseRows || []).length, invoiceRows, invoiceTotals })
   }
 
   useEffect(() => { loadAll() }, [auditDate]) // eslint-disable-line
@@ -195,6 +247,9 @@ export default function NightAudit({ userName, isAdmin, role }) {
       ['RECEIPTS (cash basis)'], ['Method', 'Amount'],
       ...Object.entries(summary.receipts).map(([m, v]) => [m, v]),
       ['TOTAL', summary.recTotal],
+      [],
+      ['INVOICE-WISE SNAPSHOT'], ['Res No', 'Guest', 'Rooms', 'Invoice', 'Invoice Total', 'Paid', 'Due', 'Room Posted Today'],
+      ...(summary.invoiceRows || []).map((r) => [r.res_no, r.guest, r.rooms, r.invoice_no, r.invoice_total, r.paid, r.due, r.room_posted_today ? 'Yes' : 'No']),
     ]
     exportXLSX(`Night_Audit_${auditDate}.xlsx`, [{ name: 'Night Audit', rows }])
   }
@@ -219,6 +274,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
           <input type="date" className="input !w-44" value={auditDate} onChange={(e) => setAuditDate(e.target.value)} />
         </div>
       </div>
+      <KPICards module="nightaudit" />
       {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
       {existing && <div className="px-4 py-3 rounded-lg bg-amber/10 text-amber text-sm font-medium">This date was already audited by {existing.performed_by} on {fmtDate(existing.performed_at)}. Closing again will overwrite the saved summary.</div>}
 
@@ -296,6 +352,55 @@ export default function NightAudit({ userName, isAdmin, role }) {
               )}
             </div>
           </div>
+          <div>
+            <div className="label">Invoice-wise audit snapshot (in-house guests)</div>
+            <div className="card overflow-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="th">Res No</th>
+                    <th className="th">Guest</th>
+                    <th className="th">Rooms</th>
+                    <th className="th">Invoice</th>
+                    <th className="th text-right">Invoice Total</th>
+                    <th className="th text-right">Paid</th>
+                    <th className="th text-right">Due</th>
+                    <th className="th">Room Posted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(summary.invoiceRows || []).map((r) => (
+                    <tr key={r.reservation_id}>
+                      <td className="td money text-xs">{r.res_no}</td>
+                      <td className="td text-sm">{r.guest}</td>
+                      <td className="td text-xs">{r.rooms}</td>
+                      <td className="td text-xs money">{r.invoice_no}</td>
+                      <td className="td money text-right">{fmtBDT(r.invoice_total)}</td>
+                      <td className="td money text-right">{fmtBDT(r.paid)}</td>
+                      <td className="td money text-right font-semibold">{fmtBDT(r.due)}</td>
+                      <td className="td text-xs">
+                        <span className={`status-chip ${r.room_posted_today ? 'bg-forest/15 text-forest' : 'bg-amber/20 text-amber'}`}>
+                          {r.room_posted_today ? 'Yes' : 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {(summary.invoiceRows || []).length === 0 && (
+                    <tr><td className="td text-pine/40" colSpan={8}>No in-house reservations on this audit date.</td></tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-leaf/40 font-bold money">
+                    <td className="td" colSpan={4}>TOTAL</td>
+                    <td className="td text-right">{fmtBDT(summary.invoiceTotals?.invoice_total)}</td>
+                    <td className="td text-right">{fmtBDT(summary.invoiceTotals?.paid)}</td>
+                    <td className="td text-right">{fmtBDT(summary.invoiceTotals?.due)}</td>
+                    <td className="td"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
@@ -328,6 +433,8 @@ function NightAuditReport({ audit, company }) {
   const revenue = s.revenue || {}
   const receipts = s.receipts || {}
   const totals = s.totals || { net: 0, sc: 0, vat: 0, total: 0 }
+  const invoiceRows = s.invoiceRows || []
+  const invoiceTotals = s.invoiceTotals || { invoice_total: 0, paid: 0, due: 0 }
   const recTotal = s.recTotal != null ? s.recTotal : Object.values(receipts).reduce((a, v) => a + (+v || 0), 0)
   const cell = { border: '1px solid #000', padding: '5px 8px', fontSize: 11 }
   const rt = { ...cell, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
@@ -374,6 +481,33 @@ function NightAuditReport({ audit, company }) {
           {Object.keys(receipts).length === 0 && <tr><td style={cell} colSpan={2}>No receipts on this date.</td></tr>}
         </tbody>
         <tfoot><tr style={{ fontWeight: 700, background: '#f5f5f5' }}><td style={cell}>TOTAL</td><td style={rt}>{fmtBDT(recTotal)}</td></tr></tfoot>
+      </table>
+
+      <div style={{ fontSize: 12, fontWeight: 700, margin: '14px 0 4px' }}>C · Invoice-wise snapshot (in-house)</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr style={{ background: '#eee' }}>
+          <th style={cell}>Res No</th><th style={cell}>Guest</th><th style={cell}>Rooms</th><th style={cell}>Invoice</th><th style={{ ...cell, textAlign: 'right' }}>Invoice total</th><th style={{ ...cell, textAlign: 'right' }}>Paid</th><th style={{ ...cell, textAlign: 'right' }}>Due</th>
+        </tr></thead>
+        <tbody>
+          {invoiceRows.map((r) => (
+            <tr key={r.reservation_id}>
+              <td style={cell}>{r.res_no}</td>
+              <td style={cell}>{r.guest}</td>
+              <td style={cell}>{r.rooms}</td>
+              <td style={cell}>{r.invoice_no}</td>
+              <td style={rt}>{fmtBDT(r.invoice_total)}</td>
+              <td style={rt}>{fmtBDT(r.paid)}</td>
+              <td style={rt}>{fmtBDT(r.due)}</td>
+            </tr>
+          ))}
+          {invoiceRows.length === 0 && <tr><td style={cell} colSpan={7}>No in-house reservations on this date.</td></tr>}
+        </tbody>
+        <tfoot><tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
+          <td style={cell} colSpan={4}>TOTAL</td>
+          <td style={rt}>{fmtBDT(invoiceTotals.invoice_total)}</td>
+          <td style={rt}>{fmtBDT(invoiceTotals.paid)}</td>
+          <td style={rt}>{fmtBDT(invoiceTotals.due)}</td>
+        </tr></tfoot>
       </table>
 
       <div style={{ fontSize: 10, marginTop: 10, color: '#444' }}>Revenue is accrual (charges posted on the date); receipts are cash basis (money received on the date). The two need not match.</div>
