@@ -7,7 +7,7 @@ import Mushak63 from '../components/print/Mushak63.jsx'
 import GuestPicker from '../components/GuestPicker.jsx'
 import { Plus, Minus, Trash2, Printer, ChefHat, Banknote, BedDouble, Search, Save, XCircle, RotateCcw, Receipt, Clock, FileText } from 'lucide-react'
 
-const TABS = ['New Order', 'Orders', 'Menu', 'Day Close']
+const TABS = ['New Order', 'Orders', 'Day Close']
 const PAYMENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
 
 // Cash rounding logic: >= 0.50 round up, < 0.50 round down
@@ -66,10 +66,10 @@ export default function RestaurantPOS({ userName, isAdmin }) {
             {t}
           </button>
         ))}
+        <span className="ml-auto text-xs text-pine/40 self-center pr-1 hidden sm:inline">Menu items &amp; recipes: Settings → Menu Management</span>
       </div>
       {tab === 'New Order' && <OrderBuilder key={editOrder?.order?.id || 'new'} cats={cats} items={items} taxConfig={taxConfig} userName={userName} existing={editOrder} flash={flash} setPrintDoc={setPrintDoc} onDone={(doc) => { setEditOrder(null); if (doc) setPrintDoc(doc); setTab('Orders') }} />}
       {tab === 'Orders' && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} isAdmin={isAdmin} userName={userName} />}
-      {tab === 'Menu' && <MenuManager cats={cats} items={items} reload={loadMenu} isAdmin={isAdmin} />}
       {tab === 'Day Close' && <DayClose flash={flash} isAdmin={isAdmin} userName={userName} />}
       {printDoc?.type === 'RECEIPT' && (<PrintPortal title={`Restaurant Bill — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)}><PosReceipt order={printDoc.order} items={printDoc.items} company={company} mushakNo={printDoc.mushakNo} /></PrintPortal>)}
       {printDoc?.type === 'KOT' && (<PrintPortal title={`Kitchen Order — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)}><KitchenTicket order={printDoc.order} items={printDoc.items} /></PrintPortal>)}
@@ -199,7 +199,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   try {
     const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
     
-    // folio_charges এ invoice_type যোগ করা হয়েছে
+    // folio_charges এ invoice_type যোগ করা হয়েছে
     const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ 
       reservation_id: order.reservation_id, 
       charge_date: todayISO(), 
@@ -244,7 +244,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
               <div className="money text-forest text-sm mt-1">{fmtBDT(mi.price)}</div>
             </button>
           ))}
-          {visible.length === 0 && (<div className="col-span-full card p-6 text-center text-sm text-pine/50">No menu items yet — add your dishes in the <b>Menu</b> tab.</div>)}
+          {visible.length === 0 && (<div className="col-span-full card p-6 text-center text-sm text-pine/50">No menu items match — add or check dishes in <b>Settings → Menu Management</b>.</div>)}
         </div>
       </div>
       <div className="xl:col-span-2 space-y-3">
@@ -408,76 +408,6 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function MenuManager({ cats, items, reload, isAdmin }) {
-  const [nc, setNc] = useState('')
-  const [ni, setNi] = useState({ category_id: '', name: '', price: '' })
-
-  const addCat = async () => {
-    if (!nc.trim()) return
-    await supabase.from('menu_categories').insert({ name: nc.trim(), sort_order: cats.length + 1 })
-    setNc(''); reload()
-  }
-  const toggleCat = async (c) => { await supabase.from('menu_categories').update({ is_active: !c.is_active }).eq('id', c.id); reload() }
-  const addItem = async () => {
-    if (!ni.name.trim() || ni.price === '' || !ni.category_id) return
-    await supabase.from('menu_items').insert({ category_id: ni.category_id, name: ni.name.trim(), price: +ni.price })
-    setNi({ category_id: ni.category_id, name: '', price: '' }); reload()
-  }
-  const updatePrice = async (it, price) => {
-    if (price === '' || +price === +it.price) return
-    await supabase.from('menu_items').update({ price: +price }).eq('id', it.id); reload()
-  }
-  const toggleItem = async (it) => { await supabase.from('menu_items').update({ is_active: !it.is_active }).eq('id', it.id); reload() }
-  const delItem = async (it) => { await supabase.from('menu_items').delete().eq('id', it.id); reload() }
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="card p-5">
-        <h3 className="font-display font-semibold text-pine mb-3">Categories</h3>
-        {isAdmin ? (
-          <div className="flex gap-2 mb-3">
-            <input className="input flex-1" placeholder="New category" value={nc} onChange={(e) => setNc(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCat()} />
-            <button className="btn-primary" onClick={addCat}><Plus size={15} /></button>
-          </div>
-        ) : (
-          <p className="text-xs text-pine/50 mb-3">Menu changes require administrator access.</p>
-        )}
-        {cats.map((c) => (
-          <div key={c.id} className="flex justify-between items-center py-1.5 border-b border-leaf/60 text-sm">
-            <span className="font-medium">{c.name}</span>
-            <button onClick={() => isAdmin && toggleCat(c)} disabled={!isAdmin} className={`status-chip ${c.is_active ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-600'} ${!isAdmin ? 'cursor-default' : ''}`}>{c.is_active ? 'ACTIVE' : 'OFF'}</button>
-          </div>
-        ))}
-      </div>
-      <div className="card p-5 lg:col-span-2">
-        <h3 className="font-display font-semibold text-pine mb-3">Menu items</h3>
-        {!isAdmin && <p className="text-xs text-pine/50 mb-3">Read-only — ask an administrator to change items or prices.</p>}
-        {isAdmin && <div className="grid grid-cols-4 gap-2 mb-4 items-end">
-          <div><label className="label">Category</label><select className="input" value={ni.category_id} onChange={(e) => setNi({ ...ni, category_id: e.target.value })}><option value="">Select…</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-          <div><label className="label">Item name</label><input className="input" value={ni.name} onChange={(e) => setNi({ ...ni, name: e.target.value })} /></div>
-          <div><label className="label">Price ৳</label><input type="number" className="input money" value={ni.price} onChange={(e) => setNi({ ...ni, price: e.target.value })} /></div>
-          <button className="btn-primary justify-center" onClick={addItem}><Plus size={15} /> Add item</button>
-        </div>}
-        <table className="w-full">
-          <thead><tr><th className="th">Item</th><th className="th">Category</th><th className="th text-right">Price (editable)</th><th className="th">Status</th><th className="th"></th></tr></thead>
-          <tbody>
-            {items.map((it) => (
-              <tr key={it.id}>
-                <td className="td font-medium text-sm">{it.name}</td>
-                <td className="td text-xs text-pine/60">{cats.find((c) => c.id === it.category_id)?.name || '—'}</td>
-                <td className="td text-right">{isAdmin ? (<input type="number" defaultValue={it.price} onBlur={(e) => updatePrice(it, e.target.value)} className="input !w-28 !py-1 money text-right inline-block" />) : (<span className="money">{Number(it.price).toFixed(2)}</span>)}</td>
-                <td className="td"><button onClick={() => isAdmin && toggleItem(it)} disabled={!isAdmin} className={`status-chip ${it.is_active ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-600'} ${!isAdmin ? 'cursor-default' : ''}`}>{it.is_active ? 'ACTIVE' : 'OFF'}</button></td>
-                <td className="td text-right">{isAdmin && <button onClick={() => delItem(it)} className="text-red-300 hover:text-red-600"><Trash2 size={14} /></button>}</td>
-              </tr>
-            ))}
-            {items.length === 0 && <tr><td className="td text-pine/50" colSpan={5}>No items yet — add your menu above.</td></tr>}
           </tbody>
         </table>
       </div>
