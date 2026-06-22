@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
+import KPICards from '../components/KPICards.jsx'
 import {
   Calculator, Plus, Trash2, Scale, Building2, Printer, Pencil,
   Lock, BookOpen, AlertCircle, CheckCircle2, X, Clock, RotateCcw, XCircle,
@@ -55,6 +56,7 @@ export default function AccountingHub({ userName, isAdmin, role }) {
           Double-entry journals (IFRS), trial balance, chart of accounts and fixed-asset depreciation.
         </p>
       </div>
+      <KPICards module="accounting" />
       {msg && (
         <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>
       )}
