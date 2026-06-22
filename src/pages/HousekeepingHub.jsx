@@ -35,8 +35,9 @@ export default function HousekeepingHub({ role, isAdmin }) {
     if (error) { setMsg(error.message); setTimeout(() => setMsg(''), 4000); return }
     loadRooms()
   }
-
+  
   return (
+    <KPICards module="housekeeping" />
     <div>
       <h1 className="font-display text-2xl font-bold text-pine mb-1">Housekeeping Hub</h1>
       <p className="text-sm text-pine/60 mb-5">Track and update the cleaning status of every room.</p>
