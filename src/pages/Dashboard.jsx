@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
-import { fmtBDT, fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
-import { LogIn, LogOut, BedDouble, Wallet, Sparkles, Brush, Wrench, DoorOpen, RefreshCw } from 'lucide-react'
+import { fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
+import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw } from 'lucide-react'
 import KPICards from '../components/KPICards.jsx'
+
 const HK_STATES = ['Clean', 'Dirty', 'Inspected', 'Out of Order']
 const HK_STYLE = {
   'Clean': 'bg-forest/15 text-forest border-forest/30',
@@ -17,8 +18,6 @@ const OCC_LABEL = { OCCUPIED: 'In-house', ARRIVAL: 'Arrival', DEPARTURE: 'Depart
 export default function Dashboard({ openReservation }) {
   const [arrivals, setArrivals] = useState([])
   const [departures, setDepartures] = useState([])
-  const [inHouse, setInHouse] = useState(0)
-  const [dues, setDues] = useState(0)
   const [rooms, setRooms] = useState([])
   const [occ, setOcc] = useState({})
   const [boardBusy, setBoardBusy] = useState(false)
@@ -58,12 +57,6 @@ export default function Dashboard({ openReservation }) {
         .select('id,res_no,reservation_name,check_in,check_out,status, guests:primary_guest_id(full_name)')
         .eq('check_out', today).eq('status', 'CHECKED_IN')
       setDepartures(dep || [])
-      const { count } = await supabase.from('reservations')
-        .select('id', { count: 'exact', head: true }).eq('status', 'CHECKED_IN')
-      setInHouse(count || 0)
-      const { data: bills } = await supabase.from('v_billing_summary')
-        .select('due_total,status').in('status', ['CHECKED_IN', 'CHECKED_OUT'])
-      setDues((bills || []).reduce((a, b) => a + Number(b.due_total || 0), 0))
     }
     load()
     loadBoard()
@@ -76,15 +69,6 @@ export default function Dashboard({ openReservation }) {
     await supabase.from('rooms').update({ hk_status: next }).eq('id', room.id)
   }
 
-  const Stat = ({ icon: Icon, label, value, accent }) => (
-    <div className="card p-5 flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${accent}`}><Icon size={20} /></div>
-      <div>
-        <div className="text-xs uppercase tracking-wider text-pine/60 font-semibold">{label}</div>
-        <div className="text-xl sm:text-2xl font-display font-bold text-pine money truncate">{value}</div>
-      </div>
-    </div>
-  )
   const List = ({ title, rows, empty }) => (
     <div className="card p-5">
       <h3 className="font-display font-semibold text-pine mb-3">{title}</h3>
@@ -113,12 +97,6 @@ export default function Dashboard({ openReservation }) {
       <h1 className="font-display text-xl sm:text-2xl font-bold text-pine mb-1">Front Office — {fmtDate(today)}</h1>
       <p className="text-sm text-pine/60 mb-6">The day at a glance.</p>
       <KPICards module="dashboard" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Stat icon={LogIn} label="Arrivals today" value={arrivals.length} accent="bg-forest/15 text-forest" />
-        <Stat icon={LogOut} label="Departures today" value={departures.length} accent="bg-amber/15 text-amber" />
-        <Stat icon={BedDouble} label="In-house" value={inHouse} accent="bg-pine/10 text-pine" />
-        <Stat icon={Wallet} label="Outstanding dues" value={fmtBDT(dues)} accent="bg-red-50 text-red-600" />
-      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <List title="Expected arrivals" rows={arrivals} empty="No arrivals expected today." />
         <List title="Due to check out" rows={departures} empty="No departures due today." />
