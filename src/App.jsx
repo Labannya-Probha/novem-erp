@@ -26,7 +26,7 @@ import TaskManagement from './pages/TaskManagement.jsx'
 import {
   Leaf, LayoutDashboard, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
   FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, Building2,
-  Menu, X, ListChecks,
+  Menu, X, ListChecks, ChevronDown,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -83,6 +83,12 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [collapsedGroups, setCollapsedGroups] = useState({})
+  const toggleGroup = (title) => {
+    const isActive = NAV_GROUPS.find(g => g.title === title)?.items.some(n => n.id === currentTopId)
+    if (isActive) return // never collapse the active group
+    setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }))
+  }
 
   const currentTopId = location.pathname.split('/').filter(Boolean)[0] || 'dashboard'
 
@@ -107,22 +113,32 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
           <X size={20} />
         </button>
       </div>
-      <nav className="flex-1 py-3 px-3 space-y-3 overflow-y-auto">
+      <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
         {NAV_GROUPS.map((g) => {
           const items = g.items.filter((n) => n.id === 'cms' ? (isAdmin || role === 'SUPERUSER') : can(role, n.id, privileges))
           if (items.length === 0) return null
+          const isActive = g.items.some(n => n.id === currentTopId)
+          const isCollapsed = !isActive && !!collapsedGroups[g.title]
           return (
             <div key={g.title}>
-              <div className="px-3 pb-1 text-[10px] uppercase tracking-widest text-pine/35 font-semibold">{g.title}</div>
-              <div className="space-y-0.5">
-                {items.map((n) => (
-                  <button key={n.id}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentTopId === n.id ? 'bg-forest/10 text-forest ring-1 ring-forest/15' : 'text-pine/70 hover:bg-paper'}`}
-                    onClick={() => navigate(`/${n.id}`)}>
-                    <n.icon size={17} /> {n.label}
-                  </button>
-                ))}
-              </div>
+              <button
+                onClick={() => toggleGroup(g.title)}
+                className="w-full px-3 py-1.5 flex items-center justify-between text-[10px] uppercase tracking-widest text-pine/35 font-semibold hover:text-pine/60 transition-colors"
+              >
+                <span>{g.title}</span>
+                <ChevronDown size={11} className={`transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+              </button>
+              {!isCollapsed && (
+                <div className="space-y-0.5 mb-1">
+                  {items.map((n) => (
+                    <button key={n.id}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentTopId === n.id ? 'bg-forest/10 text-forest ring-1 ring-forest/15' : 'text-pine/70 hover:bg-paper'}`}
+                      onClick={() => navigate(`/${n.id}`)}>
+                      <n.icon size={17} /> {n.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}
