@@ -284,6 +284,7 @@ function NewReservation({ close, openReservation, userName, prefill }) {
     source: 'Phone', notes: '', discount_pct: 0,
     discount_type: 'percentage', discount_val: 0,
     commission_pct: 0, vat_vds_pct: 0, tax_tds_pct: 0,
+    vat_mode: 'EXCLUSIVE',
   })
 
   // #3 — existing guest picked from search
@@ -297,6 +298,7 @@ function NewReservation({ close, openReservation, userName, prefill }) {
   const [taxConfig, setTaxConfig]   = useState([])
   const [facilityItems, setFacilityItems] = useState([])
   const [addons, setAddons]         = useState({})
+  const [serviceSearch, setServiceSearch] = useState('')
   const [busy, setBusy]             = useState(false)
   const [err, setErr]               = useState('')
 
@@ -453,6 +455,7 @@ function NewReservation({ close, openReservation, userName, prefill }) {
         tax_tds_pct:      f.guest_type === 'Company' ? (+f.tax_tds_pct || 0) : 0,
         source:           f.source,
         notes:            f.notes,
+        vat_mode:         f.vat_mode,
         created_by:       userName,
       }).select().single()
       if (re) throw re
@@ -677,34 +680,116 @@ function NewReservation({ close, openReservation, userName, prefill }) {
               {validRows.length > 0 && <p className="text-xs text-pine/50 mt-1">Stay window: <b>{overallCI} → {overallCO}</b> · {validRows.length} room booking(s).</p>}
             </div>
 
-            {/* Including Items */}
+            {/* Included Services — searchable, #3 */}
             <div className="col-span-2">
-              <label className="label">Including Items</label>
-              <p className="text-xs text-pine/50 mb-2">Select from your Facility Items. Prices can be edited here for this booking only.</p>
+              <label className="label">Included Services</label>
+              <p className="text-xs text-pine/50 mb-2">Select services included with this booking. Prices editable per booking.</p>
               {facilityItems.length === 0 && (
-                <p className="text-xs text-amber py-2">No active Facility Items found — add some in Settings → Facilities.</p>
+                <p className="text-xs text-amber py-2">No active Facility Items — add in Configuration → Facility Items.</p>
               )}
-              {Object.entries(groupedFacilityItems).map(([category, catItems]) => (
-                <div key={category} className="mb-3">
-                  <div className="text-[10px] uppercase tracking-wide font-bold text-pine/40 mb-1.5">{category}</div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {catItems.map((it) => (
-                      <div key={it.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${addons[it.id]?.selected ? 'border-forest bg-forest/5' : 'border-leaf'}`}>
-                        <input type="checkbox" checked={!!addons[it.id]?.selected} onChange={() => toggleAddon(it.id)} />
-                        <span className="text-sm flex-1">{it.name} <span className="text-pine/40 text-xs">/{it.unit}</span></span>
-                        {addons[it.id]?.selected && (
-                          <>
-                            <input type="number" min="0" step="0.01" className="input !w-24 !py-1 money text-right" placeholder="Price ৳"
-                              value={addons[it.id].price} onChange={(e) => updAddon(it.id, 'price', e.target.value)} />
-                            <input type="number" min="1" className="input !w-14 !py-1 money text-right" placeholder="Qty"
-                              value={addons[it.id].qty} onChange={(e) => updAddon(it.id, 'qty', e.target.value)} />
-                          </>
-                        )}
-                      </div>
-                    ))}
+              {facilityItems.length > 0 && (
+                <>
+                  {/* Search bar */}
+                  <div className="relative mb-3">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pine/30" />
+                    <input
+                      className="input !pl-8 text-sm"
+                      placeholder="Search services…"
+                      value={serviceSearch}
+                      onChange={(e) => setServiceSearch(e.target.value)}
+                    />
+                    {serviceSearch && (
+                      <button onClick={() => setServiceSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-pine/30 hover:text-pine">
+                        <X size={13} />
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                  {/* Selected services summary */}
+                  {Object.values(addons).some(a => a.selected) && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {facilityItems.filter(it => addons[it.id]?.selected).map(it => (
+                        <span key={it.id}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-forest/15 text-forest text-xs font-medium">
+                          {it.name}
+                          <button onClick={() => toggleAddon(it.id)} className="hover:text-red-500 ml-0.5">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Grouped list */}
+                  {Object.entries(groupedFacilityItems).map(([category, catItems]) => {
+                    const visible = catItems.filter(it =>
+                      !serviceSearch || it.name.toLowerCase().includes(serviceSearch.toLowerCase()) ||
+                      it.category.toLowerCase().includes(serviceSearch.toLowerCase())
+                    )
+                    if (visible.length === 0) return null
+                    return (
+                      <div key={category} className="mb-3">
+                        <div className="text-[10px] uppercase tracking-wide font-bold text-pine/40 mb-1.5">{category}</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {visible.map((it) => (
+                            <div key={it.id}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                                addons[it.id]?.selected ? 'border-forest bg-forest/5' : 'border-leaf hover:border-forest/30'
+                              }`}
+                              onClick={() => !addons[it.id]?.selected && toggleAddon(it.id)}
+                            >
+                              <input type="checkbox" checked={!!addons[it.id]?.selected}
+                                onChange={() => toggleAddon(it.id)}
+                                onClick={e => e.stopPropagation()} />
+                              <span className="text-sm flex-1">{it.name}
+                                <span className="text-pine/40 text-xs ml-1">/{it.unit}</span>
+                              </span>
+                              {addons[it.id]?.selected && (
+                                <>
+                                  <input type="number" min="0" step="0.01"
+                                    className="input !w-24 !py-1 money text-right"
+                                    placeholder="Price ৳"
+                                    value={addons[it.id].price}
+                                    onChange={(e) => updAddon(it.id, 'price', e.target.value)}
+                                    onClick={e => e.stopPropagation()} />
+                                  <input type="number" min="1"
+                                    className="input !w-14 !py-1 money text-right"
+                                    placeholder="Qty"
+                                    value={addons[it.id].qty}
+                                    onChange={(e) => updAddon(it.id, 'qty', e.target.value)}
+                                    onClick={e => e.stopPropagation()} />
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
+            </div>
+
+            {/* VAT Mode */}
+            <div className="col-span-2">
+              <label className="label">VAT on Room Charges</label>
+              <div className="flex gap-2">
+                {[
+                  { v: 'EXCLUSIVE', label: 'VAT Exclusive', hint: 'VAT added on top of rate' },
+                  { v: 'INCLUSIVE', label: 'VAT Inclusive', hint: 'VAT included in rate' },
+                  { v: 'NONE',      label: 'No VAT',        hint: 'VAT not applicable' },
+                ].map((opt) => (
+                  <button key={opt.v} type="button"
+                    onClick={() => set('vat_mode', opt.v)}
+                    className={`flex-1 py-2 px-3 rounded-xl border text-sm font-semibold transition-colors text-left ${
+                      f.vat_mode === opt.v
+                        ? 'bg-forest text-white border-forest'
+                        : 'border-leaf text-pine/70 hover:border-forest/40'
+                    }`}>
+                    <div>{opt.label}</div>
+                    <div className={`text-[10px] font-normal mt-0.5 ${f.vat_mode === opt.v ? 'text-white/70' : 'text-pine/40'}`}>
+                      {opt.hint}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div><label className="label">Adults</label><input type="number" min="1" className="input" value={f.pax_adults} onChange={(e) => set('pax_adults', e.target.value)} /></div>
