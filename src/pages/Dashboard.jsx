@@ -28,7 +28,7 @@ export default function Dashboard({ openReservation }) {
     const { data: rm } = await supabase.from('rooms').select('id, room_no, room_name, room_type, hk_status, is_active').eq('is_active', true).order('room_no')
     const { data: rr } = await supabase
       .from('reservation_rooms')
-      .select('room_id, reservations!inner(status, res_no, reservation_name, check_in, check_out)')
+      .select('room_id, reservations!inner(status, res_no, reservation_name, check_in, check_out, guests:primary_guest_id(full_name, phone))')
       .in('reservations.status', ['CHECKED_IN', 'CONFIRMED'])
     const map = {}
     for (const x of rr || []) {
@@ -40,7 +40,14 @@ export default function Dashboard({ openReservation }) {
       if (depToday) st = 'DEPARTURE'
       else if (r.status === 'CHECKED_IN') st = 'OCCUPIED'
       else if (arrToday) st = 'ARRIVAL'
-      if (st) map[x.room_id] = { st, guest: r.reservation_name, res_no: r.res_no, check_in: r.check_in, check_out: r.check_out }
+      if (st) map[x.room_id] = {
+        st,
+        guest: r.reservation_name || r.guests?.full_name,
+        phone: r.guests?.phone || '',
+        res_no: r.res_no,
+        check_in: r.check_in,
+        check_out: r.check_out,
+      }
     }
     setRooms(rm || [])
     setOcc(map)
@@ -133,7 +140,13 @@ export default function Dashboard({ openReservation }) {
                   <div className="p-1.5 space-y-1.5">
                     <div className="text-[10px] text-pine/60 leading-tight h-6 overflow-hidden">{room.room_name}</div>
                     {o
-                      ? <div className="text-[10px] text-pine leading-tight"><div className="font-medium truncate">{o.guest || o.res_no}</div><div className="text-pine/50 truncate">{occSt === 'OCCUPIED' ? `Out ${fmtDate(o.check_out)}` : occSt === 'ARRIVAL' ? `In ${fmtDate(o.check_in)}` : occSt === 'DEPARTURE' ? 'Departing' : ''}</div></div>
+                      ? (
+                        <div className="text-[10px] text-pine leading-tight space-y-0.5">
+                          <div className="truncate"><span className="text-pine/50">Res:</span> <span className="font-medium">{o.res_no || '—'}</span></div>
+                          <div className="truncate"><span className="text-pine/50">Name:</span> {o.guest || '—'}</div>
+                          <div className="truncate"><span className="text-pine/50">Mobile:</span> {o.phone || '—'}</div>
+                        </div>
+                      )
                       : <div className="text-[10px] text-pine/30 h-6">No booking</div>}
                     <button onClick={() => cycleHK(room)}
                       className={`w-full px-1.5 py-1 rounded-lg text-[10px] font-medium border flex items-center justify-center gap-1 hover:opacity-80 ${HK_STYLE[hk]}`}>
