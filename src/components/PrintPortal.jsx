@@ -11,6 +11,21 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
   const brandPrimary = primaryColor || '#1B4D2E'
   const brandAccent = accentColor || '#2E7D32'
 
+  const hexToRgb = (hex, fallback) => {
+    const safe = (hex || '').replace('#', '').trim()
+    if (/^[0-9a-fA-F]{6}$/.test(safe)) {
+      return {
+        r: parseInt(safe.slice(0, 2), 16),
+        g: parseInt(safe.slice(2, 4), 16),
+        b: parseInt(safe.slice(4, 6), 16),
+      }
+    }
+    return fallback
+  }
+
+  const primaryRgb = hexToRgb(brandPrimary, { r: 27, g: 77, b: 46 })
+  const accentRgb = hexToRgb(brandAccent, { r: 46, g: 125, b: 50 })
+
   useEffect(() => {
     const node = document.createElement('div')
     node.id = 'print-portal-container'
@@ -22,11 +37,17 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
       @page {
         size: ${type === 'thermal' ? '80mm auto' : 'A4'};
-        margin: ${type === 'thermal' ? '0' : '10mm'};
+        margin: ${type === 'thermal' ? '0' : '8mm'};
       }
       #print-root {
         --print-primary: ${brandPrimary};
         --print-accent: ${brandAccent};
+        --print-primary-rgb: ${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b};
+        --print-accent-rgb: ${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b};
+        --print-line: rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.24);
+        --print-soft: rgba(${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b}, 0.08);
+        --print-ink: #111827;
+        --print-muted: #4b5563;
       }
       @media print {
         body > div:not(#print-portal-container) { display: none !important; }
@@ -37,23 +58,44 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           font-family: 'Inter', sans-serif !important;
           display: block !important;
           width: 100% !important;
-          max-width: ${type === 'thermal' ? '72mm' : '190mm'} !important;
+          max-width: ${type === 'thermal' ? '72mm' : '194mm'} !important;
           margin: 0 auto !important;
-          padding: 0 !important;
+          padding: ${type === 'thermal' ? '0' : '0 0 8mm'} !important;
           font-size: 11px !important;
           line-height: 1.4 !important;
-          color: #111 !important;
+          color: var(--print-ink) !important;
           box-shadow: none !important;
+        }
+        #print-root .print-a4-doc {
+          width: 100% !important;
+          max-width: 186mm !important;
+          margin: 0 auto !important;
+        }
+        #print-root table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          table-layout: fixed;
+        }
+        #print-root thead { display: table-header-group; }
+        #print-root tfoot { display: table-row-group; }
+        #print-root tr, #print-root img { page-break-inside: avoid; break-inside: avoid; }
+        #print-root .print-avoid-break { page-break-inside: avoid !important; break-inside: avoid !important; }
+        #print-root .print-signature-grid {
+          display: grid !important;
+          grid-template-columns: repeat(3, 1fr) !important;
+          gap: 9mm !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
         }
         #print-footer {
           display: block !important;
           position: ${type === 'thermal' ? 'relative' : 'fixed'} !important;
-          bottom: 10px !important;
+          bottom: ${type === 'thermal' ? '0' : '6mm'} !important;
           width: 100% !important;
           text-align: center !important;
           font-family: 'Inter', sans-serif !important;
           font-size: 8px !important;
-          color: #666 !important;
+          color: var(--print-muted) !important;
           page-break-after: avoid !important;
         }
       }
