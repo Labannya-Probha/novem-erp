@@ -5,6 +5,7 @@ import {
 import { supabase } from './supabase'
 import { setCurrency } from './lib/helpers'
 import { can, ROLE_LABELS } from './lib/roles'
+import { getTenantId, setTenantId } from './lib/tenant'
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
@@ -314,25 +315,41 @@ function AppRoot() {
   }, [])
 
     const loadCompany = async () => {
-    const { data } = await supabase.from('company_settings').select('*').limit(1).single()
+    const tenantId = getTenantId()
+    let query = supabase.from('company_settings').select('*')
+    if (tenantId) query = query.eq('tenant_id', tenantId)
+    const { data } = await query.limit(1).single()
     if (data) {
       setCurrency(data.currency || '৳')
-      const { data: prop } = await supabase.from('properties').select('slug').limit(1).maybeSingle()
+      let propertyQuery = supabase.from('properties').select('slug')
+      if (tenantId) propertyQuery = propertyQuery.eq('id', tenantId)
+      const { data: prop } = await propertyQuery.limit(1).maybeSingle()
       setCompany({ ...data, slug: prop?.slug || null })
     }
   }
 
   useEffect(() => {
-    if (!session) return
-    loadCompany()
+    if (!session) {
+      setTenantId(null)
+      return
+    }
     supabase.from('app_users').select('*').eq('id', session.user.id).maybeSingle()
-      .then(({ data }) => setProfile(data || { role: 'FRONT_OFFICE', full_name: session.user.email?.split('@')[0] }))
+      .then(({ data }) => {
+        const fallbackProfile = { role: 'FRONT_OFFICE', full_name: session.user.email?.split('@')[0] }
+        const nextProfile = data || fallbackProfile
+        setProfile(nextProfile)
+        setTenantId(data?.tenant_id || null)
+        loadCompany()
+      })
   }, [session?.user?.id])
 
   useEffect(() => {
     const role = profile?.role
     if (!role) return
-    supabase.from('role_privileges').select('module, can_create, can_view, can_edit, can_delete').eq('role', role)
+    let query = supabase.from('role_privileges').select('module, can_create, can_view, can_edit, can_delete').eq('role', role)
+    const tenantId = getTenantId()
+    if (tenantId) query = query.eq('tenant_id', tenantId)
+    query
       .then(({ data }) => setPrivileges(data || []))
   }, [profile?.role])
 
