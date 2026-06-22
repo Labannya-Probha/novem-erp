@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, nightsBetween, rateFor, computeCharge, STATUS_COLORS } from '../lib/helpers'
-import { Plus, Search, Trash2 } from 'lucide-react'
+import { Search, Trash2 } from 'lucide-react'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import KPICards from '../components/KPICards.jsx'
+
 const STATUSES = ['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED', 'CANCELLED']
 
 // Which ReservationDetail tab the status badge should jump to when clicked
@@ -45,11 +46,10 @@ export default function Reservations({ openReservation, userName, prefill, clear
     <div>
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div>
-          <h1 className="font-display text-2xl font-bold text-pine">Reservations</h1>
-          <KPICards module="reservations" />
+          <h1 className="font-display text-2xl font-bold text-pine">Reservations</h1>          
         </div>
-        <button className="btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New reservation query</button>
       </div>
+      <KPICards module="reservations" />
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative w-full sm:w-64">
