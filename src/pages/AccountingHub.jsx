@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 import VoucherDoc from '../components/print/VoucherDoc.jsx'
+import KPICards from '../components/KPICards.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  RETAINED EARNINGS account code — offsetting account for OB entries  */
