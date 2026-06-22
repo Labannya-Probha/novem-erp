@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
 import { LogIn, LogOut, BedDouble, Wallet, Sparkles, Brush, Wrench, DoorOpen, RefreshCw } from 'lucide-react'
-
+import KPICards from '../components/KPICards.jsx'
 const HK_STATES = ['Clean', 'Dirty', 'Inspected', 'Out of Order']
 const HK_STYLE = {
   'Clean': 'bg-forest/15 text-forest border-forest/30',
@@ -112,6 +112,7 @@ export default function Dashboard({ openReservation }) {
     <div>
       <h1 className="font-display text-xl sm:text-2xl font-bold text-pine mb-1">Front Office — {fmtDate(today)}</h1>
       <p className="text-sm text-pine/60 mb-6">The day at a glance.</p>
+      <KPICards module="dashboard" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Stat icon={LogIn} label="Arrivals today" value={arrivals.length} accent="bg-forest/15 text-forest" />
         <Stat icon={LogOut} label="Departures today" value={departures.length} accent="bg-amber/15 text-amber" />
