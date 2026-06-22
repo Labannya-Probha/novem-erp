@@ -209,7 +209,6 @@ async function fetchReport(def, from, to) {
       const t = (data || []).reduce((a, r) => ({ tv: a.tv + +r.taxable_value, v: a.v + +r.vat_amount, tot: a.tot + +r.total }), { tv: 0, v: 0, tot: 0 })
       return { head: ['Date', 'Vendor', 'Invoice', 'Taxable', 'VAT', 'Total'], align: ['l', 'l', 'l', 'r', 'r', 'r'], rows, foot: ['', '', 'TOTAL', money(t.tv), money(t.v), money(t.tot)] }
     }
-    /* ---------- SALES / FRONT OFFICE ---------- */
     case 'sal_checkin_log': {
       const { data } = await supabase.from('reservations').select('res_no, reservation_name, check_in, check_out, checked_in_at, checkin_by, pax_adults, pax_children').not('checked_in_at', 'is', null).gte('checked_in_at', from + 'T00:00:00').lte('checked_in_at', to + 'T23:59:59').order('checked_in_at')
       const rows = (data || []).map((r) => [fmtDate(r.checked_in_at), r.res_no, r.reservation_name || '—', `${r.pax_adults || 0}+${r.pax_children || 0}`, fmtDate(r.check_out), r.checkin_by || '—'])
@@ -286,7 +285,6 @@ async function fetchReport(def, from, to) {
       const t = (data || []).reduce((a, r) => a + (+r.room_rate || 0), 0)
       return { head: ['Date', 'Res No', 'Guest', 'Charge'], align: ['l', 'l', 'l', 'r'], rows, foot: ['', '', 'TOTAL', money(t)] }
     }
-    /* ---------- RESTAURANT / POS ---------- */
     case 'pos_sales': {
       const { data } = await supabase.from('pos_orders').select('order_no, settled_at, outlet, order_type, total, payment_method, status').eq('status', 'SETTLED').gte('settled_at', from + 'T00:00:00').lte('settled_at', to + 'T23:59:59').order('settled_at')
       const rows = (data || []).map((r) => [fmtDate(r.settled_at), r.order_no, r.order_type, r.payment_method || '—', money(r.total)])
@@ -309,7 +307,6 @@ async function fetchReport(def, from, to) {
       const t = Object.values(agg).reduce((a, v) => a + v.t, 0)
       return { head: ['Item', 'Qty', 'Amount'], align: ['l', 'r', 'r'], rows, foot: ['', 'TOTAL', money(t)] }
     }
-    /* ---------- MIXED ---------- */
     case 'mix_other_items': {
       const { data } = await supabase.from('facility_sales').select('sale_date, item_name, qty, total, status').eq('status', 'SETTLED').gte('sale_date', from).lte('sale_date', to).order('sale_date')
       const rows = (data || []).map((r) => [fmtDate(r.sale_date), r.item_name, String(r.qty), money(r.total)])
@@ -328,8 +325,6 @@ async function fetchReport(def, from, to) {
       const t = (data || []).reduce((a, r) => a + +r.amount, 0)
       return { head: ['Period', 'Asset code', 'Asset', 'Depreciation'], align: ['l', 'l', 'l', 'r'], rows, foot: ['', '', 'TOTAL', money(t)] }
     }
-
-    /* ---------- CLASS B: financial statements ---------- */
     case 'acc_pnl': {
       const acc = await periodBalances(from, to)
       const inc = acc.filter((a) => a.type === 'INCOME')
@@ -406,8 +401,6 @@ async function fetchReport(def, from, to) {
       for (const rid of Object.keys(charged)) { const due = charged[rid] - (paid[rid] || 0); if (due > 0.5 && meta[rid] && meta[rid].status !== 'SETTLED') { rows.push([meta[rid].res_no, meta[rid].reservation_name || '—', meta[rid].status, money(charged[rid]), money(paid[rid] || 0), money(due)]); tot += due } }
       return { head: ['Res No', 'Guest', 'Status', 'Charged', 'Paid', 'Due'], align: ['l', 'l', 'l', 'r', 'r', 'r'], rows, foot: ['', '', '', '', 'TOTAL DUE', money(tot)] }
     }
-
-    /* ---------- GUEST RELATIONS ---------- */
     case 'gst_new_vs_repeat': {
       const { data: allRes } = await supabase.from('reservations').select('primary_guest_id, check_in').not('primary_guest_id', 'is', null)
       const firstStay = {}
@@ -456,8 +449,6 @@ async function fetchReport(def, from, to) {
       const rows = Object.entries(agg).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, String(v)])
       return { head: ['Source', 'Bookings'], align: ['l', 'r'], rows, foot: ['TOTAL', String((data || []).length)] }
     }
-
-    /* ---------- PHASE 1 GAP-ANALYSIS REPORTS ---------- */
     case 'sal_today_arrivals': {
       const { data } = await supabase.from('reservations').select('res_no, reservation_name, check_in, check_out, pax_adults, pax_children, source, reservation_rooms(rooms(room_no))').in('status', ['CONFIRMED', 'QUOTED']).gte('check_in', from).lte('check_in', to).order('check_in')
       const rows = (data || []).map((r) => [r.res_no, r.reservation_name || '—', (r.reservation_rooms || []).map((x) => x.rooms && x.rooms.room_no).filter(Boolean).join(', ') || '—', fmtDate(r.check_in), fmtDate(r.check_out), `${r.pax_adults || 0}+${r.pax_children || 0}`, r.source || '—'])
@@ -530,42 +521,27 @@ async function fetchReport(def, from, to) {
       const { data: rr } = await supabase.from('reservation_rooms').select('rate, from_date, to_date')
       let roomNightsSold = 0, roomRevenue = 0
       for (const r of rr || []) {
-        const fd = r.from_date || from
-        const td = r.to_date || to
-        const s = fd > from ? fd : from
-        const e = td < to ? td : to
+        const fd = r.from_date || from; const td = r.to_date || to
+        const s = fd > from ? fd : from; const e = td < to ? td : to
         const nights = Math.max(0, Math.floor((new Date(e) - new Date(s)) / 86400000))
         if (nights > 0) { roomNightsSold += nights; roomRevenue += nights * +r.rate }
       }
       const adr = roomNightsSold ? roomRevenue / roomNightsSold : 0
       const revpar = availableRoomNights ? roomRevenue / availableRoomNights : 0
       const occPct = availableRoomNights ? (roomNightsSold / availableRoomNights) * 100 : 0
-      const rows = [
-        ['Total Rooms', String(totalRooms)],
-        ['Days in Period', String(days)],
-        ['Available Room-Nights', String(availableRoomNights)],
-        ['Room-Nights Sold', String(roomNightsSold)],
-        ['Room Revenue', money(roomRevenue)],
-        ['Occupancy %', occPct.toFixed(1) + '%'],
-        ['ADR (Average Daily Rate)', money(adr)],
-        ['RevPAR (Revenue per Available Room)', money(revpar)],
-      ]
+      const rows = [['Total Rooms', String(totalRooms)], ['Days in Period', String(days)], ['Available Room-Nights', String(availableRoomNights)], ['Room-Nights Sold', String(roomNightsSold)], ['Room Revenue', money(roomRevenue)], ['Occupancy %', occPct.toFixed(1) + '%'], ['ADR (Average Daily Rate)', money(adr)], ['RevPAR (Revenue per Available Room)', money(revpar)]]
       return { head: ['Metric', 'Value'], align: ['l', 'r'], rows, foot: null }
     }
     case 'sal_room_type_sales': {
       const { data: rr } = await supabase.from('reservation_rooms').select('rate, from_date, to_date, rooms(room_type)')
       const agg = {}
       for (const r of rr || []) {
-        const fd = r.from_date || from
-        const td = r.to_date || to
-        const s = fd > from ? fd : from
-        const e = td < to ? td : to
+        const fd = r.from_date || from; const td = r.to_date || to
+        const s = fd > from ? fd : from; const e = td < to ? td : to
         const nights = Math.max(0, Math.floor((new Date(e) - new Date(s)) / 86400000))
         if (nights <= 0) continue
         const rt = (r.rooms && r.rooms.room_type) || 'Unknown'
-        agg[rt] = agg[rt] || { nights: 0, rev: 0 }
-        agg[rt].nights += nights
-        agg[rt].rev += nights * +r.rate
+        agg[rt] = agg[rt] || { nights: 0, rev: 0 }; agg[rt].nights += nights; agg[rt].rev += nights * +r.rate
       }
       const rows = Object.entries(agg).sort((a, b) => b[1].rev - a[1].rev).map(([rt, v]) => [rt, String(v.nights), money(v.nights ? v.rev / v.nights : 0), money(v.rev)])
       const t = Object.values(agg).reduce((a, v) => ({ n: a.n + v.nights, r: a.r + v.rev }), { n: 0, r: 0 })
@@ -574,19 +550,11 @@ async function fetchReport(def, from, to) {
     case 'sal_booking_pace': {
       const { data } = await supabase.from('reservations').select('res_no, reservation_name, check_in, created_at, status, room_rate').in('status', ['CONFIRMED', 'QUOTED', 'CHECKED_IN']).gte('check_in', from).lte('check_in', to)
       const daysBetween = (a, b) => Math.floor((new Date(b) - new Date(a)) / 86400000)
-      const buckets = [
-        { label: '0-3 days', min: 0, max: 3, n: 0, rev: 0 },
-        { label: '4-7 days', min: 4, max: 7, n: 0, rev: 0 },
-        { label: '8-14 days', min: 8, max: 14, n: 0, rev: 0 },
-        { label: '15-30 days', min: 15, max: 30, n: 0, rev: 0 },
-        { label: '31-60 days', min: 31, max: 60, n: 0, rev: 0 },
-        { label: '60+ days', min: 61, max: Infinity, n: 0, rev: 0 },
-      ]
+      const buckets = [{ label: '0-3 days', min: 0, max: 3, n: 0, rev: 0 }, { label: '4-7 days', min: 4, max: 7, n: 0, rev: 0 }, { label: '8-14 days', min: 8, max: 14, n: 0, rev: 0 }, { label: '15-30 days', min: 15, max: 30, n: 0, rev: 0 }, { label: '31-60 days', min: 31, max: 60, n: 0, rev: 0 }, { label: '60+ days', min: 61, max: Infinity, n: 0, rev: 0 }]
       for (const r of data || []) {
         const lead = daysBetween((r.created_at || '').slice(0, 10), r.check_in)
         const b = buckets.find((x) => lead >= x.min && lead <= x.max) || buckets[buckets.length - 1]
-        b.n += 1
-        b.rev += +(r.room_rate || 0)
+        b.n += 1; b.rev += +(r.room_rate || 0)
       }
       const rows = buckets.map((b) => [b.label, String(b.n), money(b.rev)])
       const t = buckets.reduce((a, b) => ({ n: a.n + b.n, rev: a.rev + b.rev }), { n: 0, rev: 0 })
@@ -598,20 +566,13 @@ async function fetchReport(def, from, to) {
       const { data: rr } = resIds.length ? await supabase.from('reservation_rooms').select('reservation_id, rate, from_date, to_date').in('reservation_id', resIds) : { data: [] }
       const revByRes = {}
       for (const r of rr || []) {
-        const fd = r.from_date || from
-        const td = r.to_date || to
-        const s = fd > from ? fd : from
-        const e = td < to ? td : to
+        const fd = r.from_date || from; const td = r.to_date || to
+        const s = fd > from ? fd : from; const e = td < to ? td : to
         const nights = Math.max(0, Math.floor((new Date(e) - new Date(s)) / 86400000))
         revByRes[r.reservation_id] = (revByRes[r.reservation_id] || 0) + nights * +r.rate
       }
       const agg = {}
-      for (const r of res || []) {
-        const k = r.source || 'Unknown'
-        agg[k] = agg[k] || { n: 0, rev: 0 }
-        agg[k].n += 1
-        agg[k].rev += revByRes[r.id] || 0
-      }
+      for (const r of res || []) { const k = r.source || 'Unknown'; agg[k] = agg[k] || { n: 0, rev: 0 }; agg[k].n += 1; agg[k].rev += revByRes[r.id] || 0 }
       const rows = Object.entries(agg).sort((a, b) => b[1].rev - a[1].rev).map(([k, v]) => [k, String(v.n), money(v.rev)])
       const t = Object.values(agg).reduce((a, v) => ({ n: a.n + v.n, rev: a.rev + v.rev }), { n: 0, rev: 0 })
       return { head: ['Source', 'Bookings', 'Room Revenue'], align: ['l', 'r', 'r'], rows, foot: ['TOTAL', String(t.n), money(t.rev)] }
@@ -619,10 +580,7 @@ async function fetchReport(def, from, to) {
     case 'pos_table_sales': {
       const { data } = await supabase.from('pos_orders').select('outlet, table_no, total').eq('status', 'SETTLED').gte('settled_at', from + 'T00:00:00').lte('settled_at', to + 'T23:59:59')
       const agg = {}
-      for (const r of data || []) {
-        const k = `${r.outlet || 'Restaurant'} — ${r.table_no || 'N/A'}`
-        agg[k] = (agg[k] || 0) + +r.total
-      }
+      for (const r of data || []) { const k = `${r.outlet || 'Restaurant'} — ${r.table_no || 'N/A'}`; agg[k] = (agg[k] || 0) + +r.total }
       const rows = Object.entries(agg).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, money(v)])
       const t = Object.values(agg).reduce((a, v) => a + v, 0)
       return { head: ['Outlet — Table/Section', 'Sales'], align: ['l', 'r'], rows, foot: ['TOTAL', money(t)] }
@@ -637,21 +595,13 @@ async function fetchReport(def, from, to) {
       const { data: zeroRooms } = await supabase.from('reservation_rooms').select('rate, rooms(room_no), reservations!inner(res_no, reservation_name, check_in, check_out, shareholder_id)').eq('rate', 0).gte('reservations.check_in', from).lte('reservations.check_in', to)
       const rows = []
       for (const r of shRes || []) rows.push([r.res_no, r.reservation_name || '—', fmtDate(r.check_in), fmtDate(r.check_out), 'Shareholder Free Stay', (r.shareholders && r.shareholders.name) || '—'])
-      for (const r of zeroRooms || []) {
-        const res = r.reservations
-        if (!res || res.shareholder_id) continue
-        rows.push([res.res_no, res.reservation_name || '—', fmtDate(res.check_in), fmtDate(res.check_out), 'Zero-Rate / House Use', (r.rooms && r.rooms.room_no) || '—'])
-      }
+      for (const r of zeroRooms || []) { const res = r.reservations; if (!res || res.shareholder_id) continue; rows.push([res.res_no, res.reservation_name || '—', fmtDate(res.check_in), fmtDate(res.check_out), 'Zero-Rate / House Use', (r.rooms && r.rooms.room_no) || '—']) }
       return { head: ['Res No', 'Guest', 'Check-in', 'Check-out', 'Type', 'Detail'], align: ['l', 'l', 'l', 'l', 'l', 'l'], rows, foot: ['', '', '', '', '', `Total: ${rows.length}`] }
     }
     case 'sal_group_block': {
       const { data } = await supabase.from('reservation_rooms').select('reservation_id, rooms(room_no), reservations!inner(res_no, reservation_name, check_in, check_out, status)').gte('reservations.check_in', from).lte('reservations.check_in', to)
       const byRes = {}
-      for (const r of data || []) {
-        const res = r.reservations
-        byRes[r.reservation_id] = byRes[r.reservation_id] || { res, rooms: [] }
-        byRes[r.reservation_id].rooms.push((r.rooms && r.rooms.room_no) || '—')
-      }
+      for (const r of data || []) { const res = r.reservations; byRes[r.reservation_id] = byRes[r.reservation_id] || { res, rooms: [] }; byRes[r.reservation_id].rooms.push((r.rooms && r.rooms.room_no) || '—') }
       const groups = Object.values(byRes).filter((g) => g.rooms.length > 1)
       const rows = groups.map((g) => [g.res.res_no, g.res.reservation_name || '—', String(g.rooms.length), g.rooms.join(', '), fmtDate(g.res.check_in), fmtDate(g.res.check_out), g.res.status])
       return { head: ['Res No', 'Guest', 'Rooms', 'Room List', 'Check-in', 'Check-out', 'Status'], align: ['l', 'l', 'r', 'l', 'l', 'l', 'l'], rows, foot: ['', '', '', '', '', '', `Group bookings: ${rows.length}`] }
@@ -660,11 +610,7 @@ async function fetchReport(def, from, to) {
       const { data } = await supabase.from('v_ap_aging').select('*').gt('outstanding', 0).order('due_date')
       const today = todayISO()
       const daysBetween = (a, b) => Math.floor((new Date(b) - new Date(a)) / 86400000)
-      const list = (data || []).map((r) => {
-        const age = daysBetween(r.due_date, today)
-        const bucket = age > 90 ? '90+ days' : age > 60 ? '61-90 days' : age > 30 ? '31-60 days' : age > 0 ? '1-30 days' : 'Current'
-        return { ...r, age, bucket }
-      })
+      const list = (data || []).map((r) => { const age = daysBetween(r.due_date, today); const bucket = age > 90 ? '90+ days' : age > 60 ? '61-90 days' : age > 30 ? '31-60 days' : age > 0 ? '1-30 days' : 'Current'; return { ...r, age, bucket } })
       list.sort((a, b) => b.outstanding - a.outstanding)
       const rows = list.map((r) => [r.grn_no, r.vendor_name, fmtDate(r.due_date), String(r.age), r.bucket, money(r.outstanding)])
       const total = list.reduce((a, r) => a + +r.outstanding, 0)
@@ -677,14 +623,7 @@ async function fetchReport(def, from, to) {
       const availableRoomNights = totalRooms * days
       const { data: rr } = await supabase.from('reservation_rooms').select('rate, from_date, to_date')
       let roomNightsSold = 0, roomRevenue = 0
-      for (const r of rr || []) {
-        const fd = r.from_date || from
-        const td = r.to_date || to
-        const s = fd > from ? fd : from
-        const e = td < to ? td : to
-        const nights = Math.max(0, Math.floor((new Date(e) - new Date(s)) / 86400000))
-        if (nights > 0) { roomNightsSold += nights; roomRevenue += nights * +r.rate }
-      }
+      for (const r of rr || []) { const fd = r.from_date || from; const td = r.to_date || to; const s = fd > from ? fd : from; const e = td < to ? td : to; const nights = Math.max(0, Math.floor((new Date(e) - new Date(s)) / 86400000)); if (nights > 0) { roomNightsSold += nights; roomRevenue += nights * +r.rate } }
       const occPct = availableRoomNights ? (roomNightsSold / availableRoomNights) * 100 : 0
       const adr = roomNightsSold ? roomRevenue / roomNightsSold : 0
       const revpar = availableRoomNights ? roomRevenue / availableRoomNights : 0
@@ -695,12 +634,7 @@ async function fetchReport(def, from, to) {
       const { data: payData } = await supabase.from('payments').select('amount').gte('received_date', from).lte('received_date', to)
       const collections = (payData || []).reduce((a, r) => a + +r.amount, 0)
       const { data: bookings } = await supabase.from('reservations').select('id').gte('check_in', from).lte('check_in', to)
-      const rows = [
-        ['Occupancy %', occPct.toFixed(1) + '%'], ['ADR', money(adr)], ['RevPAR', money(revpar)],
-        ['Room Revenue', money(roomRevenue)], ['Restaurant/POS Revenue', money(posRevenue)],
-        ['Facility Revenue', money(facRevenue)], ['Total Revenue', money(roomRevenue + posRevenue + facRevenue)],
-        ['Total Collections', money(collections)], ['Bookings (by Check-in date)', String((bookings || []).length)],
-      ]
+      const rows = [['Occupancy %', occPct.toFixed(1) + '%'], ['ADR', money(adr)], ['RevPAR', money(revpar)], ['Room Revenue', money(roomRevenue)], ['Restaurant/POS Revenue', money(posRevenue)], ['Facility Revenue', money(facRevenue)], ['Total Revenue', money(roomRevenue + posRevenue + facRevenue)], ['Total Collections', money(collections)], ['Bookings (by Check-in date)', String((bookings || []).length)]]
       return { head: ['KPI', 'Value'], align: ['l', 'r'], rows, foot: null }
     }
     case 'acc_expense_category': {
@@ -748,44 +682,15 @@ async function ledgerForCodes(codes, from, to, label) {
   return { head: ['Date', 'JV', `Particulars (${label})`, 'Debit', 'Credit', 'Balance'], align: ['l', 'l', 'l', 'r', 'r', 'r'], rows, foot: ['', '', 'TOTAL', money(t.d), money(t.c), money(t.d - t.c)] }
 }
 
-/* ===================== REPORT BUILDER ===================== */
 const BUILDER_SOURCES = {
-  folio_charges: { label: 'Folio Charges', date_col: 'charge_date', fields: [
-    { field: 'charge_date', label: 'Date', type: 'date' }, { field: 'charge_type', label: 'Type', type: 'text' },
-    { field: 'description', label: 'Description', type: 'text' }, { field: 'base_amount', label: 'Base', type: 'money' },
-    { field: 'discount', label: 'Discount', type: 'money' }, { field: 'service_charge', label: 'Service charge', type: 'money' },
-    { field: 'sd', label: 'SD', type: 'money' }, { field: 'vat', label: 'VAT', type: 'money' },
-    { field: 'total', label: 'Total', type: 'money' }, { field: 'status', label: 'Status', type: 'text' } ] },
-  payments: { label: 'Payments', date_col: 'received_date', fields: [
-    { field: 'received_date', label: 'Date', type: 'date' }, { field: 'method', label: 'Method', type: 'text' },
-    { field: 'amount', label: 'Amount', type: 'money' }, { field: 'payment_class', label: 'Class', type: 'text' },
-    { field: 'reference', label: 'Reference', type: 'text' }, { field: 'received_by', label: 'By', type: 'text' } ] },
-  pos_orders: { label: 'POS Orders', date_col: 'settled_at', fields: [
-    { field: 'order_no', label: 'Order', type: 'text' }, { field: 'order_type', label: 'Type', type: 'text' },
-    { field: 'outlet', label: 'Outlet', type: 'text' }, { field: 'payment_method', label: 'Method', type: 'text' },
-    { field: 'total', label: 'Total', type: 'money' }, { field: 'status', label: 'Status', type: 'text' } ] },
-  facility_sales: { label: 'Facility Sales', date_col: 'sale_date', fields: [
-    { field: 'sale_date', label: 'Date', type: 'date' }, { field: 'item_name', label: 'Item', type: 'text' },
-    { field: 'qty', label: 'Qty', type: 'num' }, { field: 'total', label: 'Total', type: 'money' },
-    { field: 'status', label: 'Status', type: 'text' } ] },
-  vat_sales_register: { label: 'VAT Sales Register', date_col: 'issue_date', fields: [
-    { field: 'issue_date', label: 'Date', type: 'date' }, { field: 'invoice_no', label: 'Invoice', type: 'text' },
-    { field: 'buyer_name', label: 'Buyer', type: 'text' }, { field: 'taxable_value', label: 'Taxable', type: 'money' },
-    { field: 'sd', label: 'SD', type: 'money' }, { field: 'vat', label: 'VAT', type: 'money' }, { field: 'total', label: 'Total', type: 'money' } ] },
-  vat_purchase_register: { label: 'VAT Purchase Register', date_col: 'entry_date', fields: [
-    { field: 'entry_date', label: 'Date', type: 'date' }, { field: 'vendor_name', label: 'Vendor', type: 'text' },
-    { field: 'invoice_no', label: 'Invoice', type: 'text' }, { field: 'taxable_value', label: 'Taxable', type: 'money' },
-    { field: 'vat_amount', label: 'VAT', type: 'money' }, { field: 'total', label: 'Total', type: 'money' } ] },
-  reservations: { label: 'Reservations', date_col: 'check_in', fields: [
-    { field: 'res_no', label: 'Res No', type: 'text' }, { field: 'reservation_name', label: 'Guest', type: 'text' },
-    { field: 'check_in', label: 'Check-in', type: 'date' }, { field: 'check_out', label: 'Check-out', type: 'date' },
-    { field: 'status', label: 'Status', type: 'text' }, { field: 'room_rate', label: 'Room rate', type: 'money' },
-    { field: 'source', label: 'Source', type: 'text' }, { field: 'created_by', label: 'Created by', type: 'text' } ] },
-  v_ledger: { label: 'Ledger (journal lines)', date_col: 'jv_date', fields: [
-    { field: 'jv_date', label: 'Date', type: 'date' }, { field: 'jv_no', label: 'JV', type: 'text' },
-    { field: 'account_code', label: 'A/C code', type: 'text' }, { field: 'account_name', label: 'Account', type: 'text' },
-    { field: 'debit', label: 'Debit', type: 'money' }, { field: 'credit', label: 'Credit', type: 'money' },
-    { field: 'line_note', label: 'Note', type: 'text' }, { field: 'source', label: 'Source', type: 'text' } ] },
+  folio_charges: { label: 'Folio Charges', date_col: 'charge_date', fields: [{ field: 'charge_date', label: 'Date', type: 'date' }, { field: 'charge_type', label: 'Type', type: 'text' }, { field: 'description', label: 'Description', type: 'text' }, { field: 'base_amount', label: 'Base', type: 'money' }, { field: 'discount', label: 'Discount', type: 'money' }, { field: 'service_charge', label: 'Service charge', type: 'money' }, { field: 'sd', label: 'SD', type: 'money' }, { field: 'vat', label: 'VAT', type: 'money' }, { field: 'total', label: 'Total', type: 'money' }, { field: 'status', label: 'Status', type: 'text' }] },
+  payments: { label: 'Payments', date_col: 'received_date', fields: [{ field: 'received_date', label: 'Date', type: 'date' }, { field: 'method', label: 'Method', type: 'text' }, { field: 'amount', label: 'Amount', type: 'money' }, { field: 'payment_class', label: 'Class', type: 'text' }, { field: 'reference', label: 'Reference', type: 'text' }, { field: 'received_by', label: 'By', type: 'text' }] },
+  pos_orders: { label: 'POS Orders', date_col: 'settled_at', fields: [{ field: 'order_no', label: 'Order', type: 'text' }, { field: 'order_type', label: 'Type', type: 'text' }, { field: 'outlet', label: 'Outlet', type: 'text' }, { field: 'payment_method', label: 'Method', type: 'text' }, { field: 'total', label: 'Total', type: 'money' }, { field: 'status', label: 'Status', type: 'text' }] },
+  facility_sales: { label: 'Facility Sales', date_col: 'sale_date', fields: [{ field: 'sale_date', label: 'Date', type: 'date' }, { field: 'item_name', label: 'Item', type: 'text' }, { field: 'qty', label: 'Qty', type: 'num' }, { field: 'total', label: 'Total', type: 'money' }, { field: 'status', label: 'Status', type: 'text' }] },
+  vat_sales_register: { label: 'VAT Sales Register', date_col: 'issue_date', fields: [{ field: 'issue_date', label: 'Date', type: 'date' }, { field: 'invoice_no', label: 'Invoice', type: 'text' }, { field: 'buyer_name', label: 'Buyer', type: 'text' }, { field: 'taxable_value', label: 'Taxable', type: 'money' }, { field: 'sd', label: 'SD', type: 'money' }, { field: 'vat', label: 'VAT', type: 'money' }, { field: 'total', label: 'Total', type: 'money' }] },
+  vat_purchase_register: { label: 'VAT Purchase Register', date_col: 'entry_date', fields: [{ field: 'entry_date', label: 'Date', type: 'date' }, { field: 'vendor_name', label: 'Vendor', type: 'text' }, { field: 'invoice_no', label: 'Invoice', type: 'text' }, { field: 'taxable_value', label: 'Taxable', type: 'money' }, { field: 'vat_amount', label: 'VAT', type: 'money' }, { field: 'total', label: 'Total', type: 'money' }] },
+  reservations: { label: 'Reservations', date_col: 'check_in', fields: [{ field: 'res_no', label: 'Res No', type: 'text' }, { field: 'reservation_name', label: 'Guest', type: 'text' }, { field: 'check_in', label: 'Check-in', type: 'date' }, { field: 'check_out', label: 'Check-out', type: 'date' }, { field: 'status', label: 'Status', type: 'text' }, { field: 'room_rate', label: 'Room rate', type: 'money' }, { field: 'source', label: 'Source', type: 'text' }, { field: 'created_by', label: 'Created by', type: 'text' }] },
+  v_ledger: { label: 'Ledger (journal lines)', date_col: 'jv_date', fields: [{ field: 'jv_date', label: 'Date', type: 'date' }, { field: 'jv_no', label: 'JV', type: 'text' }, { field: 'account_code', label: 'A/C code', type: 'text' }, { field: 'account_name', label: 'Account', type: 'text' }, { field: 'debit', label: 'Debit', type: 'money' }, { field: 'credit', label: 'Credit', type: 'money' }, { field: 'line_note', label: 'Note', type: 'text' }, { field: 'source', label: 'Source', type: 'text' }] },
 }
 
 function fmtCell(val, type) {
@@ -802,10 +707,7 @@ async function runCustomReport(config, from, to) {
   const sel = cols.map((c) => c.field).join(', ')
   let q = supabase.from(config.source).select(sel)
   const dcol = config.date_col || src.date_col
-  if (dcol) {
-    const isTs = dcol.endsWith('_at')
-    q = q.gte(dcol, isTs ? from + 'T00:00:00' : from).lte(dcol, isTs ? to + 'T23:59:59' : to)
-  }
+  if (dcol) { const isTs = dcol.endsWith('_at'); q = q.gte(dcol, isTs ? from + 'T00:00:00' : from).lte(dcol, isTs ? to + 'T23:59:59' : to) }
   for (const f of config.filters || []) if (f.field && f.value !== '') q = q.eq(f.field, f.value)
   q = q.order(dcol || cols[0].field)
   const { data, error } = await q
@@ -814,16 +716,10 @@ async function runCustomReport(config, from, to) {
   const align = cols.map((c) => (c.type === 'money' || c.type === 'num') ? 'r' : 'l')
   const rows = (data || []).map((r) => cols.map((c) => fmtCell(r[c.field], c.type)))
   let foot = null
-  if ((config.totals || []).length) {
-    foot = cols.map((c, i) => {
-      if (config.totals.includes(c.field)) { const s = (data || []).reduce((a, r) => a + (+r[c.field] || 0), 0); return money(s) }
-      return i === 0 ? 'TOTAL' : ''
-    })
-  }
+  if ((config.totals || []).length) { foot = cols.map((c, i) => { if (config.totals.includes(c.field)) { const s = (data || []).reduce((a, r) => a + (+r[c.field] || 0), 0); return money(s) }; return i === 0 ? 'TOTAL' : '' }) }
   return { head, align, rows, foot }
 }
 
-/* ===================== BUILDER UI (modal form) ===================== */
 function ReportBuilder({ onClose, onSaved }) {
   const [name, setName] = useState('')
   const [dept, setDept] = useState('Custom')
@@ -844,16 +740,9 @@ function ReportBuilder({ onClose, onSaved }) {
     if (picked.length === 0) { setErr('Pick at least one column.'); return }
     setBusy(true); setErr('')
     const columns = src.fields.filter((f) => picked.includes(f.field))
-    const config = {
-      source, date_col: src.date_col, columns,
-      totals: totals.filter((t) => picked.includes(t)),
-      filters: fStatusField && fStatusVal ? [{ field: fStatusField, op: 'eq', value: fStatusVal }] : [],
-    }
+    const config = { source, date_col: src.date_col, columns, totals: totals.filter((t) => picked.includes(t)), filters: fStatusField && fStatusVal ? [{ field: fStatusField, op: 'eq', value: fStatusVal }] : [] }
     const key = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') + '_' + Date.now().toString(36)
-    const { error } = await supabase.from('report_definitions').insert({
-      department: dept || 'Custom', report_name: name.trim(), report_key: key,
-      status: 'READY', is_custom: true, config, sort_order: 900,
-    })
+    const { error } = await supabase.from('report_definitions').insert({ department: dept || 'Custom', report_name: name.trim(), report_key: key, status: 'READY', is_custom: true, config, sort_order: 900 })
     setBusy(false)
     if (error) { setErr(error.message); return }
     onSaved()
@@ -874,37 +763,19 @@ function ReportBuilder({ onClose, onSaved }) {
           </div>
           <div>
             <label className="label">Data source</label>
-            <select className="input" value={source} onChange={(e) => onSource(e.target.value)}>
-              {Object.entries(BUILDER_SOURCES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-            <p className="text-[11px] text-pine/50 mt-1">Date filter uses “{src.date_col}”. Cycle/date range applies automatically.</p>
+            <select className="input" value={source} onChange={(e) => onSource(e.target.value)}>{Object.entries(BUILDER_SOURCES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
+            <p className="text-[11px] text-pine/50 mt-1">Date filter uses "{src.date_col}". Cycle/date range applies automatically.</p>
           </div>
           <div>
             <label className="label">Columns to show</label>
-            <div className="flex flex-wrap gap-2">
-              {src.fields.map((f) => (
-                <button key={f.field} onClick={() => toggle(picked, setPicked, f.field)}
-                  className={`px-2 py-1 rounded-lg text-xs border ${picked.includes(f.field) ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`}>{f.label}</button>
-              ))}
-            </div>
+            <div className="flex flex-wrap gap-2">{src.fields.map((f) => (<button key={f.field} onClick={() => toggle(picked, setPicked, f.field)} className={`px-2 py-1 rounded-lg text-xs border ${picked.includes(f.field) ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`}>{f.label}</button>))}</div>
           </div>
           <div>
             <label className="label">Sum these columns (totals row)</label>
-            <div className="flex flex-wrap gap-2">
-              {src.fields.filter((f) => f.type === 'money' || f.type === 'num').map((f) => (
-                <button key={f.field} onClick={() => toggle(totals, setTotals, f.field)}
-                  className={`px-2 py-1 rounded-lg text-xs border ${totals.includes(f.field) ? 'bg-amber text-white border-amber' : 'border-leaf text-pine'}`}>{f.label}</button>
-              ))}
-            </div>
+            <div className="flex flex-wrap gap-2">{src.fields.filter((f) => f.type === 'money' || f.type === 'num').map((f) => (<button key={f.field} onClick={() => toggle(totals, setTotals, f.field)} className={`px-2 py-1 rounded-lg text-xs border ${totals.includes(f.field) ? 'bg-amber text-white border-amber' : 'border-leaf text-pine'}`}>{f.label}</button>))}</div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Optional filter — field</label>
-              <select className="input" value={fStatusField} onChange={(e) => setFStatusField(e.target.value)}>
-                <option value="">(none)</option>
-                {src.fields.filter((f) => f.type === 'text').map((f) => <option key={f.field} value={f.field}>{f.label}</option>)}
-              </select>
-            </div>
+            <div><label className="label">Optional filter — field</label><select className="input" value={fStatusField} onChange={(e) => setFStatusField(e.target.value)}><option value="">(none)</option>{src.fields.filter((f) => f.type === 'text').map((f) => <option key={f.field} value={f.field}>{f.label}</option>)}</select></div>
             <div><label className="label">equals</label><input className="input" value={fStatusVal} onChange={(e) => setFStatusVal(e.target.value)} placeholder="e.g. SETTLED" disabled={!fStatusField} /></div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
