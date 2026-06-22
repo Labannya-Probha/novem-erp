@@ -484,6 +484,12 @@ const voucherTypeFromNo = (no = '') => {
   if (no.startsWith('CN-')) return 'CONTRA'
   return 'JOURNAL'
 }
+const voucherNoForType = (no = '', type = 'JOURNAL') => {
+  const prefix = VOUCHER_PREFIX[type] || 'JV'
+  if (!no) return no
+  if (/^[A-Z]{2}-/.test(no)) return no.replace(/^[A-Z]{2}-/, `${prefix}-`)
+  return `${prefix}-${no}`
+}
 
 function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
   const [rows, setRows]       = useState([])
@@ -528,8 +534,15 @@ function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
     if (valid.length < 2) { flash('A voucher needs at least two valid lines.'); return }
     try {
       if (editingId) {
+        const existing = rows.find((r) => r.id === editingId)
+        const updatePayload = {
+          jv_date: head.jv_date,
+          narration: head.narration,
+          source: head.voucher_type === 'JOURNAL' ? 'MANUAL' : `MANUAL_${head.voucher_type}`,
+        }
+        if (existing?.jv_no) updatePayload.jv_no = voucherNoForType(existing.jv_no, head.voucher_type)
         const { error: ue } = await supabase.from('journal_entries')
-          .update({ jv_date: head.jv_date, narration: head.narration })
+          .update(updatePayload)
           .eq('id', editingId)
         if (ue) throw ue
         await supabase.from('journal_lines').delete().eq('entry_id', editingId)
@@ -618,7 +631,6 @@ function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
           <select
             className="input"
             value={head.voucher_type}
-            disabled={!!editingId}
             onChange={(e) => setHead({ ...head, voucher_type: e.target.value })}
           >
             {VOUCHER_TYPES.map((v) => <option key={v} value={v}>{v}</option>)}
