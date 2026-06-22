@@ -8,6 +8,7 @@ import KPICards from '../components/KPICards.jsx'
 // styled on the other. 'Occupied' was dropped here since room occupancy
 // is already tracked separately via reservation status on the Dashboard.)
 const STATUSES = ['Clean', 'Dirty', 'Inspected', 'Out of Order']
+const CHECKOUT_CLEAR_STATUS = 'Inspected'
 const CHIP = {
   Clean: 'bg-forest/15 text-forest',
   Inspected: 'bg-sky-100 text-sky-700',
@@ -21,7 +22,7 @@ export default function HousekeepingHub({ role, isAdmin }) {
 
   // Front Office / Reservation staff can VIEW room HK status but not change it —
   // only Admin/SUPERUSER/Manager can update housekeeping status.
-  const canEdit = isAdmin || ['SUPERUSER', 'MANAGER'].includes(role)
+  const canEdit = isAdmin || ['SUPERUSER', 'MANAGER', 'HOUSEKEEPING'].includes(role)
 
   const loadRooms = async () => {
     const { data } = await supabase.from('rooms').select('*').eq('is_active', true).order('room_no')
@@ -39,7 +40,7 @@ export default function HousekeepingHub({ role, isAdmin }) {
   return (
     <div>
       <h1 className="font-display text-2xl font-bold text-pine mb-1">Housekeeping Hub</h1>
-      <p className="text-sm text-pine/60 mb-5">Track and update the cleaning status of every room.</p>
+      <p className="text-sm text-pine/60 mb-5">Track and update the cleaning status of every room. Mark a room as Inspected to grant check-out clearance.</p>
       <KPICards module="housekeeping" />
       {msg && <div className="mb-4 px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm">{msg}</div>}
       {!canEdit && <div className="mb-4 px-4 py-2 rounded-lg bg-amber/10 text-amber text-sm">Read-only — your role can view housekeeping status but not change it.</div>}
@@ -52,7 +53,7 @@ export default function HousekeepingHub({ role, isAdmin }) {
               <span className={`status-chip ${CHIP[room.hk_status] || 'bg-stone-200 text-stone-600'}`}>{room.hk_status || 'Clean'}</span>
             </div>
             <p className="text-xs text-pine/50 mt-1">{room.room_type}</p>
-            <div className="mt-3">
+            <div className="mt-3 space-y-2">
               <label className="label">Change status</label>
               <select
                 value={room.hk_status || 'Clean'}
@@ -62,6 +63,13 @@ export default function HousekeepingHub({ role, isAdmin }) {
               >
                 {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
+              <button
+                className="btn-ghost w-full justify-center"
+                onClick={() => updateStatus(room.id, CHECKOUT_CLEAR_STATUS)}
+                disabled={!canEdit}
+              >
+                Mark checkout clearance
+              </button>
             </div>
           </div>
         ))}
