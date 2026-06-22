@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, rateFor, computeCharge, applyRounding } from '../lib/helpers'
 import PrintPortal from '../components/PrintPortal.jsx'
+import KPICards from '../components/KPICards.jsx'
 import { PosReceipt, KitchenTicket } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
 import GuestPicker from '../components/GuestPicker.jsx'
@@ -61,6 +62,7 @@ export default function RestaurantPOS({ userName, isAdmin, role }) {
           <p className="text-sm text-pine/60">Orders for in-house guests post straight to their billing history — pay now or charge to room.</p>
         </div>
       </div>
+      <KPICards module="pos" />
       {msg && <div className="mb-4 px-4 py-2 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
       <div className="flex gap-1 border-b border-leaf mb-6 overflow-x-auto">
         {TABS.map((t) => (
@@ -510,6 +512,208 @@ function DayClose({ flash, isAdmin, userName, role }) {
     const { data: close } = await supabase.from('day_closes').select('*').eq('close_date', day).eq('type', 'RESTAURANT').maybeSingle()
     setRestOrders(rest || [])
     setClosedRow(close || null)
+  }
+
+  export function GuestPosKiosk() {
+    const [cats, setCats] = useState([])
+    const [items, setItems] = useState([])
+    const [taxConfig, setTaxConfig] = useState([])
+    const [company, setCompany] = useState(null)
+    const [activeCat, setActiveCat] = useState('ALL')
+    const [search, setSearch] = useState('')
+    const [cart, setCart] = useState([])
+    const [guestName, setGuestName] = useState('')
+    const [roomNo, setRoomNo] = useState('')
+    const [reservationId, setReservationId] = useState('')
+    const [notes, setNotes] = useState('')
+    const [busy, setBusy] = useState(false)
+    const [msg, setMsg] = useState('')
+
+    const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
+
+    useEffect(() => {
+      const q = new URLSearchParams(window.location.search)
+      setGuestName(q.get('guest') || '')
+      setRoomNo(q.get('room') || '')
+      setReservationId(q.get('rid') || '')
+    }, [])
+
+    useEffect(() => {
+      const load = async () => {
+        const [{ data: c }, { data: it }, { data: tc }, { data: co }] = await Promise.all([
+          supabase.from('menu_categories').select('*').order('sort_order'),
+          supabase.from('menu_items').select('*').eq('is_active', true).order('sort_order').order('name'),
+          supabase.from('tax_config').select('*'),
+          supabase.from('company_settings').select('*').limit(1).single(),
+        ])
+        setCats(c || [])
+        setItems(it || [])
+        setTaxConfig(tc || [])
+        setCompany(co || null)
+      }
+      load()
+    }, [])
+
+    const visible = useMemo(
+      () => items.filter((i) =>
+        (activeCat === 'ALL' || i.category_id === activeCat) &&
+        (!search || i.name.toLowerCase().includes(search.toLowerCase())),
+      ),
+      [items, activeCat, search],
+    )
+
+    const rate = rateFor(taxConfig, 'RESTAURANT', todayISO())
+    const subtotal = cart.reduce((a, c) => a + c.qty * c.unit_price, 0)
+    const t = computeCharge(subtotal, 0, rate)
+    const total = applyRounding(t.total)
+
+    const addItem = (item) => setCart((prev) => {
+      const found = prev.find((c) => c.menu_item_id === item.id)
+      if (found) return prev.map((c) => (c.menu_item_id === item.id ? { ...c, qty: c.qty + 1 } : c))
+      return [...prev, { menu_item_id: item.id, item_name: item.name, qty: 1, unit_price: Number(item.base_price || 0) }]
+    })
+
+    const bump = (idx, delta) => setCart((prev) =>
+      prev.map((c, i) => (i === idx ? { ...c, qty: Math.max(0, c.qty + delta) } : c)).filter((c) => c.qty > 0),
+    )
+
+    const confirmOrder = async () => {
+      if (!cart.length) { flash('Please add at least one item.'); return }
+      if (!guestName && !roomNo && !reservationId) { flash('Enter guest details (name/room/reservation).'); return }
+      setBusy(true)
+      try {
+        const payload = {
+          order_type: 'ROOM_CHARGE',
+          reservation_id: reservationId ? Number(reservationId) : null,
+          guest_name: guestName || null,
+          room_no: roomNo || null,
+          notes: notes || null,
+          discount_pct: 0,
+          base_amount: t.base_amount,
+          discount: t.discount,
+          service_charge: t.service_charge,
+          vat: t.vat,
+          total,
+          payment_method: 'ROOM',
+          status: 'OPEN',
+          created_by: 'Guest Kiosk',
+        }
+        const { data: order, error } = await supabase.from('pos_orders').insert(payload).select().single()
+        if (error) throw error
+
+        const lineRows = cart.map((c) => ({
+          order_id: order.id,
+          menu_item_id: c.menu_item_id,
+          item_name: c.item_name,
+          qty: c.qty,
+          unit_price: c.unit_price,
+          line_total: +(c.qty * c.unit_price).toFixed(2),
+        }))
+        const { error: itemError } = await supabase.from('pos_order_items').insert(lineRows)
+        if (itemError) throw itemError
+
+        await supabase.from('tasks').insert({
+          title: `New guest food order · ${order.order_no || 'POS'}`,
+          description: [
+            `Guest: ${guestName || '—'}`,
+            `Room: ${roomNo || '—'}`,
+            `Reservation: ${reservationId || '—'}`,
+            `Total: ${fmtBDT(total)}`,
+            `Source: QR/Kiosk POS`,
+          ].join('\n'),
+          priority: 'HIGH',
+          status: 'OPEN',
+          source: 'GUEST_POS_ORDER',
+          created_by: 'Guest Kiosk',
+        })
+
+        setCart([])
+        setNotes('')
+        flash(`Order confirmed (${order.order_no || order.id}). Restaurant has been notified.`)
+      } catch (e) {
+        flash(e.message || 'Failed to confirm order.')
+      } finally {
+        setBusy(false)
+      }
+    }
+
+    return (
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(22,163,74,0.16),transparent_45%),#f6f8f7] p-4 sm:p-8">
+        <div className="max-w-6xl mx-auto space-y-4">
+          <div className="card p-5">
+            <h1 className="font-display text-2xl font-bold text-pine">Guest Kiosk POS</h1>
+            <p className="text-sm text-pine/60 mt-1">Select items and confirm. Restaurant gets an instant order request.</p>
+            {company?.company_name && <p className="text-xs text-pine/50 mt-1">{company.company_name}</p>}
+            {msg && <div className="mt-3 px-3 py-2 rounded-lg bg-forest/10 text-forest text-sm">{msg}</div>}
+          </div>
+
+          <div className="grid lg:grid-cols-[1fr_360px] gap-4">
+            <div className="card p-4 space-y-3">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                <button className={`px-3 py-1.5 rounded-lg text-sm border ${activeCat === 'ALL' ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`} onClick={() => setActiveCat('ALL')}>All</button>
+                {cats.map((c) => (
+                  <button key={c.id} className={`px-3 py-1.5 rounded-lg text-sm border whitespace-nowrap ${activeCat === c.id ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`} onClick={() => setActiveCat(c.id)}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pine/40" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search menu item..." className="input pl-9" />
+              </div>
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[56vh] overflow-auto">
+                {visible.map((it) => (
+                  <button key={it.id} onClick={() => addItem(it)} className="text-left border border-leaf rounded-xl p-3 hover:border-forest hover:shadow-sm bg-white">
+                    <div className="font-semibold text-pine">{it.name}</div>
+                    <div className="text-xs text-pine/50 mt-1">{it.description || '—'}</div>
+                    <div className="text-sm font-bold text-forest mt-2">{fmtBDT(Number(it.base_price || 0))}</div>
+                  </button>
+                ))}
+                {visible.length === 0 && <p className="text-sm text-pine/50 col-span-full py-6 text-center">No menu item found.</p>}
+              </div>
+            </div>
+
+            <div className="card p-4 space-y-3">
+              <h3 className="font-semibold text-pine">Your order</h3>
+              <input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Guest name" className="input" />
+              <div className="grid grid-cols-2 gap-2">
+                <input value={roomNo} onChange={(e) => setRoomNo(e.target.value)} placeholder="Room no" className="input" />
+                <input value={reservationId} onChange={(e) => setReservationId(e.target.value)} placeholder="Reservation ID" className="input" />
+              </div>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Special request (optional)" className="input min-h-[72px]" />
+
+              <div className="max-h-56 overflow-auto space-y-2">
+                {cart.map((line, i) => (
+                  <div key={`${line.menu_item_id}-${i}`} className="border border-leaf rounded-lg p-2">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium text-pine">{line.item_name}</p>
+                      <p className="text-sm font-semibold text-forest">{fmtBDT(line.qty * line.unit_price)}</p>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button onClick={() => bump(i, -1)} className="btn-ghost !py-1 !px-2"><Minus size={14} /></button>
+                      <span className="text-sm w-6 text-center">{line.qty}</span>
+                      <button onClick={() => bump(i, 1)} className="btn-ghost !py-1 !px-2"><Plus size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+                {cart.length === 0 && <p className="text-sm text-pine/50">No item selected yet.</p>}
+              </div>
+
+              <div className="text-sm border-t border-leaf pt-3 space-y-1">
+                <div className="flex justify-between"><span>Subtotal</span><span>{fmtBDT(t.base_amount)}</span></div>
+                <div className="flex justify-between"><span>Service</span><span>{fmtBDT(t.service_charge)}</span></div>
+                <div className="flex justify-between"><span>VAT</span><span>{fmtBDT(t.vat)}</span></div>
+                <div className="flex justify-between font-bold text-base text-pine"><span>Total</span><span>{fmtBDT(total)}</span></div>
+              </div>
+
+              <button className="btn-primary w-full" onClick={confirmOrder} disabled={busy}>
+                {busy ? 'Confirming...' : 'Confirm Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
   useEffect(() => { load() }, [day])
 
