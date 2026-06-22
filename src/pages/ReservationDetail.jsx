@@ -1584,7 +1584,7 @@ function BillingsAndCheckOutTab({
   const [discAmt, setDiscAmt]     = useState('')
   const [discReason, setDiscReason] = useState('')
   const [discType, setDiscType]   = useState('ROOM')
-  const [p, setP]           = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
+  const [p, setP]           = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName, paid_by_party: '', payment_class: 'SETTLEMENT' })
 
   const printLiveInvoice = (type) => {
     setPrintDoc({
@@ -1725,9 +1725,18 @@ function BillingsAndCheckOutTab({
 
   const addPayment = async () => {
     if (!p.amount || +p.amount <= 0) return
-    const { error } = await supabase.from('payments').insert({ reservation_id: res.id, ...p, amount: +p.amount })
+    const { error } = await supabase.from('payments').insert({
+      reservation_id: res.id,
+      amount:         +p.amount,
+      method:         p.method,
+      reference:      p.reference,
+      received_date:  p.received_date,
+      received_by:    p.received_by,
+      paid_by_party:  p.paid_by_party || null,
+      payment_class:  p.payment_class || 'SETTLEMENT',
+    })
     if (error) { flash(error.message); return }
-    setP({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName })
+    setP({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName, paid_by_party: '', payment_class: 'SETTLEMENT' })
     await reload()
     if (isCheckedOut) await syncInvoiceStatus()
     else flash('Payment recorded.')
@@ -1875,64 +1884,141 @@ function BillingsAndCheckOutTab({
         </div>
       </div>
 
-      {/* 2. Add Charges and Payments */}
+      {/* 2. Add Charges */}
       {editable && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="card p-4 lg:col-span-2">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-              <h3 className="font-display font-semibold text-pine">Add charge</h3>
-              <div className="flex flex-wrap gap-2">
-                <button className="btn-ghost" onClick={postRoomCharges}><BedDouble size={15} /> Post room charges ({nightsBetween(res.check_in, res.check_out)} nights)</button>
-                {charges.some((ch) => ch.charge_type === 'ROOM') && (
-                  <button className="btn-amber !py-2" onClick={repostRoomCharges} title="Replace ROOM lines with current rates & discount">Repost</button>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-              <SearchableSelect
-                value={c.charge_type}
-                onChange={v => setC({ ...c, charge_type: v })}
-                options={['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER']}
-                placeholder="Type…"
-              />
-              <input className="input col-span-2" placeholder="Description" value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
-              <input type="number" className="input money" placeholder="Base ৳" value={c.base_amount} onChange={(e) => setC({ ...c, base_amount: e.target.value })} />
-              <input type="number" min="0" max="100" className="input money" placeholder="Disc %" value={c.discount_pct} onChange={(e) => setC({ ...c, discount_pct: e.target.value })} />
-              <button className="btn-primary justify-center" onClick={addCharge}><Plus size={15} /> Add</button>
+        <div className="card p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <h3 className="font-display font-semibold text-pine">Add charge</h3>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-ghost" onClick={postRoomCharges}>
+                <BedDouble size={15} /> Post room charges ({nightsBetween(res.check_in, res.check_out)} nights)
+              </button>
+              {charges.some((ch) => ch.charge_type === 'ROOM') && (
+                <button className="btn-amber !py-2" onClick={repostRoomCharges}>Repost</button>
+              )}
             </div>
           </div>
-          <div className="card p-4">
-            <h3 className="font-display font-semibold text-pine mb-3">Record payment</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="number" className="input money" placeholder="Amount ৳" value={p.amount} onChange={(e) => setP({ ...p, amount: e.target.value })} />
-              <SearchableSelect
-                value={p.method}
-                onChange={v => setP({ ...p, method: v })}
-                options={['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']}
-                placeholder="Method…"
-              />
-              <input type="date" className="input" value={p.received_date} onChange={(e) => setP({ ...p, received_date: e.target.value })} />
-              <input className="input" placeholder="Reference" value={p.reference} onChange={(e) => setP({ ...p, reference: e.target.value })} />
-            </div>
-            <button className="btn-primary w-full justify-center mt-2" onClick={addPayment}><Receipt size={15} /> Save payment</button>
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+            <SearchableSelect
+              value={c.charge_type}
+              onChange={v => setC({ ...c, charge_type: v })}
+              options={['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER']}
+              placeholder="Type…"
+            />
+            <input className="input col-span-2" placeholder="Description"
+              value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
+            <input type="number" className="input money" placeholder="Base ৳"
+              value={c.base_amount} onChange={(e) => setC({ ...c, base_amount: e.target.value })} />
+            <input type="number" min="0" max="100" className="input money" placeholder="Disc %"
+              value={c.discount_pct} onChange={(e) => setC({ ...c, discount_pct: e.target.value })} />
+            <button className="btn-primary justify-center" onClick={addCharge}><Plus size={15} /> Add</button>
           </div>
         </div>
       )}
 
-      {/* 3. Admin Discount */}
+      {/* 3. Record Payment */}
+      {editable && (
+        <div className="card p-4">
+          <h3 className="font-display font-semibold text-pine mb-3 flex items-center gap-2">
+            <Receipt size={16} className="text-forest" /> Record Payment
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Row 1: Amount + Method */}
+            <div>
+              <label className="label !text-xs">Amount (৳) *</label>
+              <input type="number" className="input money"
+                placeholder="0.00" value={p.amount}
+                onChange={(e) => setP({ ...p, amount: e.target.value })} />
+            </div>
+            <div>
+              <label className="label !text-xs">Payment method</label>
+              <SearchableSelect
+                value={p.method}
+                onChange={v => setP({ ...p, method: v })}
+                options={['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'CHEQUE', 'OTHER']}
+                placeholder="Method…"
+              />
+            </div>
+            <div>
+              <label className="label !text-xs">Date</label>
+              <input type="date" className="input" value={p.received_date}
+                onChange={(e) => setP({ ...p, received_date: e.target.value })} />
+            </div>
+            <div>
+              <label className="label !text-xs">Reference / TrxID</label>
+              <input className="input" placeholder="Optional"
+                value={p.reference} onChange={(e) => setP({ ...p, reference: e.target.value })} />
+            </div>
+            {/* Row 2: Paid by party + Class */}
+            <div className="sm:col-span-2">
+              <label className="label !text-xs">Paid by</label>
+              <SearchableSelect
+                value={p.paid_by_party || ''}
+                onChange={v => setP({ ...p, paid_by_party: v })}
+                options={[
+                  { value: guest?.full_name || 'Guest', label: `👤 ${guest?.full_name || 'Guest'} (Guest)` },
+                  ...(res.agencies ? [{ value: res.agencies.name, label: `🤝 ${res.agencies.name} (Agency)` }] : []),
+                  ...(res.shareholders ? [{ value: res.shareholders.name, label: `👥 ${res.shareholders.name} (Shareholder)` }] : []),
+                  ...(res.company_id && guest ? [] : []),
+                ].filter(Boolean)}
+                placeholder="Select who is paying…"
+                allowCreate
+                onCreate={async (v) => v}
+              />
+            </div>
+            <div>
+              <label className="label !text-xs">Payment class</label>
+              <SearchableSelect
+                value={p.payment_class || 'SETTLEMENT'}
+                onChange={v => setP({ ...p, payment_class: v })}
+                options={[
+                  { value: 'ADVANCE', label: 'Advance' },
+                  { value: 'SETTLEMENT', label: 'Settlement' },
+                  { value: 'PARTIAL', label: 'Partial' },
+                ]}
+                placeholder="Class…"
+              />
+            </div>
+            <div className="sm:col-span-4 flex justify-end">
+              <button className="btn-primary" onClick={addPayment} disabled={!p.amount || +p.amount <= 0}>
+                <Receipt size={15} /> Save payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Admin Discount */}
       {isAdmin && editable && (
-        <div className="card p-4 border-amber/40 bg-amber/5">
-          <h3 className="font-display font-semibold text-pine flex items-center gap-2 mb-3"><BadgePercent size={16} className="text-amber" /> Additional discount (admin)</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-            <input type="number" min="0" className="input money" placeholder="Discount ৳" value={discAmt} onChange={(e) => setDiscAmt(e.target.value)} />
-            <SearchableSelect
-              value={discType}
-              onChange={setDiscType}
-              options={['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER']}
-              placeholder="Type…"
-            />
-            <input className="input col-span-2" placeholder="Reason (loyal guest, goodwill...)" value={discReason} onChange={(e) => setDiscReason(e.target.value)} />
-            <button className="btn-amber justify-center col-span-2" onClick={addDiscount}><BadgePercent size={15} /> Apply discount</button>
+        <div className="card p-4 border border-amber/30 bg-amber/5">
+          <h3 className="font-display font-semibold text-pine flex items-center gap-2 mb-3">
+            <BadgePercent size={16} className="text-amber" /> Additional Discount (Admin)
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div>
+              <label className="label !text-xs">Amount (৳)</label>
+              <input type="number" min="0" className="input money"
+                placeholder="e.g. 500" value={discAmt}
+                onChange={(e) => setDiscAmt(e.target.value)} />
+            </div>
+            <div>
+              <label className="label !text-xs">Charge type</label>
+              <SearchableSelect
+                value={discType} onChange={setDiscType}
+                options={['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER']}
+                placeholder="Type…"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label !text-xs">Reason</label>
+              <input className="input" placeholder="e.g. Loyal guest, goodwill…"
+                value={discReason} onChange={(e) => setDiscReason(e.target.value)} />
+            </div>
+            <div className="flex items-end">
+              <button className="btn-amber w-full justify-center" onClick={addDiscount}>
+                <BadgePercent size={15} /> Apply
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2009,8 +2095,8 @@ function BillingsAndCheckOutTab({
         <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr>
-            <th className="th">Date</th><th className="th">Class</th><th className="th">Method</th>
-            <th className="th">Reference</th><th className="th">Received by</th><th className="th text-right">Amount</th>
+            <th className="th">Date</th><th className="th">Paid by</th><th className="th">Class</th><th className="th">Method</th>
+            <th className="th">Reference</th><th className="th text-right">Amount</th>
           </tr></thead>
           <tbody>
             {payments.map((pm) => (
@@ -2023,12 +2109,16 @@ function BillingsAndCheckOutTab({
                     </button>
                   )}
                 </td>
+                <td className="td text-sm font-medium">{pm.paid_by_party || pm.received_by || '—'}</td>
                 <td className="td">
-                  <span className={`status-chip ${pm.payment_class === 'ADVANCE' ? 'bg-amber/20 text-amber' : 'bg-forest/15 text-forest'}`}>{pm.payment_class}</span>
+                  <span className={`status-chip text-xs ${
+                    pm.payment_class === 'ADVANCE'    ? 'bg-amber/20 text-amber' :
+                    pm.payment_class === 'SETTLEMENT' ? 'bg-forest/15 text-forest' :
+                    'bg-sky-50 text-sky-700'
+                  }`}>{pm.payment_class || 'SETTLEMENT'}</span>
                 </td>
                 <td className="td text-sm">{pm.method}</td>
                 <td className="td text-xs">{pm.reference || '—'}</td>
-                <td className="td text-xs">{pm.received_by || '—'}</td>
                 <td className="td money text-right font-semibold">{Number(pm.amount).toFixed(2)}</td>
               </tr>
             ))}
