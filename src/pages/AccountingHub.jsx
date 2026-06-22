@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
-import KPICards from '../components/KPICards.jsx'
 import {
   Calculator, Plus, Trash2, Scale, Building2, Printer, Pencil,
-  Lock, BookOpen, AlertCircle, CheckCircle2, X, Clock, RotateCcw, XCircle,
+  Lock, BookOpen, AlertCircle, CheckCircle2, X, ArrowRight, Save, Search,
 } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 import VoucherDoc from '../components/print/VoucherDoc.jsx'
@@ -18,7 +17,7 @@ const RE_CODE = '300100'
 /* ------------------------------------------------------------------ */
 /*  ROOT                                                                */
 /* ------------------------------------------------------------------ */
-export default function AccountingHub({ userName, isAdmin, role }) {
+export default function AccountingHub({ userName, isAdmin }) {
   const [tab, setTab]         = useState('Journal Vouchers')
   const [accounts, setAccounts] = useState([])
   const [company, setCompany] = useState(null)
@@ -42,8 +41,8 @@ export default function AccountingHub({ userName, isAdmin, role }) {
     'Trial Balance',
     'Chart of Accounts',
     'Fixed Assets',
-    'Day Close',
     ...(isAdmin ? ['Opening Balance'] : []),
+    ...(isAdmin ? ['Transaction Mapping'] : []),
   ]
 
   return (
@@ -56,7 +55,6 @@ export default function AccountingHub({ userName, isAdmin, role }) {
           Double-entry journals (IFRS), trial balance, chart of accounts and fixed-asset depreciation.
         </p>
       </div>
-      <KPICards module="accounting" />
       {msg && (
         <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>
       )}
@@ -91,74 +89,12 @@ export default function AccountingHub({ userName, isAdmin, role }) {
       {tab === 'Fixed Assets'     && (
         <AssetsTab accounts={accounts} userName={userName} flash={flash} />
       )}
-      {tab === 'Day Close' && (
-        <AccountsDayCloseTab userName={userName} role={role} isAdmin={isAdmin} flash={flash} />
-      )}
       {tab === 'Opening Balance' && isAdmin && (
         <OpeningBalanceTab accounts={accounts} userName={userName} flash={flash} />
       )}
-    </div>
-  )
-}
-
-function AccountsDayCloseTab({ userName, role, isAdmin, flash }) {
-  const [day, setDay] = useState(todayISO())
-  const [closeRow, setCloseRow] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const canCloseDay = isAdmin || role === 'ACCOUNTS' || role === 'MANAGER'
-  const canOpenDay = role === 'SUPERUSER'
-
-  const loadClose = useCallback(async () => {
-    const { data } = await supabase.from('day_closes').select('*').eq('close_date', day).eq('type', 'ACCOUNTS').maybeSingle()
-    setCloseRow(data || null)
-  }, [day])
-
-  useEffect(() => { loadClose() }, [loadClose])
-
-  const closeDay = async () => {
-    if (!canCloseDay) { flash('Accounts day-close requires Accounts, Manager, Admin or SUPERUSER access.'); return }
-    setBusy(true)
-    const payload = { close_date: day, type: 'ACCOUNTS', closed_by: userName, closed_at: new Date().toISOString() }
-    const { error: delErr } = await supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'ACCOUNTS')
-    if (delErr) { setBusy(false); flash(delErr.message); return }
-    const { error } = await supabase.from('day_closes').insert(payload)
-    setBusy(false)
-    if (error) flash(error.message)
-    else { flash(`Accounts day closed for ${day}.`); loadClose() }
-  }
-
-  const openDay = async () => {
-    if (!canOpenDay) { flash('Only SUPERUSER can open a closed day.'); return }
-    setBusy(true)
-    const { error } = await supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'ACCOUNTS')
-    setBusy(false)
-    if (error) flash(error.message)
-    else { flash(`Accounts day opened for ${day}.`); loadClose() }
-  }
-
-  return (
-    <div className="card p-5 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="font-display font-semibold text-pine flex items-center gap-2"><Clock size={16} className="text-amber" /> Accounts Day Close</h3>
-          <p className="text-xs text-pine/60 mt-1">This closes Accounting day only.</p>
-          {closeRow && <p className="text-xs text-pine/50 mt-1">Closed by {closeRow.closed_by || '—'} at {fmtDate(closeRow.closed_at || closeRow.created_at || day)}.</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <input type="date" className="input !w-44" value={day} onChange={(e) => setDay(e.target.value)} />
-          <button className="btn-ghost !py-1" onClick={loadClose} disabled={busy}><RotateCcw size={14} /> Refresh</button>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        {canOpenDay && closeRow && (
-          <button className="btn-ghost !py-1 text-red-600" onClick={openDay} disabled={busy}>
-            <XCircle size={14} /> Day Open
-          </button>
-        )}
-        <button className="btn-amber !py-1" onClick={closeDay} disabled={busy}>
-          <Clock size={14} /> Close Day
-        </button>
-      </div>
+      {tab === 'Transaction Mapping' && isAdmin && (
+        <TransactionMappingTab accounts={accounts} flash={flash} userName={userName} />
+      )}
     </div>
   )
 }
@@ -991,6 +927,291 @@ function AssetsTab({ accounts, userName, flash }) {
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+/* ================================================================== */
+/*  TRANSACTION MAPPING TAB                                             */
+/*  Maps each transaction type to Dr/Cr GL accounts                    */
+/*  Admin/Superuser only — controls how folio charges post to ledger   */
+/* ================================================================== */
+const TRANSACTION_GROUPS = [
+  {
+    title: 'Room & Accommodation',
+    types: ['ROOM_REVENUE'],
+  },
+  {
+    title: 'Restaurant & F&B',
+    types: ['RESTAURANT_REVENUE', 'TEA_REVENUE', 'PICKLE_REVENUE'],
+  },
+  {
+    title: 'Facilities & Other',
+    types: ['SPORTS_REVENUE', 'LAUNDRY_REVENUE', 'OTHER_REVENUE'],
+  },
+  {
+    title: 'Payments Received',
+    types: ['PAYMENT_CASH', 'PAYMENT_BKASH', 'PAYMENT_NAGAD', 'PAYMENT_CARD', 'PAYMENT_BANK', 'PAYMENT_ADVANCE'],
+  },
+  {
+    title: 'Adjustments',
+    types: ['DISCOUNT_GIVEN', 'SHAREHOLDER_REDEEM'],
+  },
+  {
+    title: 'Tax & SC Settlement',
+    types: ['VAT_SETTLEMENT', 'SC_SETTLEMENT'],
+  },
+]
+
+function TransactionMappingTab({ accounts, flash, userName }) {
+  const [mappings, setMappings] = useState([])
+  const [editId, setEditId]     = useState(null)
+  const [editF, setEditF]       = useState({})
+  const [busy, setBusy]         = useState(false)
+  const [search, setSearch]     = useState('')
+
+  const load = async () => {
+    const { data } = await supabase
+      .from('accounting_transaction_mapping')
+      .select(`
+        *,
+        debit:debit_account_id(code, name),
+        credit:credit_account_id(code, name),
+        vat:vat_account_id(code, name),
+        sc:sc_account_id(code, name)
+      `)
+      .order('transaction_type')
+    setMappings(data || [])
+  }
+  useEffect(() => { load() }, [])
+
+  const startEdit = (m) => {
+    setEditId(m.id)
+    setEditF({
+      label:            m.label,
+      debit_account_id: m.debit_account_id  || '',
+      credit_account_id: m.credit_account_id || '',
+      vat_account_id:   m.vat_account_id    || '',
+      sc_account_id:    m.sc_account_id     || '',
+      notes:            m.notes             || '',
+    })
+  }
+
+  const saveEdit = async () => {
+    setBusy(true)
+    const { error } = await supabase
+      .from('accounting_transaction_mapping')
+      .update({
+        label:            editF.label,
+        debit_account_id: editF.debit_account_id  || null,
+        credit_account_id: editF.credit_account_id || null,
+        vat_account_id:   editF.vat_account_id    || null,
+        sc_account_id:    editF.sc_account_id     || null,
+        notes:            editF.notes,
+        updated_by:       userName,
+        updated_at:       new Date().toISOString(),
+      })
+      .eq('id', editId)
+    setBusy(false)
+    if (error) flash(error.message)
+    else { setEditId(null); load(); flash('Mapping updated.') }
+  }
+
+  // Account options for dropdowns — grouped by type
+  const acctOptions = accounts.map(a => ({
+    value: a.id,
+    label: `${a.code} · ${a.name}`,
+    type: a.type,
+  }))
+
+  const acctName = (id) => {
+    const a = accounts.find(x => x.id === id)
+    return a ? `${a.code} · ${a.name}` : '—'
+  }
+
+  const filteredMappings = (types) =>
+    mappings.filter(m =>
+      types.includes(m.transaction_type) &&
+      (!search || m.label.toLowerCase().includes(search.toLowerCase()) ||
+       m.transaction_type.toLowerCase().includes(search.toLowerCase()))
+    )
+
+  const AccountSelect = ({ value, onChange, placeholder }) => (
+    <select
+      className="input text-xs !py-1"
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+    >
+      <option value="">— {placeholder || 'Select account'} —</option>
+      {['ASSET','LIABILITY','EQUITY','INCOME','EXPENSE'].map(type => {
+        const group = acctOptions.filter(a => a.type === type)
+        if (!group.length) return null
+        return (
+          <optgroup key={type} label={type}>
+            {group.map(a => (
+              <option key={a.value} value={a.value}>{a.label}</option>
+            ))}
+          </optgroup>
+        )
+      })}
+    </select>
+  )
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+          <div>
+            <h3 className="font-display font-semibold text-pine">Transaction → GL Account Mapping</h3>
+            <p className="text-xs text-pine/50 mt-0.5">
+              Defines which accounts to Debit and Credit for each transaction type.
+              Changes apply to newly posted JVs — historical entries are unchanged.
+            </p>
+          </div>
+          <div className="relative w-56">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pine/30" />
+            <input
+              className="input !pl-8 text-sm"
+              placeholder="Search transaction…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-3 text-xs text-pine/50">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400 inline-block" /> Dr = Debit account</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-forest inline-block" /> Cr = Credit account</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> VAT = VAT Output account</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-400 inline-block" /> SC = Service Charge account</span>
+        </div>
+      </div>
+
+      {/* Grouped mapping cards */}
+      {TRANSACTION_GROUPS.map(group => {
+        const rows = filteredMappings(group.types)
+        if (rows.length === 0 && search) return null
+        return (
+          <div key={group.title} className="card overflow-hidden">
+            <div className="px-4 py-2.5 bg-leaf/30 border-b border-leaf">
+              <h4 className="font-display font-semibold text-pine text-sm">{group.title}</h4>
+            </div>
+            <div className="divide-y divide-leaf/40">
+              {rows.length === 0 && (
+                <p className="text-xs text-pine/40 px-4 py-3">No mappings found.</p>
+              )}
+              {rows.map(m => (
+                <div key={m.id} className="p-4">
+                  {editId === m.id ? (
+                    /* ── Edit row ── */
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] text-pine/40 bg-pine/5 px-2 py-0.5 rounded">{m.transaction_type}</span>
+                          <input className="input !py-1 text-sm font-semibold flex-1 min-w-[160px]"
+                            value={editF.label}
+                            onChange={e => setEditF(p => ({ ...p, label: e.target.value }))} />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={saveEdit} disabled={busy} className="btn-primary !py-1 text-xs">
+                            <Save size={12} /> {busy ? 'Saving…' : 'Save'}
+                          </button>
+                          <button onClick={() => setEditId(null)} className="btn-ghost !py-1 text-xs">Cancel</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div>
+                          <label className="label !text-[10px] flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-sky-400 inline-block" /> Debit account
+                          </label>
+                          <AccountSelect value={editF.debit_account_id} onChange={v => setEditF(p => ({ ...p, debit_account_id: v }))} placeholder="Debit" />
+                        </div>
+                        <div>
+                          <label className="label !text-[10px] flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-forest inline-block" /> Credit account
+                          </label>
+                          <AccountSelect value={editF.credit_account_id} onChange={v => setEditF(p => ({ ...p, credit_account_id: v }))} placeholder="Credit" />
+                        </div>
+                        <div>
+                          <label className="label !text-[10px] flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> VAT account
+                          </label>
+                          <AccountSelect value={editF.vat_account_id} onChange={v => setEditF(p => ({ ...p, vat_account_id: v }))} placeholder="VAT (optional)" />
+                        </div>
+                        <div>
+                          <label className="label !text-[10px] flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" /> SC account
+                          </label>
+                          <AccountSelect value={editF.sc_account_id} onChange={v => setEditF(p => ({ ...p, sc_account_id: v }))} placeholder="SC (optional)" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label !text-xs">Notes</label>
+                        <input className="input text-xs" value={editF.notes}
+                          onChange={e => setEditF(p => ({ ...p, notes: e.target.value }))} />
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── View row ── */
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <span className="font-semibold text-sm text-pine">{m.label}</span>
+                          <span className="font-mono text-[10px] text-pine/40 bg-pine/5 px-1.5 py-0.5 rounded">{m.transaction_type}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {/* Debit */}
+                          <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-700">
+                            <span className="font-bold">Dr</span>
+                            <span className="truncate max-w-[160px]">{m.debit ? `${m.debit.code} · ${m.debit.name}` : '—'}</span>
+                          </span>
+                          <ArrowRight size={12} className="text-pine/30 shrink-0" />
+                          {/* Credit */}
+                          <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-forest/10 border border-forest/20 text-forest">
+                            <span className="font-bold">Cr</span>
+                            <span className="truncate max-w-[160px]">{m.credit ? `${m.credit.code} · ${m.credit.name}` : '—'}</span>
+                          </span>
+                          {/* VAT */}
+                          {m.vat && (
+                            <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700">
+                              <span className="font-bold">VAT</span>
+                              <span className="truncate max-w-[120px]">{m.vat.code} · {m.vat.name}</span>
+                            </span>
+                          )}
+                          {/* SC */}
+                          {m.sc && (
+                            <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 border border-violet-200 text-violet-700">
+                              <span className="font-bold">SC</span>
+                              <span className="truncate max-w-[120px]">{m.sc.code} · {m.sc.name}</span>
+                            </span>
+                          )}
+                        </div>
+                        {m.notes && (
+                          <p className="text-[10px] text-pine/40 mt-1.5">{m.notes}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => startEdit(m)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-leaf text-pine/40 hover:text-forest shrink-0"
+                        title="Edit mapping"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+
+      <div className="text-xs text-pine/40 px-1">
+        ℹ️ These mappings define the accounting entries when transactions are posted from Reservations, POS, and Inventory modules.
+        Consult your accountant before changing mappings.
       </div>
     </div>
   )
