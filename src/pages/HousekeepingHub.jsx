@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
+import KPICards from '../components/KPICards.jsx'
 
 // Canonical HK vocabulary — must match Dashboard.jsx's HK_STATES exactly
 // (previously this file used a different set: Occupied/Out of Service —
