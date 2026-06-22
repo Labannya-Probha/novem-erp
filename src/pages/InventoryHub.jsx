@@ -6,6 +6,7 @@ import {
   Undo2, Pencil, Save, RotateCcw, Search, ChevronRight, FileText,
 } from 'lucide-react'
 import VendorPaymentTab from '../components/VendorPaymentTab.jsx'
+import KPICards from '../components/KPICards.jsx'
 
 const TABS = ['Items & Stock', 'Vendors', 'Requisitions', 'Purchase Orders', 'Goods Receipt', 'Transfers', 'Returns', 'Vendor Payments']
 
