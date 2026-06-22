@@ -26,7 +26,7 @@ import TaskManagement from './pages/TaskManagement.jsx'
 import {
   Leaf, LayoutDashboard, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
   FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, Building2,
-  Menu, X, ListChecks, ChevronDown,
+  Menu, X, ListChecks, ChevronDown, Bot,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -41,6 +41,7 @@ const NAV_GROUPS = [
   ]},
   { title: 'Tasks', items: [
     { id: 'tasks', label: 'Task Management', icon: ListChecks },
+    { id: 'ai-tasker', label: 'AI Tasker', icon: Bot },
   ]},
   { title: 'Front Office', items: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -114,6 +115,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
   const startReservation = (prefill = {}) => navigate('/reservations', { state: { prefill } })
 
   const softwareName = company?.software_name || 'Aura Stay'
+  const sidebarThemeClass = 'bg-[linear-gradient(180deg,#0c3f46_0%,#1f6f78_52%,#0a2f34_100%)]'
 
   // Close the mobile drawer automatically whenever the route changes â€”
   // otherwise it stays open after tapping a nav link.
@@ -141,7 +143,11 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
       </div>
       <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
         {NAV_GROUPS.map((g) => {
-          const items = g.items.filter((n) => n.id === 'cms' ? (isAdmin || role === 'SUPERUSER') : can(role, n.id, privileges))
+          const items = g.items.filter((n) => {
+            if (n.id === 'ai-tasker') return true
+            if (n.id === 'cms') return isAdmin || role === 'SUPERUSER'
+            return can(role, n.id, privileges)
+          })
           if (items.length === 0) return null
           const isOpenGroup = openGroup === g.title
           return (
@@ -231,7 +237,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
   return (
     <div className="min-h-screen flex">
       {/* Desktop sidebar â€” always visible, fixed, unchanged from before */}
-      <aside className="hidden lg:flex w-60 bg-gradient-to-b from-[#18252f] to-[#111a21] text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
+      <aside className={`hidden lg:flex w-60 ${sidebarThemeClass} text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]`}>
         {SidebarContent}
       </aside>
 
@@ -239,7 +245,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
       {mobileNavOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-ink/35" onClick={() => setMobileNavOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-gradient-to-b from-[#18252f] to-[#111a21] text-white flex flex-col shadow-2xl border-r border-white/10">
+          <aside className={`absolute inset-y-0 left-0 w-72 max-w-[85vw] ${sidebarThemeClass} text-white flex flex-col shadow-2xl border-r border-white/10`}>
             {SidebarContent}
           </aside>
         </div>
@@ -336,6 +342,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
+          <Route path="/ai-tasker" element={<GuestPosKiosk />} />
           <Route path="/cms" element={
               (isAdmin || role === 'SUPERUSER')
                 ? <CmsPortal role={role} isAdmin={isAdmin} />
