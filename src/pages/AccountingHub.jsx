@@ -3,11 +3,10 @@ import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
 import {
   Calculator, Plus, Trash2, Scale, Building2, Printer, Pencil,
-  Lock, BookOpen, AlertCircle, CheckCircle2, X,
+  Lock, BookOpen, AlertCircle, CheckCircle2, X, Clock, RotateCcw, XCircle,
 } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 import VoucherDoc from '../components/print/VoucherDoc.jsx'
-import KPICards from '../components/KPICards.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  RETAINED EARNINGS account code — offsetting account for OB entries  */
@@ -18,7 +17,7 @@ const RE_CODE = '300100'
 /* ------------------------------------------------------------------ */
 /*  ROOT                                                                */
 /* ------------------------------------------------------------------ */
-export default function AccountingHub({ userName, isAdmin }) {
+export default function AccountingHub({ userName, isAdmin, role }) {
   const [tab, setTab]         = useState('Journal Vouchers')
   const [accounts, setAccounts] = useState([])
   const [company, setCompany] = useState(null)
@@ -42,6 +41,7 @@ export default function AccountingHub({ userName, isAdmin }) {
     'Trial Balance',
     'Chart of Accounts',
     'Fixed Assets',
+    'Day Close',
     ...(isAdmin ? ['Opening Balance'] : []),
   ]
 
@@ -89,9 +89,74 @@ export default function AccountingHub({ userName, isAdmin }) {
       {tab === 'Fixed Assets'     && (
         <AssetsTab accounts={accounts} userName={userName} flash={flash} />
       )}
+      {tab === 'Day Close' && (
+        <AccountsDayCloseTab userName={userName} role={role} isAdmin={isAdmin} flash={flash} />
+      )}
       {tab === 'Opening Balance' && isAdmin && (
         <OpeningBalanceTab accounts={accounts} userName={userName} flash={flash} />
       )}
+    </div>
+  )
+}
+
+function AccountsDayCloseTab({ userName, role, isAdmin, flash }) {
+  const [day, setDay] = useState(todayISO())
+  const [closeRow, setCloseRow] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const canCloseDay = isAdmin || role === 'ACCOUNTS' || role === 'MANAGER'
+  const canOpenDay = role === 'SUPERUSER'
+
+  const loadClose = useCallback(async () => {
+    const { data } = await supabase.from('day_closes').select('*').eq('close_date', day).eq('type', 'ACCOUNTS').maybeSingle()
+    setCloseRow(data || null)
+  }, [day])
+
+  useEffect(() => { loadClose() }, [loadClose])
+
+  const closeDay = async () => {
+    if (!canCloseDay) { flash('Accounts day-close requires Accounts, Manager, Admin or SUPERUSER access.'); return }
+    setBusy(true)
+    const payload = { close_date: day, type: 'ACCOUNTS', closed_by: userName, closed_at: new Date().toISOString() }
+    const { error: delErr } = await supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'ACCOUNTS')
+    if (delErr) { setBusy(false); flash(delErr.message); return }
+    const { error } = await supabase.from('day_closes').insert(payload)
+    setBusy(false)
+    if (error) flash(error.message)
+    else { flash(`Accounts day closed for ${day}.`); loadClose() }
+  }
+
+  const openDay = async () => {
+    if (!canOpenDay) { flash('Only SUPERUSER can open a closed day.'); return }
+    setBusy(true)
+    const { error } = await supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'ACCOUNTS')
+    setBusy(false)
+    if (error) flash(error.message)
+    else { flash(`Accounts day opened for ${day}.`); loadClose() }
+  }
+
+  return (
+    <div className="card p-5 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="font-display font-semibold text-pine flex items-center gap-2"><Clock size={16} className="text-amber" /> Accounts Day Close</h3>
+          <p className="text-xs text-pine/60 mt-1">This closes Accounting day only.</p>
+          {closeRow && <p className="text-xs text-pine/50 mt-1">Closed by {closeRow.closed_by || '—'} at {fmtDate(closeRow.closed_at || closeRow.created_at || day)}.</p>}
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="date" className="input !w-44" value={day} onChange={(e) => setDay(e.target.value)} />
+          <button className="btn-ghost !py-1" onClick={loadClose} disabled={busy}><RotateCcw size={14} /> Refresh</button>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {canOpenDay && closeRow && (
+          <button className="btn-ghost !py-1 text-red-600" onClick={openDay} disabled={busy}>
+            <XCircle size={14} /> Day Open
+          </button>
+        )}
+        <button className="btn-amber !py-1" onClick={closeDay} disabled={busy}>
+          <Clock size={14} /> Close Day
+        </button>
+      </div>
     </div>
   )
 }
