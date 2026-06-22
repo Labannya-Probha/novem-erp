@@ -479,6 +479,7 @@ function OpeningBalanceTab({ accounts, userName, flash }) {
 const VOUCHER_TYPES = ['JOURNAL', 'DEBIT', 'CREDIT', 'CONTRA']
 const VOUCHER_PREFIX = { JOURNAL: 'JV', DEBIT: 'DV', CREDIT: 'CV', CONTRA: 'CN' }
 const voucherTypeFromNo = (no = '') => {
+  if (no.startsWith('JV-')) return 'JOURNAL'
   if (no.startsWith('DV-')) return 'DEBIT'
   if (no.startsWith('CV-')) return 'CREDIT'
   if (no.startsWith('CN-')) return 'CONTRA'
