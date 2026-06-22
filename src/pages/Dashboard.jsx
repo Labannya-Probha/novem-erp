@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
-import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle } from 'lucide-react'
+import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle, Send } from 'lucide-react'
 import KPICards from '../components/KPICards.jsx'
 
 const HK_STATES = ['Clean', 'Dirty', 'Inspected', 'Out of Order']
@@ -24,6 +24,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
   const [dayBusy, setDayBusy] = useState(false)
   const [foCloseRow, setFoCloseRow] = useState(null)
   const [dayMsg, setDayMsg] = useState('')
+  const [reqBusy, setReqBusy] = useState({})
   const today = todayISO()
   const canCloseFrontDay = isAdmin || role === 'MANAGER' || role === 'FRONT_OFFICE' || role === 'ACCOUNTS'
   const canOpenDay = role === 'SUPERUSER'
@@ -114,6 +115,43 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
     await supabase.from('rooms').update({ hk_status: next }).eq('id', room.id)
   }
 
+  const requestCheckoutClearance = async (room, occupancy) => {
+    const title = `Checkout clearance request · Room ${room.room_no}`
+    setReqBusy((p) => ({ ...p, [room.id]: true }))
+    try {
+      const { data: existing } = await supabase
+        .from('tasks')
+        .select('id, status')
+        .eq('source', 'CHECKOUT_CLEARANCE')
+        .eq('title', title)
+        .in('status', ['OPEN', 'IN_PROGRESS'])
+        .limit(1)
+      if (existing && existing.length) {
+        flashDay(`Clearance request already pending for Room ${room.room_no}.`)
+        return
+      }
+
+      const reservationBits = occupancy
+        ? [`Res: ${occupancy.res_no || '—'}`, `Guest: ${occupancy.guest || '—'}`, `Mobile: ${occupancy.phone || '—'}`]
+        : []
+      const { error } = await supabase.from('tasks').insert({
+        title,
+        description: [`Please inspect and clear room for checkout.`, ...reservationBits, `Requested by: ${userName}`].join('\n'),
+        priority: 'HIGH',
+        status: 'OPEN',
+        due_date: today,
+        source: 'CHECKOUT_CLEARANCE',
+        created_by: userName,
+      })
+      if (error) throw error
+      flashDay(`Checkout clearance request sent to Housekeeping for Room ${room.room_no}.`)
+    } catch (e) {
+      flashDay(e.message || 'Failed to send clearance request.')
+    } finally {
+      setReqBusy((p) => ({ ...p, [room.id]: false }))
+    }
+  }
+
   const List = ({ title, rows, empty }) => (
     <div className="card p-5">
       <h3 className="font-display font-semibold text-pine mb-3">{title}</h3>
@@ -187,6 +225,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
             {list.map((room) => {
               const o = occ[room.id]
               const occSt = (o && o.st) || 'VACANT'
+              const canRequestClearance = occSt === 'DEPARTURE' || occSt === 'OCCUPIED'
               const hk = room.hk_status || 'Clean'
               const Icon = HK_ICON[hk] || Sparkles
               return (
@@ -211,6 +250,14 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
                       title={canEditHousekeeping ? 'Change housekeeping status' : 'Housekeeping status can be changed only by Housekeeping/Manager/Admin'}
                       className={`w-full px-1.5 py-1 rounded-lg text-[10px] font-medium border flex items-center justify-center gap-1 hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed ${HK_STYLE[hk]}`}>
                       <Icon size={11} /> {hk}
+                    </button>
+                    <button
+                      onClick={() => requestCheckoutClearance(room, o)}
+                      disabled={reqBusy[room.id] || !canRequestClearance}
+                      className="w-full px-1.5 py-1 rounded-lg text-[10px] font-medium border flex items-center justify-center gap-1 bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+                      title={canRequestClearance ? 'Send checkout clearance request to Housekeeping' : 'Checkout clearance request applies to in-house/departure rooms'}
+                    >
+                      <Send size={11} /> {reqBusy[room.id] ? 'Sending…' : 'Request checkout clearance'}
                     </button>
                   </div>
                 </div>
