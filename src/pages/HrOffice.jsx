@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
+import KPICards from '../components/KPICards.jsx'
 import { Users, Plus, Check, X, CalendarDays, FileText, Wallet, Printer } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 import ComplianceTab from '../components/ComplianceTab'
 import EmployeeProfile from '../components/EmployeeProfile.jsx'
-import KPICards from '../components/KPICards.jsx'
+
 const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Payroll', 'Incidents', 'Letters / Docket', 'Compliance']
 
 export default function HrOffice({ userName, role, isAdmin, company }) {
@@ -19,6 +20,7 @@ export default function HrOffice({ userName, role, isAdmin, company }) {
         <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><Users className="text-forest" /> HR & Office</h1>
         <p className="text-sm text-pine/60">Employee records, attendance, leave, payroll, incidents and the office document register.</p>
       </div>
+      <KPICards module="hr" />
       {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
       <div className="flex gap-1 border-b border-leaf flex-wrap">
         {TABS.map((t) => (<button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-semibold rounded-t-lg ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>{t}</button>))}
@@ -222,6 +224,7 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
   const [runs, setRuns] = useState([])
+  const [runsLoaded, setRunsLoaded] = useState(false)
   const [active, setActive] = useState(null)
   const [slips, setSlips] = useState([])
   const [busy, setBusy] = useState(false)
@@ -243,7 +246,7 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
   // pulling absent-day counts from attendance_records to apply a simple
   // per-day deduction, and the Internet/Telephone allowance amount from
   // allowance_config (matched by designation, falling back to 'DEFAULT').
-  const generateRun = async () => {
+  const generateRun = async ({ silent = false } = {}) => {
     setBusy(true)
     try {
       const { data: existing } = await supabase.from('payroll_runs').select('id').eq('period_month', month).eq('period_year', year).maybeSingle()
@@ -287,7 +290,7 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
           net_payable: netPayable,
         })
       }
-      if (slipsToInsert.length === 0) { flash('No active employees to run payroll for.'); setBusy(false); return }
+      if (slipsToInsert.length === 0) { if (!silent) flash('No active employees to run payroll for.'); setBusy(false); return }
       const { error: se } = await supabase.from('payslips').insert(slipsToInsert)
       if (se) throw se
 
@@ -298,6 +301,13 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
     setBusy(false)
   }
 
+  useEffect(() => {
+    if (!canApprove || !runsLoaded || busy) return
+    const exists = runs.some((r) => r.period_month === month && r.period_year === year)
+    if (!exists) {
+      generateRun({ silent: true })
+    }
+  }, [canApprove, runsLoaded, runs, month, year])
   const updateSlip = async (slip, field, value) => {
     const n = { ...slip, [field]: value }
     n.net_payable = +(
