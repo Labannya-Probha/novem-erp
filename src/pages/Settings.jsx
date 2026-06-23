@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase, SUPABASE_CONFIG } from '../supabase'
 import { fmtBDT, todayISO, setCurrency } from '../lib/helpers'
@@ -747,7 +748,7 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
       const { data: propRow } = await supabase
         .from('properties').select('slug').eq('id', myRow.tenant_id).maybeSingle()
       const tenantSlug = propRow?.slug || myRow.tenant_id.replace(/-/g, '').substring(0, 8)
-      const { createClient } = await import('@supabase/supabase-js')
+      // createClient is statically imported at the top of this file
       const tmp = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, { auth: { persistSession: false, autoRefreshToken: false } })
       const email = `${uname}.${tenantSlug}@${LOGIN_DOMAIN}`
       const { data, error } = await tmp.auth.signUp({

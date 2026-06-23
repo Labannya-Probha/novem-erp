@@ -4,7 +4,14 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      treeshake: false
-    }
-  }
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          supabase: ['@supabase/supabase-js'],
+          xlsx: ['xlsx'],
+          lucide: ['lucide-react'],
+        },
+      },
+    },
+  },
 })
