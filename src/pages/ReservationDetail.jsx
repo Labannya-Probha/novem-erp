@@ -2277,7 +2277,7 @@ function ShareholderRedemption({ res, charges = [], reload, flash, userName }) {
     setBusy(false)
   }
 
-  if (!shareholder && !showPicker) {
+  if (!shareholder) {
     return (
       <div className="card p-4">
         <h3 className="font-display font-semibold text-pine text-sm mb-2 flex items-center gap-2">
