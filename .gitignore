@@ -18,7 +18,8 @@ pnpm-debug.log*
 
 # editor/system files
 .DS_Store
-.vscode/
+.vscode/*
+!.vscode/mcp.json
 .idea/
 *.swp
 
