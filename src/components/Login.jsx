@@ -6,6 +6,7 @@ import { LogIn } from 'lucide-react'
 const FALLBACK_LOGO     = 'https://gwllsoembqacolzfrquu.supabase.co/storage/v1/object/public/branding/logo_1781457117977.png'
 const FALLBACK_NAME     = 'Novem Eco Resort'
 const FALLBACK_SOFTWARE = 'Aura Stay ERP'
+const LOGIN_DOMAIN      = 'aura-stay.local'
 
 // Default slug when accessing the root domain (www.erp.aurastay.bd with no path)
 const DEFAULT_SLUG = 'novemecoresort'
@@ -61,7 +62,7 @@ export default function Login({ slug }) {
   const signIn = async () => {
     setBusy(true); setErr('')
     try {
-      const uname = username.trim()
+      const uname = username.trim().toLowerCase()
       if (!uname) throw new Error('Enter your username')
       const { data: email, error: re } = await supabase.rpc('email_for_username', {
         p_username: uname,
