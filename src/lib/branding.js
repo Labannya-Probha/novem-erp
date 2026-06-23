@@ -38,6 +38,7 @@ export function applyBrandTheme(theme) {
   root.style.setProperty('--brand-accent',        theme.accent)
   root.style.setProperty('--brand-print-primary', theme.printPrimary)
   root.style.setProperty('--brand-print-accent',  theme.printAccent)
+  root.style.setProperty('--sidebar-bg',          theme.printPrimary)
 }
 
 /**

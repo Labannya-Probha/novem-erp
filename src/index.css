@@ -35,6 +35,7 @@
     --text-secondary:     #5F5A55;
     --interactive-glow:   rgba(31, 111, 120, 0.16);
     --interactive-shadow: 0 16px 36px rgba(23, 23, 23, 0.10);
+    --sidebar-bg:         #1B4D2E;
 
     /* ── Motion system ───────────────────────────────────────────────── */
     --aura-enter-duration:  0.75s;
