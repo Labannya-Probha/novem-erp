@@ -8,3 +8,11 @@ This repository includes workspace-level VS Code settings in `.vscode/settings.j
 
 - If you open this repo in VS Code, these settings are applied automatically.
 - Please keep this file committed so the whole team sees the same lint behavior.
+
+## Supabase security hardening notes
+
+- This repo now includes a DB migration to harden exposed `SECURITY DEFINER` functions in the `public` schema.
+- Supabase **Leaked password protection** is a hosted Auth setting and must be enabled in the Supabase dashboard:
+  - Go to **Authentication → Providers → Email**
+  - Enable **Leaked password protection**
+  - Save changes

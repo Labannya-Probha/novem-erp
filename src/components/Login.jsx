@@ -6,6 +6,7 @@ import { LogIn } from 'lucide-react'
 const FALLBACK_LOGO     = 'https://gwllsoembqacolzfrquu.supabase.co/storage/v1/object/public/branding/logo_1781457117977.png'
 const FALLBACK_NAME     = 'Novem Eco Resort'
 const FALLBACK_SOFTWARE = 'Aura Stay ERP'
+const LOGIN_DOMAIN      = 'aura-stay.local'
 
 // Default slug when accessing the root domain (www.erp.aurastay.bd with no path)
 const DEFAULT_SLUG = 'novemecoresort'
@@ -51,16 +52,18 @@ export default function Login({ slug }) {
   const signIn = async () => {
     setBusy(true); setErr('')
     try {
-      const uname = username.trim()
+      const uname = username.trim().toLowerCase()
       if (!uname) throw new Error('Enter your username')
-      const { data: email, error: re } = await supabase.rpc('email_for_username', {
-        p_username: uname,
-        p_slug: effectiveSlug,
-      })
-      if (re) throw re
-      if (!email) throw new Error('No active account found for this username')
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw new Error('Wrong username or password')
+      const candidates = [
+        `${uname}.${effectiveSlug}@${LOGIN_DOMAIN}`,
+        `${uname}@${LOGIN_DOMAIN}`,
+      ]
+      let signedIn = false
+      for (const email of candidates) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (!error) { signedIn = true; break }
+      }
+      if (!signedIn) throw new Error('Wrong username or password')
     } catch (e) { setErr(e.message) }
     setBusy(false)
   }
