@@ -4,12 +4,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        forest: '#2E7D32',
-        pine: '#1F1F1C',
-        ink: '#20241F',
-        paper: '#F7F5F2',
-        leaf: '#E5DFD6',
-        amber: '#C89B5C',
+        forest: 'rgb(var(--color-forest-rgb) / <alpha-value>)',
+        pine: 'rgb(var(--color-pine-rgb) / <alpha-value>)',
+        ink: 'rgb(var(--color-ink-rgb) / <alpha-value>)',
+        paper: 'rgb(var(--color-paper-rgb) / <alpha-value>)',
+        leaf: 'rgb(var(--color-leaf-rgb) / <alpha-value>)',
+        amber: 'rgb(var(--color-amber-rgb) / <alpha-value>)',
       },
       fontFamily: {
         display: ['Fraunces', 'serif'],
