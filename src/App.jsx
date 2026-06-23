@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import {
   BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation,
 } from 'react-router-dom'
 import { supabase } from './supabase'
+import { applyBrandTheme, buildBrandTheme, DEFAULT_THEME, resolveBrandTheme } from './lib/branding'
 import { setCurrency } from './lib/helpers'
 import { can, ROLE_LABELS } from './lib/roles'
 import { getTenantId, setTenantId } from './lib/tenant'
@@ -92,6 +93,7 @@ const SIDEBAR_CMS_ENTITY_TABS = [
   { id: 'facility_items', label: 'Facility Items' },
   { id: 'chart_of_accounts', label: 'Chart of Accounts' },
   { id: 'rooms', label: 'Rooms' },
+  { id: 'reservation_policies', label: 'Reservation Policies' },
 ]
 
 const firstAccessiblePath = (role, privileges) => {
@@ -115,7 +117,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
   const startReservation = (prefill = {}) => navigate('/reservations', { state: { prefill } })
 
   const softwareName = company?.software_name || 'Aura Stay'
-  const sidebarThemeClass = 'bg-[linear-gradient(180deg,#0c3f46_0%,#1f6f78_52%,#0a2f34_100%)]'
+  const sidebarThemeStyle = { background: 'var(--sidebar-bg)' }
 
   // Close the mobile drawer automatically whenever the route changes â€”
   // otherwise it stays open after tapping a nav link.
@@ -144,7 +146,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
       <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
         {NAV_GROUPS.map((g) => {
           const items = g.items.filter((n) => {
-            if (n.id === 'ai-tasker') return true
+            if (n.id === 'ai-tasker') return can(role, 'tasks', privileges)
             if (n.id === 'cms') return isAdmin || role === 'SUPERUSER'
             return can(role, n.id, privileges)
           })
@@ -237,7 +239,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
   return (
     <div className="min-h-screen flex">
       {/* Desktop sidebar â€” always visible, fixed, unchanged from before */}
-      <aside className={`hidden lg:flex w-60 ${sidebarThemeClass} text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]`}>
+      <aside style={sidebarThemeStyle} className="hidden lg:flex w-60 text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
         {SidebarContent}
       </aside>
 
@@ -245,7 +247,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
       {mobileNavOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-ink/35" onClick={() => setMobileNavOpen(false)} />
-          <aside className={`absolute inset-y-0 left-0 w-72 max-w-[85vw] ${sidebarThemeClass} text-white flex flex-col shadow-2xl border-r border-white/10`}>
+          <aside style={sidebarThemeStyle} className="absolute inset-y-0 left-0 w-72 max-w-[85vw] text-white flex flex-col shadow-2xl border-r border-white/10">
             {SidebarContent}
           </aside>
         </div>
@@ -342,7 +344,11 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
-          <Route path="/ai-tasker" element={<GuestPosKiosk />} />
+          <Route path="/ai-tasker" element={
+            <GuardedRoute role={role} navId="tasks" privileges={privileges}>
+              <TaskManagement userName={userName} role={role} isAdmin={isAdmin} aiTaskerMode />
+            </GuardedRoute>
+          } />
           <Route path="/cms" element={
               (isAdmin || role === 'SUPERUSER')
                 ? <CmsPortal role={role} isAdmin={isAdmin} />
@@ -399,6 +405,7 @@ function AppRoot() {
   const [profile, setProfile] = useState(null)
   const [company, setCompany] = useState(null)
   const [privileges, setPrivileges] = useState(null)
+  const [brandTheme, setBrandTheme] = useState(buildBrandTheme(DEFAULT_THEME))
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -423,6 +430,10 @@ function AppRoot() {
   useEffect(() => {
     if (!session) {
       setTenantId(null)
+      setCompany(null)
+      const fallbackTheme = buildBrandTheme(DEFAULT_THEME)
+      setBrandTheme(fallbackTheme)
+      applyBrandTheme(fallbackTheme)
       return
     }
     supabase.from('app_users').select('*').eq('id', session.user.id).maybeSingle()
@@ -434,6 +445,23 @@ function AppRoot() {
         loadCompany()
       })
   }, [session?.user?.id])
+
+  useEffect(() => {
+    let active = true
+    resolveBrandTheme(company)
+      .then((theme) => {
+        if (!active) return
+        setBrandTheme(theme)
+        applyBrandTheme(theme)
+      })
+      .catch(() => {
+        if (!active) return
+        const fallbackTheme = buildBrandTheme(DEFAULT_THEME)
+        setBrandTheme(fallbackTheme)
+        applyBrandTheme(fallbackTheme)
+      })
+    return () => { active = false }
+  }, [company?.logo_url, company?.primary_color, company?.accent_color, company?.brand_primary, company?.brand_accent])
 
   useEffect(() => {
     const role = profile?.role
@@ -461,5 +489,13 @@ function AppRoot() {
   const isAdmin  = role === 'ADMIN' || role === 'SUPERUSER'
   const userName = profile?.full_name || session.user?.email?.split('@')[0] || 'User'
 
-  return <AppShell company={company} role={role} isAdmin={isAdmin} userName={userName} loadCompany={loadCompany} privileges={privileges} />
+  const themedCompany = company ? {
+    ...company,
+    primary_color: company.primary_color || brandTheme.primary,
+    accent_color: company.accent_color || brandTheme.accent,
+    brand_primary: company.brand_primary || brandTheme.printPrimary,
+    brand_accent: company.brand_accent || brandTheme.printAccent,
+  } : null
+
+  return <AppShell company={themedCompany} role={role} isAdmin={isAdmin} userName={userName} loadCompany={loadCompany} privileges={privileges} />
 }
