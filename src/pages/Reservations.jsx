@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../supabase'
-import { fmtBDT, fmtDate, todayISO, nightsBetween, rateFor, computeCharge, STATUS_COLORS } from '../lib/helpers'
+import { fmtBDT, fmtDate, todayISO, nightsBetween, eachNight, rateFor, computeCharge, STATUS_COLORS } from '../lib/helpers'
+import { loadReservationConfig } from '../lib/reservationConfig'
 import { Search, Trash2, UserSearch, X, CheckCircle2 } from 'lucide-react'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import KPICards from '../components/KPICards.jsx'
@@ -11,6 +12,11 @@ const STATUS_TO_TAB = {
   QUERY: 'Overview', QUOTED: 'Overview', CONFIRMED: 'Check-In',
   CHECKED_IN: 'Billings & Check-Out', CHECKED_OUT: 'Billings & Check-Out',
   SETTLED: 'Billings & Check-Out', CANCELLED: 'Overview',
+}
+
+const dayName = (dateStr) => {
+  if (!dateStr) return '—'
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
 }
 
 export default function Reservations({ openReservation, userName, prefill, clearPrefill }) {
@@ -297,6 +303,8 @@ function NewReservation({ close, openReservation, userName, prefill }) {
   const [roomRows, setRoomRows]     = useState([])
   const [taxConfig, setTaxConfig]   = useState([])
   const [facilityItems, setFacilityItems] = useState([])
+  const [reservationCfg, setReservationCfg] = useState(() => loadReservationConfig())
+  const [selectedPolicyId, setSelectedPolicyId] = useState('')
   const [addons, setAddons]         = useState({})
   const [serviceSearch, setServiceSearch] = useState('')
   const [busy, setBusy]             = useState(false)
@@ -305,6 +313,26 @@ function NewReservation({ close, openReservation, userName, prefill }) {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const toggleAddon  = (key) => setAddons((p) => ({ ...p, [key]: { ...p[key], selected: !p[key].selected } }))
   const updAddon     = (key, field, val) => setAddons((p) => ({ ...p, [key]: { ...p[key], [field]: val } }))
+
+  const applyDiscountPolicy = (policyId) => {
+    setSelectedPolicyId(policyId)
+    const policy = reservationCfg.discountPolicies.find((item) => item.id === policyId)
+    if (!policy) return
+    setF((prev) => ({
+      ...prev,
+      discount_type: policy.type,
+      discount_val: policy.value,
+      notes: policy.note && !prev.notes?.includes(policy.note)
+        ? `${prev.notes ? `${prev.notes}\n` : ''}${policy.note}`.trim()
+        : prev.notes,
+    }))
+  }
+
+  const hasBlackoutOverlap = (fromDate, toDate) => {
+    if (!fromDate || !toDate || toDate <= fromDate) return false
+    const blocked = new Set(reservationCfg.blackoutDays || [])
+    return eachNight(fromDate, toDate).some((d) => blocked.has(d))
+  }
 
   const setCheckIn = (val) => setF((p) => {
     const next = { ...p, check_in: val }
@@ -350,6 +378,24 @@ function NewReservation({ close, openReservation, userName, prefill }) {
         ])))
       })
   }, [])
+
+  useEffect(() => {
+    const syncConfig = () => setReservationCfg(loadReservationConfig())
+    syncConfig()
+    window.addEventListener('focus', syncConfig)
+    window.addEventListener('storage', syncConfig)
+    return () => {
+      window.removeEventListener('focus', syncConfig)
+      window.removeEventListener('storage', syncConfig)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selectedPolicyId) return
+    const defaultPolicy = (reservationCfg.discountPolicies || []).find((item) => item.active)
+    if (!defaultPolicy) return
+    applyDiscountPolicy(defaultPolicy.id)
+  }, [reservationCfg.discountPolicies, selectedPolicyId])
 
   const createCompany = async (name) => {
     const { data, error } = await supabase.from('companies').insert({ name }).select().single()
@@ -404,7 +450,12 @@ function NewReservation({ close, openReservation, userName, prefill }) {
       if (!f.reservation_name) throw new Error('Reservation Name is required')
       if (!f.guest_name)       throw new Error('Guest Name is required')
       if (validRows.length === 0 && f.check_out <= f.check_in) throw new Error('Check-out must be after check-in')
+      if (hasBlackoutOverlap(overallCI, overallCO)) throw new Error('Selected stay window includes blackout day(s). Please adjust dates.')
       for (const r of validRows) {
+        if (hasBlackoutOverlap(r.from_date, r.to_date)) {
+          const rm = rooms.find((x) => x.id === r.room_id)
+          throw new Error(`Room ${rm?.room_no || ''} dates include configured blackout day(s).`)
+        }
         if (isBusy(r.room_id, r.from_date, r.to_date)) {
           const rm = rooms.find((x) => x.id === r.room_id)
           throw new Error(`Room ${rm?.room_no} is already booked for ${r.from_date} → ${r.to_date}`)
@@ -643,7 +694,9 @@ function NewReservation({ close, openReservation, userName, prefill }) {
             )}
 
             <div><label className="label">Default check-in *</label><input type="date" className="input" value={f.check_in} onChange={(e) => setCheckIn(e.target.value)} /></div>
+            <div className="text-[11px] text-pine/50 -mt-2">{dayName(f.check_in)}</div>
             <div><label className="label">Default check-out *</label><input type="date" className="input" value={f.check_out} onChange={(e) => set('check_out', e.target.value)} /></div>
+            <div className="text-[11px] text-pine/50 -mt-2">{dayName(f.check_out)}</div>
 
             <div className="col-span-2">
               <div className="flex items-center justify-between mb-1">
@@ -670,6 +723,9 @@ function NewReservation({ close, openReservation, userName, prefill }) {
                       <input type="date" className="input sm:col-span-3" value={row.from_date} onChange={(e) => updRow(i, 'from_date', e.target.value)} />
                       <input type="date" className="input sm:col-span-3" value={row.to_date} onChange={(e) => updRow(i, 'to_date', e.target.value)} />
                       <button type="button" className="text-red-400 hover:text-red-600 sm:col-span-1 justify-self-end sm:justify-self-auto" onClick={() => delRow(i)}><Trash2 size={15} /></button>
+                      <p className="sm:col-span-3 text-[10px] text-pine/50 -mt-1">{dayName(row.from_date)}</p>
+                      <p className="sm:col-span-3 text-[10px] text-pine/50 -mt-1">{dayName(row.to_date)}</p>
+                      <p className="sm:col-span-1" />
                       {taken && <p className="sm:col-span-12 text-xs text-red-600 -mt-1">This room is already booked for the selected dates.</p>}
                     </div>
                   )
@@ -678,6 +734,9 @@ function NewReservation({ close, openReservation, userName, prefill }) {
                 {rooms.length === 0 && <p className="text-xs text-amber">No rooms defined — add room inventory in Settings first.</p>}
               </div>
               {validRows.length > 0 && <p className="text-xs text-pine/50 mt-1">Stay window: <b>{overallCI} → {overallCO}</b> · {validRows.length} room booking(s).</p>}
+              {reservationCfg.blackoutDays.length > 0 && (
+                <p className="text-xs text-amber mt-1">Configured blackout days: {reservationCfg.blackoutDays.join(', ')}</p>
+              )}
             </div>
 
             {/* Included Services — searchable, #3 */}
@@ -794,6 +853,24 @@ function NewReservation({ close, openReservation, userName, prefill }) {
 
             <div><label className="label">Adults</label><input type="number" min="1" className="input" value={f.pax_adults} onChange={(e) => set('pax_adults', e.target.value)} /></div>
             <div><label className="label">Children</label><input type="number" min="0" className="input" value={f.pax_children} onChange={(e) => set('pax_children', e.target.value)} /></div>
+
+            <div className="col-span-2">
+              <label className="label">Discount Policy</label>
+              <SearchableSelect
+                options={[
+                  { value: '', label: 'No policy (manual discount)' },
+                  ...reservationCfg.discountPolicies
+                    .filter((item) => item.active)
+                    .map((item) => ({
+                      value: item.id,
+                      label: `${item.name} · ${item.type === 'fixed' ? fmtBDT(item.value) : `${item.value}%`}`,
+                    })),
+                ]}
+                value={selectedPolicyId}
+                onChange={(val) => applyDiscountPolicy(val)}
+                placeholder="Select policy…"
+              />
+            </div>
 
             <div className="col-span-2">
               <label className="label">Discount</label>

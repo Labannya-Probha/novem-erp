@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, todayISO } from '../lib/helpers'
+import { loadReservationConfig } from '../lib/reservationConfig'
 import { CalendarRange, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 
 const DAY_W = 34
@@ -34,6 +35,7 @@ export default function BookingCalendar({ openReservation, onNewReservation, onO
   const [ym, setYm]         = useState(todayISO().slice(0, 7))
   const [rooms, setRooms]   = useState([])
   const [cells, setCells]   = useState({})
+  const [reservationCfg, setReservationCfg] = useState(() => loadReservationConfig())
   const [paidSet, setPaidSet] = useState(new Set()) // reservation_ids with ≥1 payment
   const [loading, setLoading] = useState(false)
   const [msg, setMsg]         = useState('')
@@ -98,8 +100,19 @@ export default function BookingCalendar({ openReservation, onNewReservation, onO
   }
 
   useEffect(() => { load() }, [ym])
+  useEffect(() => {
+    const syncConfig = () => setReservationCfg(loadReservationConfig())
+    syncConfig()
+    window.addEventListener('focus', syncConfig)
+    window.addEventListener('storage', syncConfig)
+    return () => {
+      window.removeEventListener('focus', syncConfig)
+      window.removeEventListener('storage', syncConfig)
+    }
+  }, [])
 
   const days         = monthDays(ym)
+  const blackoutSet  = new Set(reservationCfg.blackoutDays || [])
   const occRoomNights = Object.keys(cells).length
   const occPct       = rooms.length ? (occRoomNights / (rooms.length * days.length)) * 100 : 0
 
@@ -155,14 +168,17 @@ export default function BookingCalendar({ openReservation, onNewReservation, onO
                 {days.map((d) => {
                   const dow  = new Date(d + 'T00:00:00').getDay()
                   const isWe = dow === 5 || dow === 6
+                  const isBlackout = blackoutSet.has(d)
+                  const dayShort = new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short' })
                   return (
                     <th
                       key={d}
-                      className={`th text-center !px-1 ${isWe ? 'bg-leaf/40' : ''}`}
+                      className={`th text-center !px-1 ${isBlackout ? 'bg-red-100 text-red-700' : isWe ? 'bg-leaf/40' : ''}`}
                       style={{ minWidth: DAY_W }}
                       title={d}
                     >
-                      {d.slice(8)}
+                      <div className="text-[9px] leading-none text-pine/50 mb-0.5">{dayShort}</div>
+                      <div className="leading-none">{d.slice(8)}</div>
                     </th>
                   )
                 })}
@@ -232,9 +248,15 @@ export default function BookingCalendar({ openReservation, onNewReservation, onO
                         style={{ minWidth: DAY_W, height: 60 }}
                       >
                         <button
-                          onClick={() => onNewReservation?.({ room_id: r.id, from_date: d, to_date: nextDay(d) })}
+                          onClick={() => {
+                            if (blackoutSet.has(d)) {
+                              flash(`Blackout day (${d}) - reservation not allowed.`)
+                              return
+                            }
+                            onNewReservation?.({ room_id: r.id, from_date: d, to_date: nextDay(d) })
+                          }}
                           title={`New reservation — Room ${r.room_no}, ${d}`}
-                          className="w-full h-full transition-colors hover:bg-forest/15"
+                          className={`w-full h-full transition-colors ${blackoutSet.has(d) ? 'bg-red-100/60 cursor-not-allowed' : 'hover:bg-forest/15'}`}
                         />
                       </td>
                     )

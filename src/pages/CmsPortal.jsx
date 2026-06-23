@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
+import { loadReservationConfig, saveReservationConfig } from '../lib/reservationConfig'
 import { fmtBDT } from '../lib/helpers'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import {
   Plus, Pencil, Trash2, Save, ShieldCheck, Search, X,
-  Building2, Truck, Package, FolderTree, UtensilsCrossed, Sparkles, Calculator, Handshake, Users, BedDouble,
+  Building2, Truck, Package, FolderTree, UtensilsCrossed, Sparkles, Calculator, Handshake, Users, BedDouble, CalendarRange,
 } from 'lucide-react'
 
 /* ------------------------------------------------------------------ */
@@ -110,6 +111,8 @@ const CMS_ENTITIES = [
 ]
 
 export const CMS_ENTITY_TABS = CMS_ENTITIES.map((e) => ({ id: e.id, label: e.label }))
+const CMS_EXTRA_TABS = [{ id: 'reservation_policies', label: 'Reservation Policies', icon: CalendarRange }]
+const CMS_TABS = [...CMS_ENTITY_TABS, ...CMS_EXTRA_TABS.map(({ id, label }) => ({ id, label }))]
 
 function emptyForm(entity) {
   const obj = {}
@@ -371,6 +374,156 @@ function EntityManager({ entity }) {
   )
 }
 
+function ReservationPoliciesCard() {
+  const [cfg, setCfg] = useState(() => loadReservationConfig())
+  const [newBlackout, setNewBlackout] = useState('')
+  const [policy, setPolicy] = useState({ name: '', type: 'percentage', value: '', note: '' })
+  const [msg, setMsg] = useState('')
+
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3500) }
+  const persist = (nextCfg) => {
+    const saved = saveReservationConfig(nextCfg)
+    setCfg(saved)
+    return saved
+  }
+
+  const addBlackout = () => {
+    if (!newBlackout) { flash('Select a blackout date first.'); return }
+    if (cfg.blackoutDays.includes(newBlackout)) { flash('This blackout date already exists.'); return }
+    persist({ ...cfg, blackoutDays: [...cfg.blackoutDays, newBlackout].sort() })
+    setNewBlackout('')
+    flash('Blackout day added.')
+  }
+
+  const removeBlackout = (date) => {
+    persist({ ...cfg, blackoutDays: cfg.blackoutDays.filter((d) => d !== date) })
+  }
+
+  const addPolicy = () => {
+    const name = policy.name.trim()
+    const raw = Number(policy.value)
+    if (!name) { flash('Policy name is required.'); return }
+    if (!Number.isFinite(raw) || raw < 0) { flash('Enter a valid discount value.'); return }
+    if (policy.type === 'percentage' && raw > 100) { flash('Percentage policy must be between 0 and 100.'); return }
+    persist({
+      ...cfg,
+      discountPolicies: [
+        ...cfg.discountPolicies,
+        {
+          id: `policy-${Date.now()}`,
+          name,
+          type: policy.type,
+          value: raw,
+          note: policy.note.trim(),
+          active: true,
+        },
+      ],
+    })
+    setPolicy({ name: '', type: 'percentage', value: '', note: '' })
+    flash('Discount policy added.')
+  }
+
+  const togglePolicy = (id) => {
+    persist({
+      ...cfg,
+      discountPolicies: cfg.discountPolicies.map((item) => item.id === id ? { ...item, active: !item.active } : item),
+    })
+  }
+
+  const removePolicy = (id) => {
+    persist({
+      ...cfg,
+      discountPolicies: cfg.discountPolicies.filter((item) => item.id !== id),
+    })
+  }
+
+  return (
+    <div className="card p-5 space-y-5">
+      <div>
+        <h2 className="font-display font-semibold text-pine flex items-center gap-2 mb-1">
+          <CalendarRange size={18} className="text-forest" /> Reservation Policies
+        </h2>
+        <p className="text-xs text-pine/50">Set blackout days and reusable discount policies for reservation entry.</p>
+      </div>
+
+      {msg && <div className="px-3 py-2 rounded-lg bg-forest/10 text-forest text-sm">{msg}</div>}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-3 rounded-xl border border-leaf bg-leaf/20">
+          <div className="text-xs font-bold text-pine/60 uppercase tracking-wide mb-2">Blackout Days</div>
+          <div className="flex gap-2">
+            <input type="date" className="input flex-1" value={newBlackout} onChange={(e) => setNewBlackout(e.target.value)} />
+            <button className="btn-primary !px-3" onClick={addBlackout}><Plus size={14} /> Add</button>
+          </div>
+          <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
+            {cfg.blackoutDays.length === 0 && <p className="text-xs text-pine/50">No blackout day configured.</p>}
+            {cfg.blackoutDays.map((date) => (
+              <div key={date} className="flex items-center justify-between text-sm px-2 py-1 rounded border border-leaf bg-white">
+                <span>{date}</span>
+                <button className="text-red-500 hover:text-red-700" onClick={() => removeBlackout(date)} title="Remove blackout day">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-3 rounded-xl border border-leaf bg-leaf/20">
+          <div className="text-xs font-bold text-pine/60 uppercase tracking-wide mb-2">Discount Policies</div>
+          <div className="space-y-2">
+            <input className="input" placeholder="Policy name (e.g. Corporate 10%)" value={policy.name} onChange={(e) => setPolicy((p) => ({ ...p, name: e.target.value }))} />
+            <div className="flex gap-2">
+              <select className="input w-36" value={policy.type} onChange={(e) => setPolicy((p) => ({ ...p, type: e.target.value }))}>
+                <option value="percentage">Percentage %</option>
+                <option value="fixed">Fixed ৳</option>
+              </select>
+              <input type="number" min="0" max={policy.type === 'percentage' ? 100 : undefined} className="input money flex-1" placeholder={policy.type === 'percentage' ? '10' : '500'} value={policy.value} onChange={(e) => setPolicy((p) => ({ ...p, value: e.target.value }))} />
+            </div>
+            <input className="input" placeholder="Optional note/reason" value={policy.note} onChange={(e) => setPolicy((p) => ({ ...p, note: e.target.value }))} />
+            <button className="btn-primary w-full justify-center" onClick={addPolicy}><Plus size={14} /> Add Policy</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className="th">Name</th>
+              <th className="th">Type</th>
+              <th className="th text-right">Value</th>
+              <th className="th">Note</th>
+              <th className="th">Status</th>
+              <th className="th"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {cfg.discountPolicies.map((item) => (
+              <tr key={item.id}>
+                <td className="td text-sm font-medium">{item.name}</td>
+                <td className="td text-sm">{item.type === 'fixed' ? 'Fixed' : 'Percentage'}</td>
+                <td className="td money text-right">{item.type === 'fixed' ? fmtBDT(item.value) : `${item.value}%`}</td>
+                <td className="td text-xs">{item.note || '—'}</td>
+                <td className="td">
+                  <button className={`status-chip ${item.active ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-600'}`} onClick={() => togglePolicy(item.id)}>
+                    {item.active ? 'Active' : 'Inactive'}
+                  </button>
+                </td>
+                <td className="td">
+                  <button className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-300 hover:text-red-600" onClick={() => removePolicy(item.id)} title="Delete policy">
+                    <Trash2 size={13} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {cfg.discountPolicies.length === 0 && <tr><td className="td text-pine/40 text-center" colSpan={6}>No discount policy configured.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 /*  ROOT — Admin & Superuser only                                       */
 /* ------------------------------------------------------------------ */
@@ -378,7 +531,7 @@ export default function CmsPortal({ role, isAdmin }) {
   const location = useLocation()
   const isSuperuser = role === 'SUPERUSER'
   const isAdminPlus = isSuperuser || isAdmin
-  const [selectedId, setSelectedId] = useState(CMS_ENTITIES[0].id)
+  const [selectedId, setSelectedId] = useState(CMS_TABS[0].id)
 
   if (!isAdminPlus) {
     return (
@@ -395,7 +548,7 @@ export default function CmsPortal({ role, isAdmin }) {
 
   useEffect(() => {
     const requested = new URLSearchParams(location.search).get('entity')
-    if (requested && CMS_ENTITIES.some((e) => e.id === requested)) {
+    if (requested && CMS_TABS.some((t) => t.id === requested)) {
       setSelectedId(requested)
     }
   }, [location.search])
@@ -405,7 +558,10 @@ export default function CmsPortal({ role, isAdmin }) {
       <h1 className="font-display text-2xl font-bold text-pine mb-1">Configuration</h1>
       <p className="text-sm text-pine/60 mb-6">Create and edit master records used across Reservations, POS, Inventory and Accounting.</p>
       <div>
-        <EntityManager key={entity.id} entity={entity} />
+        {selectedId === 'reservation_policies'
+          ? <ReservationPoliciesCard />
+          : <EntityManager key={entity.id} entity={entity} />
+        }
       </div>
     </div>
   )
