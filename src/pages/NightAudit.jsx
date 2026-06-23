@@ -429,6 +429,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
 
 /* ---------------- A4 Night Audit report (print) ---------------- */
 function NightAuditReport({ audit, company }) {
+  const primary = 'var(--print-primary, #1B4D2E)'
   const s = audit?.summary || {}
   const revenue = s.revenue || {}
   const receipts = s.receipts || {}
@@ -441,10 +442,10 @@ function NightAuditReport({ audit, company }) {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#000' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '2px solid #1B4D2E', paddingBottom: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: `2px solid ${primary}`, paddingBottom: 8, marginBottom: 12 }}>
         {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 50, width: 50, objectFit: 'contain' }} />}
         <div style={{ flex: 1, textAlign: company?.logo_url ? 'left' : 'center' }}>
-          <div style={{ fontSize: 19, fontWeight: 700, fontFamily: 'Fraunces, serif', color: '#1B4D2E' }}>{company?.name || 'Resort'}</div>
+          <div style={{ fontSize: 19, fontWeight: 700, fontFamily: 'Fraunces, serif', color: primary }}>{company?.name || 'Resort'}</div>
           <div style={{ fontSize: 10.5 }}>{company?.address}{company?.phone ? ` · ${company.phone}` : ''}</div>
         </div>
       </div>

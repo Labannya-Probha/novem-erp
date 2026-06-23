@@ -446,14 +446,16 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
 
 /* ---------------- A4 Payslip (print) ---------------- */
 function PayslipDoc({ slip, run, company }) {
+  const primary = 'var(--print-primary, #1B4D2E)'
+  const accent = 'var(--print-accent, #2E7D32)'
   const cell = { border: '1px solid #000', padding: '6px 8px', fontSize: 11, verticalAlign: 'top' }
   const rt = { ...cell, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', color: '#000' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '2px solid #1B4D2E', paddingBottom: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: `2px solid ${primary}`, paddingBottom: 8, marginBottom: 12 }}>
         {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 50, width: 50, objectFit: 'contain' }} />}
         <div style={{ flex: 1, textAlign: company?.logo_url ? 'left' : 'center' }}>
-          <div style={{ fontSize: 19, fontWeight: 700, fontFamily: 'Fraunces, serif', color: '#1B4D2E' }}>{company?.name || 'Resort'}</div>
+          <div style={{ fontSize: 19, fontWeight: 700, fontFamily: 'Fraunces, serif', color: primary }}>{company?.name || 'Resort'}</div>
           <div style={{ fontSize: 10.5 }}>{company?.address}</div>
         </div>
       </div>
@@ -480,7 +482,7 @@ function PayslipDoc({ slip, run, company }) {
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}><td style={cell}>Gross</td><td style={rt}>{fmtBDT(slip.gross_salary)}</td><td style={cell}>Total deduction</td><td style={rt}>{fmtBDT(+slip.absent_deduction + +slip.advance_deduction + +slip.other_deduction)}</td></tr>
         </tfoot>
       </table>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#fff', background: '#2E7D32', padding: '8px 12px', borderRadius: 6, margin: '10px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#fff', background: accent, padding: '8px 12px', borderRadius: 6, margin: '10px 0' }}>
         <span>NET PAYABLE</span><span>{fmtBDT(slip.net_payable)}</span>
       </div>
       <table style={{ width: '100%', marginTop: 40, fontSize: 11 }}>

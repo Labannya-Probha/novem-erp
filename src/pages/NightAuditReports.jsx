@@ -113,14 +113,16 @@ export default function NightAuditReports() {
 
 /* ---------- PRINTABLE DAILY STATEMENT ---------- */
 function DailyStatementReport({ report }) {
+  const primary = 'var(--print-primary, #1B4D2E)'
+  const accent = 'var(--print-accent, #2E7D32)'
   const cell = { borderBottom: '1px solid #ddd', padding: '6px 8px', fontSize: 11 }
   const num = { ...cell, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
-  const hcell = { borderBottom: '2px solid #2E7D32', padding: '6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'left', fontWeight: 'bold' }
+  const hcell = { borderBottom: `2px solid ${accent}`, padding: '6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'left', fontWeight: 'bold' }
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', color: '#000' }}>
-      <div style={{ textAlign: 'center', borderBottom: '2px solid #2E7D32', paddingBottom: 8, marginBottom: 12 }}>
-        <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Fraunces, serif', color: '#2E7D32' }}>DAILY REVENUE STATEMENT</div>
+      <div style={{ textAlign: 'center', borderBottom: `2px solid ${primary}`, paddingBottom: 8, marginBottom: 12 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Fraunces, serif', color: primary }}>DAILY REVENUE STATEMENT</div>
         <div style={{ fontSize: 11, color: '#444', marginTop: 4 }}>
           <b>Statement Date:</b> {fmtDate(report.date)} · <b>Run At:</b> {new Date(report.run_at).toLocaleString()} · <b>Audited By:</b> {report.run_by}
         </div>
@@ -137,7 +139,7 @@ function DailyStatementReport({ report }) {
       </table>
 
       {/* Revenue breakdown */}
-      <h4 style={{ fontSize: 12, fontWeight: 'bold', color: '#2E7D32', textTransform: 'uppercase', marginBottom: 6 }}>Revenue Summary</h4>
+      <h4 style={{ fontSize: 12, fontWeight: 'bold', color: accent, textTransform: 'uppercase', marginBottom: 6 }}>Revenue Summary</h4>
       <table style={{ width: '100%', marginBottom: 20, borderCollapse: 'collapse' }}>
         <thead>
           <tr>
@@ -166,7 +168,7 @@ function DailyStatementReport({ report }) {
       </table>
 
       {/* Payments breakdown */}
-      <h4 style={{ fontSize: 12, fontWeight: 'bold', color: '#2E7D32', textTransform: 'uppercase', marginBottom: 6 }}>Financial Receipts Summary</h4>
+      <h4 style={{ fontSize: 12, fontWeight: 'bold', color: accent, textTransform: 'uppercase', marginBottom: 6 }}>Financial Receipts Summary</h4>
       <table style={{ width: '100%', marginBottom: 25, borderCollapse: 'collapse' }}>
         <thead>
           <tr>
