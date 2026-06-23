@@ -6,7 +6,7 @@ import { fmtBDT, todayISO, setCurrency } from '../lib/helpers'
 import { ROLES, ROLE_LABELS } from '../lib/roles'
 import {
   Save, Plus, Percent, Building2, Trash2, Users, ShieldCheck,
-  Upload, Image, KeyRound, AlertTriangle,
+  Upload, Image, KeyRound, AlertTriangle, FileText, Lock,
   Eye, EyeOff, ChevronDown, ChevronUp, Pencil,
 } from 'lucide-react'
 
@@ -14,8 +14,10 @@ export const SETTINGS_SECTIONS = [
   { id: 'my-account', label: 'My Account' },
   { id: 'branding', label: 'Branding', adminOnly: true },
   { id: 'tax', label: 'Tax Rates' },
+  { id: 'tax-policy', label: 'Tax Policy' },
   { id: 'allowance', label: 'Allowance Configuration', superuserOnly: true },
   { id: 'role-permissions', label: 'Role Permissions', superuserOnly: true },
+  { id: 'admin-feature-access', label: 'Admin Feature Access', superuserOnly: true },
   { id: 'staff', label: 'Staff Management' },
   { id: 'data-system', label: 'Data & System', superuserOnly: true },
 ]
@@ -67,8 +69,10 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
     { id: 'my-account', title: 'My Account', icon: KeyRound, visible: true, content: <MyAccountCard userName={userName} /> },
     { id: 'branding', title: 'Branding', icon: Image, visible: isAdminPlus, content: <BrandingCard reloadCompany={reloadCompany} /> },
     { id: 'tax', title: 'Tax Rates', visible: true, content: <TaxCard /> },
+    { id: 'tax-policy', title: 'Tax Policy', icon: FileText, visible: true, content: <TaxPolicyCard /> },
     { id: 'allowance', title: 'Allowance Configuration', icon: Percent, visible: isSuperuser, content: <AllowanceCard /> },
     { id: 'role-permissions', title: 'Role Permissions', icon: ShieldCheck, visible: isSuperuser, content: <RolePrivilegesCard /> },
+    { id: 'admin-feature-access', title: 'Admin Feature Access', icon: Lock, visible: isSuperuser, content: <AdminFeatureAccessCard /> },
     { id: 'staff', title: 'Staff Management', icon: Users, visible: true, content: <StaffCard isAdminPlus={isAdminPlus} isSuperuser={isSuperuser} currentUserName={userName} /> },
     { id: 'data-system', title: 'Data & System', icon: AlertTriangle, visible: isSuperuser, content: <DataWipeCard /> },
   ].filter((s) => s.visible)
@@ -373,7 +377,7 @@ function MyAccountCard({ userName }) {
 /* ------------------------------------------------------------------ */
 /*  RICH TEXT EDITOR — contentEditable, properly implemented           */
 /* ------------------------------------------------------------------ */
-function RichTextEditor({ initialHtml, onSave }) {
+function RichTextEditor({ initialHtml, onSave, saveLabel = 'Save' }) {
   const editorRef = useRef(null)
   const [saving, setSaving]   = useState(false)
   const [saved, setSaved]     = useState(false)
@@ -481,7 +485,7 @@ function RichTextEditor({ initialHtml, onSave }) {
           className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${saved ? 'bg-forest/15 text-forest' : 'bg-forest text-white hover:bg-forest/90'}`}
         >
           <Save size={12} />
-          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save T&C'}
+          {saving ? 'Saving…' : saved ? 'Saved ✓' : saveLabel}
         </button>
       </div>
 
@@ -597,6 +601,7 @@ function BrandingCard({ reloadCompany }) {
         <label className="label">Default Terms &amp; Conditions</label>
         <RichTextEditor
           initialHtml={c.terms_conditions || ''}
+          saveLabel="Save T&C"
           onSave={async (html) => {
             const { error } = await supabase.from('company_settings').update({
               terms_conditions: html, updated_at: new Date().toISOString(),
@@ -916,6 +921,175 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  TAX POLICY — editable policy statement stored in company_settings  */
+/* ------------------------------------------------------------------ */
+function TaxPolicyCard() {
+  const [c, setC]   = useState(null)
+  const [msg, setMsg] = useState('')
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
+  const load  = async () => {
+    const { data } = await supabase.from('company_settings').select('id, tax_policy_text').single()
+    setC(data)
+  }
+  useEffect(() => { load() }, [])
+  if (!c) return <div className="card p-5 text-pine/50">Loading…</div>
+
+  return (
+    <div className="card p-5 space-y-4">
+      <div>
+        <h2 className="font-display font-semibold text-pine flex items-center gap-2 mb-1">
+          <FileText size={18} className="text-forest" /> Tax Policy
+        </h2>
+        <p className="text-xs text-pine/50">
+          Define how VAT, service charge, and supplementary duty apply to different charge types.
+          This statement is used for internal reference and printed documents.
+        </p>
+      </div>
+      {msg && <div className="px-3 py-2 rounded-lg bg-forest/10 text-forest text-sm">{msg}</div>}
+      <RichTextEditor
+        initialHtml={c.tax_policy_text || ''}
+        saveLabel="Save policy"
+        onSave={async (html) => {
+          const { error } = await supabase.from('company_settings').update({
+            tax_policy_text: html, updated_at: new Date().toISOString(),
+          }).eq('id', c.id)
+          if (error) flash(error.message)
+          else flash('Tax policy saved.')
+        }}
+      />
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  ADMIN FEATURE ACCESS — Superuser controls which modules each Admin  */
+/*  user can see. Backed by the admin_feature_access table.             */
+/* ------------------------------------------------------------------ */
+function AdminFeatureAccessCard() {
+  const [admins, setAdmins]           = useState([])
+  const [access, setAccess]           = useState({})   // { [userId]: { [module]: boolean } }
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [msg, setMsg]                 = useState('')
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
+
+  const load = async () => {
+    const { data: adminUsers } = await supabase
+      .from('app_users')
+      .select('id, full_name, username')
+      .eq('role', 'ADMIN')
+      .eq('is_active', true)
+      .order('full_name')
+
+    const { data: accessRows } = await supabase
+      .from('admin_feature_access')
+      .select('user_id, module, can_access')
+
+    const map = {}
+    for (const u of (adminUsers || [])) {
+      map[u.id] = {}
+      for (const mod of PRIV_MODULES) {
+        map[u.id][mod] = true  // default: full access
+      }
+    }
+    for (const row of (accessRows || [])) {
+      if (map[row.user_id]) {
+        map[row.user_id][row.module] = row.can_access !== false
+      }
+    }
+
+    setAdmins(adminUsers || [])
+    setAccess(map)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const toggle = async (userId, module) => {
+    const current = access[userId]?.[module] ?? true
+    const next    = !current
+
+    setAccess((prev) => ({
+      ...prev,
+      [userId]: { ...prev[userId], [module]: next },
+    }))
+
+    if (next) {
+      // Restore access — remove the restriction row
+      const { error } = await supabase
+        .from('admin_feature_access')
+        .delete()
+        .eq('user_id', userId)
+        .eq('module', module)
+      if (error) { flash(error.message); load() }
+    } else {
+      // Restrict — upsert with can_access = false
+      const { error } = await supabase
+        .from('admin_feature_access')
+        .upsert({ user_id: userId, module, can_access: false }, { onConflict: 'user_id,module' })
+      if (error) { flash(error.message); load() }
+    }
+  }
+
+  return (
+    <div className="card p-5">
+      <h2 className="font-display font-semibold text-pine flex items-center gap-2 mb-1">
+        <Lock size={18} className="text-forest" /> Admin Feature Access
+      </h2>
+      <p className="text-xs text-pine/50 mb-4">
+        Control which modules each Admin user can access. Unchecked modules are hidden from that admin.
+        Superusers always retain full access regardless of these settings.
+      </p>
+      {msg && <div className="mb-3 px-3 py-2 rounded-lg bg-forest/10 text-forest text-sm">{msg}</div>}
+
+      {admins.length === 0 ? (
+        <p className="text-sm text-pine/40">
+          No active Admin users found. Promote a user to the Admin role in Staff Management first.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {admins.map((u) => (
+              <button
+                key={u.id}
+                onClick={() => setSelectedUser((prev) => (prev === u.id ? null : u.id))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                  selectedUser === u.id
+                    ? 'bg-forest text-white border-forest'
+                    : 'bg-white text-pine/70 border-leaf hover:border-forest/40 hover:text-pine'
+                }`}
+              >
+                {u.full_name || u.username}
+              </button>
+            ))}
+          </div>
+
+          {selectedUser ? (
+            <div className="grid grid-cols-2 gap-2">
+              {PRIV_MODULES.map((mod) => {
+                const canAccess = access[selectedUser]?.[mod] ?? true
+                return (
+                  <label key={mod} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-leaf cursor-pointer hover:bg-leaf/40 transition-colors">
+                    <input
+                      type="checkbox"
+                      className="accent-forest w-4 h-4 shrink-0"
+                      checked={canAccess}
+                      onChange={() => toggle(selectedUser, mod)}
+                    />
+                    <span className="text-xs text-pine">{MODULE_LABELS[mod] || mod}</span>
+                  </label>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-pine/40 italic">Select an admin above to configure their feature access.</p>
+          )}
+        </>
+      )}
     </div>
   )
 }
