@@ -6,20 +6,31 @@
 
 /* ============================================================
    AURA STAY — MINIMAL LUXE ERP DESIGN SYSTEM
-   Clean, high-readability UI for dashboards, tables, and forms.
    ============================================================ */
 
 @layer base {
   :root {
-    --brand-color: #1F6F78;
-    --card-bg: #FFFFFF;
-    --surface-muted: #F1EEE9;
-    --border-color: #E5DFD6;
-    --text-primary: #171717;
-    --text-secondary: #5F5A55;
-    --interactive-glow: rgba(31, 111, 120, 0.16);
+    /* ── Design tokens ── */
+    --brand-color:        #1F6F78;
+    --card-bg:            #FFFFFF;
+    --surface-muted:      #F1EEE9;
+    --border-color:       #E5DFD6;
+    --text-primary:       #171717;
+    --text-secondary:     #5F5A55;
+    --interactive-glow:   rgba(31, 111, 120, 0.16);
     --interactive-shadow: 0 16px 36px rgba(23, 23, 23, 0.10);
+
+    /* ── Motion system (FIX 1: merged from utilities :root) ── */
+    --aura-enter-duration: 0.75s;
+    --aura-enter-ease:     cubic-bezier(0.22, 1, 0.36, 1);
+    --aura-stagger-step:   30ms;
+    --aura-loader-duration: 3s;
+
+    /* FIX 2: alias instead of duplicate value */
+    --aura-brand:      var(--brand-color);
+    --aura-brand-soft: var(--interactive-glow);
   }
+
   body {
     @apply text-ink font-body antialiased;
     background: #F7F5F2;
@@ -33,14 +44,21 @@
     line-height: 1.5;
     overflow-x: hidden;
     background-size: 140% 140%;
-    animation: aura-bg-drift 18s ease-in-out infinite alternate;
   }
+
+  /* FIX 3: gate body animation at declaration — no need for !important override */
+  @media (prefers-reduced-motion: no-preference) {
+    body {
+      animation: aura-bg-drift 18s ease-in-out infinite alternate;
+    }
+  }
+
   #root { width: 100%; max-width: 100%; }
   h1, h2, h3, h4 { line-height: 1.25; }
-  /* Consistent vertical rhythm for headings */
   h1 { letter-spacing: -0.01em; }
+
   @keyframes aura-bg-drift {
-    0% { background-position: 0% 0%, 100% 0%, 0% 0%; }
+    0%   { background-position: 0% 0%, 100% 0%, 0% 0%; }
     100% { background-position: 8% 10%, 92% -4%, 0% 0%; }
   }
 }
@@ -78,11 +96,9 @@
     @apply block text-pine/70 mb-1.5;
     font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
   }
-  /* In multi-column form rows, a label that wraps to 2 lines must not push its
-     input below the others. Reserve 2 lines of height so every input aligns. */
   .grid .label, .flex .label { min-height: 2.4em; }
 
-  /* ---------- FORM CONTROLS — all share the SAME height (38px) ---------- */
+  /* ---------- FORM CONTROLS ---------- */
   .input, .btn-primary, .btn-ghost, .btn-amber {
     height: 38px;
     box-sizing: border-box;
@@ -97,19 +113,22 @@
     transition: border-color .15s, box-shadow .15s, background .15s, transform .15s;
   }
   .input::placeholder { color: rgba(95,90,85,0.55); }
-  .input:focus { border-color: #1F6F78; box-shadow: 0 0 0 3px var(--interactive-glow); background: #fff; transform: translateY(-1px); }
-  /* textarea & multiline override the fixed height */
+  .input:focus {
+    border-color: var(--brand-color);
+    box-shadow: 0 0 0 3px var(--interactive-glow);
+    background: #fff;
+    transform: translateY(-1px);
+  }
   textarea.input { height: auto; min-height: 76px; padding: 9px 12px; line-height: 1.5; }
   select.input { padding-right: 8px; }
 
-  /* ---------- BUTTONS — identical padding, height, alignment ---------- */
+  /* ---------- BUTTONS ---------- */
   .btn-primary, .btn-ghost, .btn-amber {
-    @apply inline-flex items-center justify-center gap-2 font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 font-semibold disabled:opacity-40 disabled:cursor-not-allowed;
     padding: 0 16px;
     font-size: 13.5px;
     border-radius: 9px;
     white-space: nowrap;
-    transform: translateY(0);
     transition: transform .16s ease, box-shadow .16s ease, filter .16s ease, background-color .16s ease, border-color .16s ease;
   }
   .btn-primary {
@@ -118,14 +137,14 @@
     border: 1px solid rgba(255,255,255,0.18);
     box-shadow: 0 8px 18px rgba(31,111,120,0.18);
   }
-  .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 12px 26px rgba(31,111,120,0.26); transform: translateY(-1px); }
+  .btn-primary:hover  { filter: brightness(1.06); box-shadow: 0 12px 26px rgba(31,111,120,0.26); transform: translateY(-1px); }
   .btn-primary:active { transform: translateY(0); }
   .btn-ghost {
     @apply text-pine;
     background: #FFFFFF;
     border: 1px solid var(--border-color);
   }
-  .btn-ghost:hover { background: #FAF8F5; transform: translateY(-1px); border-color: rgba(31,111,120,0.30); box-shadow: 0 8px 20px rgba(23,23,23,0.08); }
+  .btn-ghost:hover  { background: #FAF8F5; transform: translateY(-1px); border-color: rgba(31,111,120,0.30); box-shadow: 0 8px 20px rgba(23,23,23,0.08); }
   .btn-ghost:active { transform: translateY(0); }
   .btn-amber {
     @apply text-white;
@@ -133,12 +152,11 @@
     border: 1px solid rgba(255,255,255,0.18);
     box-shadow: 0 8px 18px rgba(184,134,11,0.16);
   }
-  .btn-amber:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 11px 24px rgba(184,134,11,0.24); }
+  .btn-amber:hover  { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 11px 24px rgba(184,134,11,0.24); }
   .btn-amber:active { transform: translateY(0); }
-  /* compact buttons (when JSX adds !py-1 etc. they still align) */
   .btn-primary svg, .btn-ghost svg, .btn-amber svg { flex-shrink: 0; }
 
-  /* ---------- TABLES — roomy cells, aligned numbers ---------- */
+  /* ---------- TABLES ---------- */
   .th {
     @apply text-left text-pine/60;
     font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
@@ -154,9 +172,7 @@
     border-bottom: 1px solid rgba(229,223,214,0.9);
     vertical-align: middle;
   }
-  /* right-aligned numeric columns get tabular figures automatically */
   .th.text-right, .td.text-right { text-align: right; font-variant-numeric: tabular-nums; }
-  /* zebra + hover for any table row inside a .card */
   .card tbody tr { transition: background .14s, box-shadow .14s; }
   .card tbody tr:hover { background: #F8F4EE; box-shadow: inset 0 0 0 1px rgba(31,111,120,0.10); }
   .card tbody tr:last-child .td { border-bottom: none; }
@@ -172,82 +188,62 @@
   }
   .status-chip:hover { transform: translateY(-1px); filter: saturate(1.08); }
 
-  /* ---------- Spacing helpers (optional, used where JSX opts in) ---------- */
   .card-pad { padding: 20px; }
 }
 
-/* tighten default gaps so grids look even (screen only) */
 @media screen {
   table { border-collapse: collapse; width: 100%; }
 }
 
-/* =======================================================================
-   PRINT
-   NOTE: PrintPortal.jsx owns ALL print CSS (it injects @page and a
-   @media print block that hides everything except #print-root while it
-   is mounted). We deliberately do NOT define #print-root / #root /
-   .print-doc / .epos-receipt print rules here, because doing so fights
-   PrintPortal and blanks out the preview & the printout.
-   Only keep a tiny safety net for the .no-print helper.
-   ======================================================================= */
+/* =====================================================================
+   PRINT — .no-print only. PrintPortal.jsx owns all other print rules.
+   ===================================================================== */
 @media print {
   .no-print { display: none !important; }
 }
+
 /* =====================================================================
-   AURA STAY — Motion System  (paste at END of index_CSS.css)
-   Matches the Minimal Luxe ERP design tokens.
-   NOTE: timings tuned so the page LOADER runs for 3 seconds.
+   AURA STAY — Motion System
    ===================================================================== */
+
+/* Keyframes are global (not layered) — browser support is broadest this way */
+@keyframes aura-enter {
+  0% {
+    opacity: var(--aura-enter-opacity, 1);
+    transform:
+      translate3d(var(--aura-enter-x, 0), var(--aura-enter-y, 0), 0)
+      scale3d(var(--aura-enter-scale, 1), var(--aura-enter-scale, 1), 1)
+      rotate(var(--aura-enter-rotate, 0));
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1) rotate(0deg);
+  }
+}
+@keyframes aura-overlay-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aura-spin          { to   { transform: rotate(360deg); } }
+@keyframes aura-loader-out    { to   { opacity: 0; visibility: hidden; pointer-events: none; } }
+@keyframes aura-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 @layer utilities {
 
-  /* ---- Global tuning variables ---------------------------------- */
-  :root {
-    --aura-enter-duration: 0.75s;          /* entry transitions */
-    --aura-enter-ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --aura-stagger-step: 30ms;             /* gap between staggered children */
-    --aura-loader-duration: 3s;            /* page loader = 3 seconds */
-    --aura-brand: #1F6F78;
-    --aura-brand-soft: rgba(31, 111, 120, 0.16);
-  }
-
-  /* ============================================================
-     1. ENTRY ANIMATION  (fade + slide, variable-driven)
-     ============================================================ */
-  @keyframes aura-enter {
-    0% {
-      opacity: var(--aura-enter-opacity, 1);
-      transform: translate3d(
-          var(--aura-enter-x, 0),
-          var(--aura-enter-y, 0), 0)
-        scale3d(
-          var(--aura-enter-scale, 1),
-          var(--aura-enter-scale, 1), 1)
-        rotate(var(--aura-enter-rotate, 0));
-    }
-    100% {
-      opacity: 1;
-      transform: translate3d(0, 0, 0) scale3d(1, 1, 1) rotate(0deg);
-    }
-  }
-
+  /* ── Entry animation ── */
   .animate-entry {
     animation-name: aura-enter;
     animation-duration: var(--aura-enter-duration);
     animation-timing-function: var(--aura-enter-ease);
-    animation-fill-mode: both;          /* holds start + end -> no flicker */
+    animation-fill-mode: both;
     will-change: transform, opacity;
-
-    /* default = fade + slide down */
     --aura-enter-opacity: 0;
     --aura-enter-y: -18px;
     --aura-enter-x: 0;
     --aura-enter-scale: 1;
     --aura-enter-rotate: 0;
   }
-
-  /* direction / style variants */
-  .fade        { --aura-enter-y: 0;  --aura-enter-x: 0; }
+  .fade        { --aura-enter-y: 0;    --aura-enter-x: 0; }
   .slide-down  { --aura-enter-y: -24px; }
   .slide-up    { --aura-enter-y: 24px; }
   .slide-left  { --aura-enter-x: 24px;  --aura-enter-y: 0; }
@@ -257,15 +253,12 @@
   .pop         { --aura-enter-scale: 0.8;  --aura-enter-y: 0; }
   .spin-in     { --aura-enter-rotate: -8deg; --aura-enter-scale: 0.94; --aura-enter-y: 0; }
 
-  /* manual delays */
   .delay-100 { animation-delay: 0.1s; }
   .delay-200 { animation-delay: 0.2s; }
   .delay-300 { animation-delay: 0.3s; }
   .delay-500 { animation-delay: 0.5s; }
 
-  /* ============================================================
-     2. STAGGER  — put .animate-stagger on the PARENT
-     ============================================================ */
+  /* ── Stagger ── */
   .animate-stagger > * {
     animation-name: aura-enter;
     animation-duration: var(--aura-enter-duration);
@@ -285,51 +278,32 @@
   .animate-stagger > *:nth-child(9)  { animation-delay: calc(var(--aura-stagger-step) * 9); }
   .animate-stagger > *:nth-child(10) { animation-delay: calc(var(--aura-stagger-step) * 10); }
 
-  /* ============================================================
-     3. PAGE LOADER  — full-screen frosted overlay, 3-second cycle
-     ============================================================ */
+  /* ── Page loader ── */
   .aura-loader-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
     background: rgba(247, 245, 242, 0.84);
     backdrop-filter: blur(8px) saturate(120%);
     -webkit-backdrop-filter: blur(8px) saturate(120%);
     animation: aura-overlay-fade var(--aura-enter-duration) var(--aura-enter-ease) both;
   }
-  @keyframes aura-overlay-fade { from { opacity: 0; } to { opacity: 1; } }
-
   .aura-spinner {
-    width: 54px;
-    height: 54px;
+    width: 54px; height: 54px;
     border-radius: 50%;
     border: 4px solid var(--aura-brand-soft);
     border-top-color: var(--aura-brand);
-    /* 3-second full cycle */
     animation: aura-spin var(--aura-loader-duration) cubic-bezier(0.65, 0, 0.35, 1) infinite;
   }
-  @keyframes aura-spin { to { transform: rotate(360deg); } }
-
-  /* optional: auto-hide the loader after exactly 3s without JS */
   .aura-loader-overlay.auto-dismiss {
     animation:
       aura-overlay-fade var(--aura-enter-duration) var(--aura-enter-ease) both,
       aura-loader-out 0.4s var(--aura-enter-ease) var(--aura-loader-duration) forwards;
   }
-  @keyframes aura-loader-out {
-    to { opacity: 0; visibility: hidden; pointer-events: none; }
-  }
 
-  /* ============================================================
-     4. INLINE BUTTON SPINNER  (matches .btn-primary)
-     ============================================================ */
+  /* ── Inline button spinner ── */
   .btn-spinner {
     display: inline-block;
-    width: 1em;
-    height: 1em;
+    width: 1em; height: 1em;
     margin-right: 0.5em;
     vertical-align: -0.15em;
     border-radius: 50%;
@@ -338,9 +312,7 @@
     animation: aura-spin 0.7s linear infinite;
   }
 
-  /* ============================================================
-     5. SKELETON LOADERS  (frosted shimmer)
-     ============================================================ */
+  /* ── Skeleton loaders ── */
   .skeleton {
     border-radius: 8px;
     background: linear-gradient(
@@ -354,16 +326,9 @@
   }
   .skeleton-line { height: 14px; margin: 8px 0; }
   .skeleton-line.short { width: 60%; }
-  @keyframes aura-shimmer {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
 
-  /* ============================================================
-     6. ACCESSIBILITY  — respect reduced motion
-     ============================================================ */
+  /* ── Reduced motion (FIX 3: body animation already gated above) ── */
   @media (prefers-reduced-motion: reduce) {
-    body { animation: none !important; }
     .animate-entry,
     .animate-stagger > *,
     .aura-loader-overlay,
