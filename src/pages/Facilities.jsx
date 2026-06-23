@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, rateFor, computeCharge } from '../lib/helpers'
+import KPICards from '../components/KPICards.jsx'
 import PrintPortal from '../components/PrintPortal.jsx'
 import GuestPicker from '../components/GuestPicker.jsx'
 import { PosReceipt } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
-import KPICards from '../components/KPICards.jsx'
 import { Plus, Minus, Trash2, Banknote, BedDouble, Leaf, Printer } from 'lucide-react'
 
 const CATS = [
@@ -38,6 +38,7 @@ export default function Facilities({ userName, isAdmin }) {
     <div>
       <h1 className="font-display text-2xl font-bold text-pine mb-1">Facilities & Shop</h1>
       <p className="text-sm text-pine/60 mb-4">Tea sale · Pickle sale · Sports items rental — prices editable at the counter; charge to room or settle on the spot.</p>
+      <KPICards module="facilities" />
 
       {msg && <div className="mb-4 px-4 py-2 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
 
@@ -56,12 +57,12 @@ export default function Facilities({ userName, isAdmin }) {
       {tab === 'Items' && <ItemsManager items={items} reload={load} isAdmin={isAdmin} />}
 
       {printDoc?.type === 'RECEIPT' && (
-        <PrintPortal title={`${printDoc.order.outlet} — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)}>
+        <PrintPortal title={`${printDoc.order.outlet} — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}>
           <PosReceipt order={printDoc.order} items={printDoc.items} company={company} mushakNo={printDoc.mushakNo} />
         </PrintPortal>
       )}
       {printDoc?.type === 'MUSHAK' && (
-        <PrintPortal title={`Mushak-6.3 — ${printDoc.invoice.invoice_no}`} onClose={() => setPrintDoc(null)}>
+        <PrintPortal title={`Mushak-6.3 — ${printDoc.invoice.invoice_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}>
           <Mushak63 invoice={printDoc.invoice} res={null} company={company} refNo={printDoc.refNo} />
         </PrintPortal>
       )}

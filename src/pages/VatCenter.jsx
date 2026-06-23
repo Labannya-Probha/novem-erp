@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import KPICards from '../components/KPICards.jsx'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, exportXLSX } from '../lib/helpers'
+import KPICards from '../components/KPICards.jsx'
 import { FileSpreadsheet, Plus, FileDown, Printer, Trash2, Pencil } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 import VdsCertificate from '../components/print/VdsCertificate.jsx'
 import ChallanForm from './ChallanForm'
+
 const TABS = ['Sales 6.2', 'Purchase 6.1', 'VDS 6.6', 'Monthly 9.1', 'Over-threshold 6.10', 'A-Challan']
 const monthBounds = (ym) => { const [y, m] = ym.split('-').map(Number); const start = `${ym}-01`; const end = new Date(y, m, 0); return { start, end: `${ym}-${String(end.getDate()).padStart(2, '0')}` } }
 const thisMonth = () => todayISO().slice(0, 7)
@@ -19,16 +20,17 @@ export default function VatCenter({ userName, company }) {
   return (
     <div className="space-y-5">
       {printCert && (
-        <PrintPortal title={`Mushak-6.6 — ${printCert.cert_no || 'VDS'}`} onClose={() => setPrintCert(null)}>
+        <PrintPortal title={`Mushak-6.6 — ${printCert.cert_no || 'VDS'}`} onClose={() => setPrintCert(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}>
           <VdsCertificate cert={printCert} company={company} />
         </PrintPortal>
       )}      
-    <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><FileSpreadsheet className="text-forest" /> VAT Center</h1>
         </div>
         <div className="flex items-center gap-2"><span className="label !mb-0">Month</span><input type="month" className="input !w-44" value={ym} onChange={(e) => setYm(e.target.value)} /></div>
       </div>
+      <KPICards module="vat" />
       {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
       <div className="flex gap-1 border-b border-leaf flex-wrap">
         {TABS.map((t) => (<button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-semibold rounded-t-lg ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>{t}</button>))}

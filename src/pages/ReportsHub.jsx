@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, exportXLSX } from '../lib/helpers'
+import KPICards from '../components/KPICards.jsx'
 import { BarChart3, FileDown, Printer, CalendarRange, ChevronLeft, Lock, Search, Plus, Trash2, Settings2, GripVertical, EyeOff, Eye, X } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 
@@ -47,6 +48,7 @@ export default function ReportsHub({ userName, role }) {
         <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><BarChart3 className="text-forest" /> Report Center</h1>
         <p className="text-sm text-pine/60">{defs.length} reports · {readyCount} ready. Pick a report, choose a cycle, then print or export.</p>
       </div>
+      <KPICards module="reports" />
       {canManage && (
         <div className="flex justify-end">
           <button className="btn-primary" onClick={() => setShowBuilder(true)}><Plus size={15} /> New custom report</button>

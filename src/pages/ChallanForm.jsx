@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { fmtBDT } from '../lib/helpers'
-import KPICards from '../components/KPICards.jsx'
 
 export default function ChallanForm({ res }) {
   const [challan, setChallan] = useState({ no: '', date: '', amount: '', status: 'Pending' })

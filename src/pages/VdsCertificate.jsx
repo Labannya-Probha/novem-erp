@@ -1,4 +1,4 @@
-import { fmtBDT, fmtDate, takaInWords } from '../../lib/helpers'
+import { fmtBDT, fmtDate, takaInWords } from '../lib/helpers'
 
 function NbrLogo({ url, size = 54 }) {
   if (url) return <img src={url} alt="NBR" style={{ height: size, width: size, objectFit: 'contain' }} />
