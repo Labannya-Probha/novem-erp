@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 let CUR = '৳'
 export const setCurrency = (c) => { CUR = (c || '৳').toString().trim() }
@@ -97,14 +97,27 @@ export const takaInWords = (amount) => {
   return out + ' Only'
 }
 
-export const exportXLSX = (filename, sheets) => {
-  const wb = XLSX.utils.book_new()
+export const exportXLSX = async (filename, sheets) => {
+  const wb = new ExcelJS.Workbook()
   sheets.forEach(({ name, rows }) => {
-    const ws = XLSX.utils.aoa_to_sheet(rows)
-    ws['!cols'] = rows[0]?.map((_, i) => ({ wch: Math.max(12, ...rows.map((r) => String(r[i] ?? '').length + 2)) }))
-    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31))
+    const ws = wb.addWorksheet(name.slice(0, 31))
+    rows.forEach((row) => ws.addRow(row))
+    if (rows[0]) {
+      rows[0].forEach((_, i) => {
+        ws.getColumn(i + 1).width = Math.max(12, ...rows.map((r) => String(r[i] ?? '').length + 2))
+      })
+    }
   })
-  XLSX.writeFile(wb, filename)
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 export const STATUS_COLORS = {
