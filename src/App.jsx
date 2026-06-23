@@ -24,11 +24,10 @@ import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
-import GuestCRM from './pages/GuestCRM.jsx'
 import {
   Leaf, LayoutDashboard, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
   FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, Building2,
-  Menu, X, ListChecks, ChevronDown, Bot, HeartHandshake, ChefHat, ClipboardList,
+  Menu, X, ListChecks, ChevronDown, Bot, ChefHat, ClipboardList,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -44,7 +43,6 @@ const NAV_GROUPS = [
   { title: 'Sales & Reservation', items: [
     { id: 'calendar',     label: 'Booking Calendar', icon: CalendarDays },
     { id: 'reservations', label: 'Reservations',     icon: BedDouble },
-    { id: 'crm',          label: 'Guest CRM',         icon: HeartHandshake },
   ]},
   { title: 'Tasks', items: [
     { id: 'tasks',     label: 'Task Management', icon: ListChecks },
@@ -320,13 +318,6 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
           <Route path="/reservations/:id" element={
             <GuardedRoute role={role} navId="reservations" privileges={privileges}>
               <ReservationDetailRoute userName={userName} role={role} isAdmin={isAdmin} />
-            </GuardedRoute>
-          } />
-
-          {/* Guest CRM */}
-          <Route path="/crm" element={
-            <GuardedRoute role={role} navId="crm" privileges={privileges}>
-              <GuestCRM userName={userName} isAdmin={isAdmin} role={role} />
             </GuardedRoute>
           } />
 
