@@ -24,10 +24,11 @@ import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
+import GuestCRM from './pages/GuestCRM.jsx'
 import {
   Leaf, LayoutDashboard, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
   FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, Building2,
-  Menu, X, ListChecks, ChevronDown, Bot,
+  Menu, X, ListChecks, ChevronDown, Bot, HeartHandshake, ChefHat, ClipboardList,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -36,64 +37,80 @@ function BrandLogo({ url }) {
   return <div className="w-9 h-9 rounded-lg bg-forest flex items-center justify-center shadow-sm ring-1 ring-forest/15"><Leaf size={18} /></div>
 }
 
+/* ------------------------------------------------------------------ */
+/*  NAV GROUPS                                                          */
+/* ------------------------------------------------------------------ */
 const NAV_GROUPS = [
-   { title: 'Sales & Reservation', items: [
-    { id: 'calendar', label: 'Booking Calendar', icon: CalendarDays },
+  { title: 'Sales & Reservation', items: [
+    { id: 'calendar',     label: 'Booking Calendar', icon: CalendarDays },
+    { id: 'reservations', label: 'Reservations',     icon: BedDouble },
+    { id: 'crm',          label: 'Guest CRM',         icon: HeartHandshake },
   ]},
   { title: 'Tasks', items: [
-    { id: 'tasks', label: 'Task Management', icon: ListChecks },
-    { id: 'ai-tasker', label: 'AI Tasker', icon: Bot },
+    { id: 'tasks',     label: 'Task Management', icon: ListChecks },
+    { id: 'ai-tasker', label: 'AI Tasker',        icon: Bot },
   ]},
   { title: 'Front Office', items: [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'nightaudit', label: 'Night Audit', icon: MoonStar },
+    { id: 'dashboard',    label: 'Dashboard',   icon: LayoutDashboard },
+    { id: 'nightaudit',   label: 'Night Audit', icon: MoonStar },
     { id: 'housekeeping', label: 'Housekeeping', icon: BedDouble },
-    { id: 'facilities', label: 'Facilities', icon: ShoppingBasket },
+    { id: 'facilities',   label: 'Facilities',  icon: ShoppingBasket },
   ]},
   { title: 'Restaurant POS', items: [
-    { id: 'pos', label: 'Restaurant POS', icon: UtensilsCrossed },
+    { id: 'pos',              label: 'Restaurant POS',  icon: UtensilsCrossed },
+    { id: 'menu-management',  label: 'Menu Management', icon: ChefHat },
   ]},
   { title: 'Accounting', items: [
     { id: 'accounting', label: 'Accounting', icon: Calculator },
-    { id: 'vat', label: 'VAT Center', icon: FileSpreadsheet },
+    { id: 'vat',        label: 'VAT Center',  icon: FileSpreadsheet },
   ]},
   { title: 'Inventory', items: [
-    { id: 'inventory', label: 'Inventory', icon: Boxes },
+    { id: 'inventory',   label: 'Inventory',          icon: Boxes },
+    { id: 'consumption', label: 'Consumption Entry',  icon: ClipboardList },
   ]},
   { title: 'HR & Admin', items: [
     { id: 'hr', label: 'HR & Office', icon: Users },
-  ]},   
+  ]},
   { title: 'Insight', items: [
     { id: 'reports', label: 'Reports', icon: BarChart3 },
   ]},
   { title: 'System', items: [
-    { id: 'cms', label: 'Configuration', icon: Building2 },
-    { id: 'settings', label: 'Settings', icon: Settings2 },
+    { id: 'cms',      label: 'Configuration', icon: Building2 },
+    { id: 'settings', label: 'Settings',       icon: Settings2 },
   ]},
 ]
 
 const ALL_NAV_IDS = NAV_GROUPS.flatMap((g) => g.items.map((n) => n.id))
+
+/* ------------------------------------------------------------------ */
+/*  SIDEBAR NESTED MENUS                                               */
+/* ------------------------------------------------------------------ */
 const SIDEBAR_SETTINGS_SECTIONS = [
-  { id: 'my-account', label: 'My Account', adminOnly: false, superuserOnly: false },
-  { id: 'branding', label: 'Branding', adminOnly: true, superuserOnly: false },
-  { id: 'tax', label: 'Tax Rates', adminOnly: false, superuserOnly: false },
-  { id: 'allowance', label: 'Allowance Configuration', adminOnly: false, superuserOnly: true },
-  { id: 'role-permissions', label: 'Role Permissions', adminOnly: false, superuserOnly: true },
-  { id: 'staff', label: 'Staff Management', adminOnly: false, superuserOnly: false },
-  { id: 'data-system', label: 'Data & System', adminOnly: false, superuserOnly: true },
+  { id: 'my-account',           label: 'My Account',              adminOnly: false, superuserOnly: false },
+  { id: 'branding',             label: 'Branding',                adminOnly: true,  superuserOnly: false },
+  { id: 'tax',                  label: 'Tax Rates',               adminOnly: false, superuserOnly: false },
+  { id: 'tax-policy',           label: 'Tax Policy',              adminOnly: false, superuserOnly: false },
+  { id: 'allowance',            label: 'Allowance Configuration', adminOnly: false, superuserOnly: true  },
+  { id: 'role-permissions',     label: 'Role Permissions',        adminOnly: false, superuserOnly: true  },
+  { id: 'admin-feature-access', label: 'Admin Feature Access',    adminOnly: false, superuserOnly: true  },
+  { id: 'staff',                label: 'Staff Management',        adminOnly: false, superuserOnly: false },
+  { id: 'data-system',          label: 'Data & System',           adminOnly: false, superuserOnly: true  },
 ]
+
 const SIDEBAR_CMS_ENTITY_TABS = [
-  { id: 'companies', label: 'Companies' },
-  { id: 'agencies', label: 'Agencies' },
-  { id: 'shareholders', label: 'Shareholders' },
-  { id: 'vendors', label: 'Vendors' },
-  { id: 'inv_items', label: 'Inventory Items' },
-  { id: 'menu_categories', label: 'Menu Categories' },
-  { id: 'menu_items', label: 'Menu Items' },
-  { id: 'facility_items', label: 'Facility Items' },
-  { id: 'chart_of_accounts', label: 'Chart of Accounts' },
-  { id: 'rooms', label: 'Rooms' },
+  { id: 'companies',            label: 'Companies' },
+  { id: 'agencies',             label: 'Agencies' },
+  { id: 'shareholders',         label: 'Shareholders' },
+  { id: 'vendors',              label: 'Vendors' },
+  { id: 'inv_items',            label: 'Inventory Items' },
+  { id: 'menu_categories',      label: 'Menu Categories' },
+  { id: 'menu_items',           label: 'Menu Items' },
+  { id: 'facility_items',       label: 'Facility Items' },
+  { id: 'chart_of_accounts',    label: 'Chart of Accounts' },
+  { id: 'rooms',                label: 'Rooms' },
   { id: 'reservation_policies', label: 'Reservation Policies' },
+  { id: 'store_locations',      label: 'Store Locations' },
+  { id: 'guests',               label: 'Guests' },
 ]
 
 const firstAccessiblePath = (role, privileges) => {
@@ -103,24 +120,25 @@ const firstAccessiblePath = (role, privileges) => {
   return '/dashboard'
 }
 
+/* ------------------------------------------------------------------ */
+/*  APP SHELL                                                           */
+/* ------------------------------------------------------------------ */
 function AppShell({ company, role, isAdmin, userName, loadCompany, privileges }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [openGroup, setOpenGroup] = useState(null)
+  const [openGroup, setOpenGroup]         = useState(null)
   const [openSystemMenu, setOpenSystemMenu] = useState(null)
   const toggleGroup = (title) => setOpenGroup((prev) => (prev === title ? null : title))
 
   const currentTopId = location.pathname.split('/').filter(Boolean)[0] || 'dashboard'
 
-  const openReservation = (id) => navigate(`/reservations/${id}`)
-  const startReservation = (prefill = {}) => navigate('/reservations', { state: { prefill } })
+  const openReservation   = (id) => navigate(`/reservations/${id}`)
+  const startReservation  = (prefill = {}) => navigate('/reservations', { state: { prefill } })
 
-  const softwareName = company?.software_name || 'Aura Stay'
+  const softwareName    = company?.software_name || 'Aura Stay'
   const sidebarThemeStyle = { background: 'var(--sidebar-bg)' }
 
-  // Close the mobile drawer automatically whenever the route changes â€”
-  // otherwise it stays open after tapping a nav link.
   useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
   useEffect(() => {
     const activeGroup = NAV_GROUPS.find((g) => g.items.some((n) => n.id === currentTopId))
@@ -143,11 +161,14 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
           <X size={20} />
         </button>
       </div>
+
       <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
         {NAV_GROUPS.map((g) => {
           const items = g.items.filter((n) => {
-            if (n.id === 'ai-tasker') return can(role, 'tasks', privileges)
-            if (n.id === 'cms') return isAdmin || role === 'SUPERUSER'
+            if (n.id === 'ai-tasker')        return can(role, 'tasks', privileges)
+            if (n.id === 'cms')              return isAdmin || role === 'SUPERUSER'
+            if (n.id === 'menu-management')  return isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT'
+            if (n.id === 'consumption')      return can(role, 'inventory', privileges)
             return can(role, n.id, privileges)
           })
           if (items.length === 0) return null
@@ -161,50 +182,58 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
                 <span>{g.title}</span>
                 <ChevronDown size={11} className={`transition-transform duration-200 ${isOpenGroup ? '' : '-rotate-90'}`} />
               </button>
+
               {isOpenGroup && (
                 <div className="space-y-0.5 mb-1">
                   {items.map((n) => {
+                    // Simple nav items (not settings/cms)
                     if (n.id !== 'settings' && n.id !== 'cms') {
                       return (
                         <button key={n.id}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentTopId === n.id ? 'bg-white/14 text-white ring-1 ring-white/20' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            currentTopId === n.id
+                              ? 'bg-white/14 text-white ring-1 ring-white/20'
+                              : 'text-white/75 hover:bg-white/10 hover:text-white'
+                          }`}
                           onClick={() => navigate(`/${n.id}`)}>
                           <n.icon size={17} /> {n.label}
                         </button>
                       )
                     }
+
+                    // Settings / CMS — expandable sub-menus
                     const isOpen = openSystemMenu === n.id
                     const nested = n.id === 'settings'
                       ? SIDEBAR_SETTINGS_SECTIONS.filter((s) => {
-                        if (!s.adminOnly && !s.superuserOnly) return true
-                        if (s.adminOnly) return isAdmin || role === 'SUPERUSER'
-                        return role === 'SUPERUSER'
-                      })
+                          if (!s.adminOnly && !s.superuserOnly) return true
+                          if (s.adminOnly) return isAdmin || role === 'SUPERUSER'
+                          return role === 'SUPERUSER'
+                        })
                       : SIDEBAR_CMS_ENTITY_TABS
                     return (
                       <div key={n.id} className="space-y-1">
                         <button
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentTopId === n.id ? 'bg-white/14 text-white ring-1 ring-white/20' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}
-                          onClick={() => {
-                            setOpenSystemMenu(n.id)
-                            navigate(`/${n.id}`)
-                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            currentTopId === n.id
+                              ? 'bg-white/14 text-white ring-1 ring-white/20'
+                              : 'text-white/75 hover:bg-white/10 hover:text-white'
+                          }`}
+                          onClick={() => { setOpenSystemMenu(n.id); navigate(`/${n.id}`) }}
                         >
-                          <span className="flex items-center gap-3">
-                            <n.icon size={17} /> {n.label}
-                          </span>
+                          <span className="flex items-center gap-3"><n.icon size={17} /> {n.label}</span>
                           <ChevronDown size={13} className={`transition-transform ${isOpen ? '' : '-rotate-90'}`} />
                         </button>
                         {isOpen && (
                           <div className="ml-6 space-y-0.5">
                             {nested.map((child) => {
-                              const isActiveChild = currentTopId === n.id && location.search.includes(`${n.id === 'settings' ? 'section' : 'entity'}=${child.id}`)
+                              const paramKey = n.id === 'settings' ? 'section' : 'entity'
+                              const isActiveChild = currentTopId === n.id && location.search.includes(`${paramKey}=${child.id}`)
                               return (
-                                <button
-                                  key={child.id}
-                                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${isActiveChild ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'}`}
-                                  onClick={() => navigate(`/${n.id}?${n.id === 'settings' ? 'section' : 'entity'}=${child.id}`)}
-                                >
+                                <button key={child.id}
+                                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                                    isActiveChild ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
+                                  }`}
+                                  onClick={() => navigate(`/${n.id}?${paramKey}=${child.id}`)}>
                                   {child.label}
                                 </button>
                               )
@@ -220,6 +249,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
           )
         })}
       </nav>
+
       <div className="px-5 py-4 border-t border-white/10 text-xs text-white/65">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -238,12 +268,12 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
 
   return (
     <div className="min-h-screen flex">
-      {/* Desktop sidebar â€” always visible, fixed, unchanged from before */}
+      {/* Desktop sidebar */}
       <aside style={sidebarThemeStyle} className="hidden lg:flex w-60 text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
         {SidebarContent}
       </aside>
 
-      {/* Mobile sidebar â€” slide-in drawer + backdrop, only rendered when open */}
+      {/* Mobile drawer */}
       {mobileNavOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-ink/35" onClick={() => setMobileNavOpen(false)} />
@@ -253,7 +283,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
         </div>
       )}
 
-      {/* Mobile top bar â€” hamburger + brand, only visible below lg */}
+      {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 inset-x-0 z-20 bg-white/95 backdrop-blur text-pine flex items-center gap-3 px-4 py-3 shadow-sm border-b border-leaf/80">
         <button onClick={() => setMobileNavOpen(true)} className="text-pine/70 hover:text-forest">
           <Menu size={22} />
@@ -266,16 +296,22 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
 
       <main className="flex-1 min-w-0 lg:ml-60 p-4 pt-20 lg:pt-8 lg:p-8 w-full overflow-x-hidden">
         {company?.maintenance_mode && (
-          <div className="no-print" style={{position:'sticky',top:0,zIndex:50,background:'#b91c1c',
-               color:'#fff',textAlign:'center',padding:'6px',fontWeight:600,fontSize:13,
-               margin:'-16px -16px 16px'}}>
-            âš  Maintenance mode â€” posting & edits are locked while accounts reconcile.
+          <div className="no-print" style={{ position:'sticky', top:0, zIndex:50, background:'#b91c1c',
+            color:'#fff', textAlign:'center', padding:'6px', fontWeight:600, fontSize:13,
+            margin:'-16px -16px 16px' }}>
+            ⚠ Maintenance mode — posting & edits are locked while accounts reconcile.
           </div>
         )}
 
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard openReservation={openReservation} userName={userName} role={role} isAdmin={isAdmin} />} />
+
+          {/* Dashboard */}
+          <Route path="/dashboard" element={
+            <Dashboard openReservation={openReservation} userName={userName} role={role} isAdmin={isAdmin} />
+          } />
+
+          {/* Reservations */}
           <Route path="/reservations" element={
             <GuardedRoute role={role} navId="reservations" privileges={privileges}>
               <ReservationsRoute openReservation={openReservation} userName={userName} />
@@ -287,12 +323,25 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
             </GuardedRoute>
           } />
 
-          <Route path="/calendar" element={
-            <GuardedRoute role={role} navId="calendar" privileges={privileges}>
-              <BookingCalendar openReservation={openReservation} onNewReservation={startReservation} onOpenReservations={() => navigate('/reservations')} />
+          {/* Guest CRM */}
+          <Route path="/crm" element={
+            <GuardedRoute role={role} navId="crm" privileges={privileges}>
+              <GuestCRM userName={userName} isAdmin={isAdmin} role={role} />
             </GuardedRoute>
           } />
 
+          {/* Booking Calendar */}
+          <Route path="/calendar" element={
+            <GuardedRoute role={role} navId="calendar" privileges={privileges}>
+              <BookingCalendar
+                openReservation={openReservation}
+                onNewReservation={startReservation}
+                onOpenReservations={() => navigate('/reservations')}
+              />
+            </GuardedRoute>
+          } />
+
+          {/* Front Office */}
           <Route path="/nightaudit" element={
             <GuardedRoute role={role} navId="nightaudit" privileges={privileges}>
               <NightAudit userName={userName} isAdmin={isAdmin} role={role} />
@@ -303,22 +352,38 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
               <HousekeepingHub userName={userName} role={role} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
+          <Route path="/facilities" element={
+            <GuardedRoute role={role} navId="facilities" privileges={privileges}>
+              <Facilities userName={userName} isAdmin={isAdmin} />
+            </GuardedRoute>
+          } />
+
+          {/* Restaurant */}
           <Route path="/pos" element={
             <GuardedRoute role={role} navId="pos" privileges={privileges}>
               <RestaurantPOS userName={userName} role={role} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
           <Route path="/kiosk/pos" element={<GuestPosKiosk />} />
-          <Route path="/facilities" element={
-            <GuardedRoute role={role} navId="facilities" privileges={privileges}>
-              <Facilities userName={userName} isAdmin={isAdmin} />
-            </GuardedRoute>
+          <Route path="/menu-management" element={
+            (isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT')
+              ? <InventoryHub userName={userName} role={role} isAdmin={isAdmin} menuMode />
+              : <Navigate to={firstAccessiblePath(role, privileges)} replace />
           } />
+
+          {/* Inventory */}
           <Route path="/inventory" element={
             <GuardedRoute role={role} navId="inventory" privileges={privileges}>
               <InventoryHub userName={userName} role={role} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
+          <Route path="/consumption" element={
+            <GuardedRoute role={role} navId="inventory" privileges={privileges}>
+              <InventoryHub userName={userName} role={role} isAdmin={isAdmin} consumptionMode />
+            </GuardedRoute>
+          } />
+
+          {/* Accounting */}
           <Route path="/vat" element={
             <GuardedRoute role={role} navId="vat" privileges={privileges}>
               <VatCenter userName={userName} company={company} />
@@ -329,16 +394,22 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
               <AccountingHub userName={userName} isAdmin={isAdmin} role={role} />
             </GuardedRoute>
           } />
+
+          {/* HR */}
           <Route path="/hr" element={
             <GuardedRoute role={role} navId="hr" privileges={privileges}>
               <HrOffice userName={userName} role={role} isAdmin={isAdmin} company={company} />
             </GuardedRoute>
           } />
+
+          {/* Reports */}
           <Route path="/reports" element={
             <GuardedRoute role={role} navId="reports" privileges={privileges}>
               <ReportsHub userName={userName} role={role} />
             </GuardedRoute>
           } />
+
+          {/* Tasks */}
           <Route path="/tasks" element={
             <GuardedRoute role={role} navId="tasks" privileges={privileges}>
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} />
@@ -349,10 +420,12 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} aiTaskerMode />
             </GuardedRoute>
           } />
+
+          {/* System */}
           <Route path="/cms" element={
-              (isAdmin || role === 'SUPERUSER')
-                ? <CmsPortal role={role} isAdmin={isAdmin} />
-                : <Navigate to={firstAccessiblePath(role, privileges)} replace />
+            (isAdmin || role === 'SUPERUSER')
+              ? <CmsPortal role={role} isAdmin={isAdmin} />
+              : <Navigate to={firstAccessiblePath(role, privileges)} replace />
           } />
           <Route path="/settings" element={
             <GuardedRoute role={role} navId="settings" privileges={privileges}>
@@ -372,15 +445,21 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
   )
 }
 
+/* ------------------------------------------------------------------ */
+/*  GUARDED ROUTE                                                       */
+/* ------------------------------------------------------------------ */
 function GuardedRoute({ role, navId, privileges, children }) {
   if (!can(role, navId, privileges)) return <Navigate to={firstAccessiblePath(role, privileges)} replace />
   return children
 }
 
+/* ------------------------------------------------------------------ */
+/*  ROUTE HELPERS                                                       */
+/* ------------------------------------------------------------------ */
 function ReservationsRoute({ openReservation, userName }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const prefill = location.state?.prefill || null
+  const prefill    = location.state?.prefill || null
   const clearPrefill = () => navigate(location.pathname, { replace: true, state: {} })
   return <Reservations openReservation={openReservation} userName={userName} prefill={prefill} clearPrefill={clearPrefill} />
 }
@@ -391,6 +470,9 @@ function ReservationDetailRoute({ userName, role, isAdmin }) {
   return <ReservationDetail id={id} back={() => navigate('/reservations')} userName={userName} role={role} isAdmin={isAdmin} />
 }
 
+/* ------------------------------------------------------------------ */
+/*  APP ROOT                                                            */
+/* ------------------------------------------------------------------ */
 export default function App() {
   return (
     <BrowserRouter>
@@ -401,9 +483,9 @@ export default function App() {
 
 function AppRoot() {
   const location = useLocation()
-  const [session, setSession] = useState(undefined)
-  const [profile, setProfile] = useState(null)
-  const [company, setCompany] = useState(null)
+  const [session,    setSession]    = useState(undefined)
+  const [profile,    setProfile]    = useState(null)
+  const [company,    setCompany]    = useState(null)
   const [privileges, setPrivileges] = useState(null)
   const [brandTheme, setBrandTheme] = useState(buildBrandTheme(DEFAULT_THEME))
 
@@ -413,13 +495,13 @@ function AppRoot() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-    const loadCompany = async () => {
+  const loadCompany = async () => {
     const tenantId = getTenantId()
     let query = supabase.from('company_settings').select('*')
     if (tenantId) query = query.eq('tenant_id', tenantId)
     const { data } = await query.limit(1).single()
     if (data) {
-      setCurrency(data.currency || 'à§³')
+      setCurrency(data.currency || '৳')
       let propertyQuery = supabase.from('properties').select('slug')
       if (tenantId) propertyQuery = propertyQuery.eq('id', tenantId)
       const { data: prop } = await propertyQuery.limit(1).maybeSingle()
@@ -466,14 +548,49 @@ function AppRoot() {
   useEffect(() => {
     const role = profile?.role
     if (!role) return
-    let query = supabase.from('role_privileges').select('module, can_create, can_view, can_edit, can_delete').eq('role', role)
+
     const tenantId = getTenantId()
+
+    // Base privileges from role_privileges table
+    let query = supabase
+      .from('role_privileges')
+      .select('module, can_create, can_view, can_edit, can_delete')
+      .eq('role', role)
     if (tenantId) query = query.eq('tenant_id', tenantId)
-    query
-      .then(({ data }) => setPrivileges(data || []))
+
+    query.then(async ({ data: basePrivs }) => {
+      let privs = basePrivs || []
+
+      // For ADMIN role — apply admin_feature_access restrictions
+      if (role === 'ADMIN') {
+        const { data: accessRows } = await supabase
+          .from('admin_feature_access')
+          .select('module, can_access')
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+
+        if (accessRows && accessRows.length > 0) {
+          // Zero out modules where can_access = false
+          const restricted = new Set(
+            accessRows.filter(r => r.can_access === false).map(r => r.module)
+          )
+          if (restricted.size > 0) {
+            privs = privs.map(p =>
+              restricted.has(p.module)
+                ? { ...p, can_view: false, can_create: false, can_edit: false, can_delete: false }
+                : p
+            )
+          }
+        }
+        // No rows = full access (no restrictions set by Superuser)
+      }
+
+      setPrivileges(privs)
+    })
   }, [profile?.role])
 
-  if (session === undefined) return <div className="min-h-screen flex items-center justify-center text-pine/60">Loadingâ€¦</div>
+  if (session === undefined) return (
+    <div className="min-h-screen flex items-center justify-center text-pine/60">Loading…</div>
+  )
 
   if (location.pathname.endsWith('/login')) {
     const slug = location.pathname.split('/').filter(Boolean)[0]
@@ -482,7 +599,6 @@ function AppRoot() {
   }
 
   if (!session && location.pathname.startsWith('/kiosk/pos')) return <GuestPosKiosk />
-
   if (!session) return <Login />
 
   const role     = profile?.role || 'FRONT_OFFICE'
@@ -492,10 +608,19 @@ function AppRoot() {
   const themedCompany = company ? {
     ...company,
     primary_color: company.primary_color || brandTheme.primary,
-    accent_color: company.accent_color || brandTheme.accent,
+    accent_color:  company.accent_color  || brandTheme.accent,
     brand_primary: company.brand_primary || brandTheme.printPrimary,
-    brand_accent: company.brand_accent || brandTheme.printAccent,
+    brand_accent:  company.brand_accent  || brandTheme.printAccent,
   } : null
 
-  return <AppShell company={themedCompany} role={role} isAdmin={isAdmin} userName={userName} loadCompany={loadCompany} privileges={privileges} />
+  return (
+    <AppShell
+      company={themedCompany}
+      role={role}
+      isAdmin={isAdmin}
+      userName={userName}
+      loadCompany={loadCompany}
+      privileges={privileges}
+    />
+  )
 }
