@@ -6,8 +6,9 @@ import { Users, Plus, Check, X, CalendarDays, FileText, Wallet, Printer } from '
 import PrintPortal from '../components/PrintPortal.jsx'
 import ComplianceTab from '../components/ComplianceTab'
 import EmployeeProfile from '../components/EmployeeProfile.jsx'
+import HrLetterDoc from '../components/print/HrLetterDoc.jsx'
 
-const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Payroll', 'Incidents', 'Letters / Docket', 'Compliance']
+const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Payroll', 'Incidents', 'Letters / Docket', 'HR Letters', 'Compliance']
 
 export default function HrOffice({ userName, role, isAdmin, company }) {
   const [tab, setTab] = useState('Employees')
@@ -32,6 +33,7 @@ export default function HrOffice({ userName, role, isAdmin, company }) {
       {tab === 'Payroll' && <PayrollTab flash={flash} userName={userName} canApprove={canApprove} isAdmin={isAdmin} company={company} />}
       {tab === 'Incidents' && <IncidentsTab flash={flash} userName={userName} />}
       {tab === 'Letters / Docket' && <DocketTab flash={flash} userName={userName} />}
+      {tab === 'HR Letters' && <HrLettersTab flash={flash} company={company} />}
       {tab === 'Compliance' && <ComplianceTab role={role} />}
     </div>
   )
@@ -550,6 +552,180 @@ function DocketTab({ flash, userName }) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   HR LETTERS TAB — printable application / letter templates
+   ───────────────────────────────────────────────────────────── */
+const LETTER_TYPES = [
+  { value: 'APPOINTMENT', label: 'Appointment Letter',      extraFields: ['joiningDate', 'probation'] },
+  { value: 'SALARY_CERT', label: 'Salary Certificate',      extraFields: ['purpose', 'showBreakdown'] },
+  { value: 'EXP_CERT',    label: 'Experience Certificate',  extraFields: ['lastWorkingDate', 'tenure', 'skills', 'additionalNote'] },
+  { value: 'RELIEVING',   label: 'Relieving Letter',        extraFields: ['lastWorkingDate', 'resignationType'] },
+  { value: 'WARNING',     label: 'Warning Letter',          extraFields: ['incidentDate', 'subject', 'description', 'warningNo'] },
+  { value: 'SHOW_CAUSE',  label: 'Show Cause Notice',       extraFields: ['incidentDate', 'subject', 'allegation', 'details', 'replyDays'] },
+  { value: 'LEAVE_APP',   label: 'Leave Application',       extraFields: ['leaveType', 'fromDate', 'toDate', 'reason', 'resumeDate', 'addressDuringLeave'] },
+  { value: 'JOINING',     label: 'Joining Report',          extraFields: ['joiningDate'] },
+]
+
+function HrLettersTab({ flash, company }) {
+  const [emps, setEmps]   = useState([])
+  const [empId, setEmpId] = useState('')
+  const [type, setType]   = useState('APPOINTMENT')
+  const [date, setDate]   = useState(todayISO())
+  const [extra, setExtra] = useState({})
+  const [printDoc, setPrintDoc] = useState(null)
+
+  useEffect(() => {
+    supabase.from('employees').select('*').order('full_name').then(({ data }) => setEmps(data || []))
+  }, [])
+
+  const selectedEmp  = emps.find((e) => e.id === empId) || null
+  const selectedType = LETTER_TYPES.find((t) => t.value === type)
+
+  const setE = (k, v) => setExtra((p) => ({ ...p, [k]: v }))
+
+  const openPrint = () => {
+    if (!selectedEmp) { flash('Please select an employee.'); return }
+    setPrintDoc({ type, employee: selectedEmp, extra, date })
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="card p-4 space-y-3">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="label">Employee</label>
+            <select className="input" value={empId} onChange={(e) => setEmpId(e.target.value)}>
+              <option value="">Select employee…</option>
+              {emps.map((e) => <option key={e.id} value={e.id}>{e.full_name} ({e.emp_code})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Letter Type</label>
+            <select className="input" value={type} onChange={(e) => { setType(e.target.value); setExtra({}) }}>
+              {LETTER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Date</label>
+            <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Dynamic extra fields per letter type */}
+        {selectedType && (
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            {selectedType.extraFields.includes('joiningDate') && (
+              <div><label className="label">Joining Date</label><input type="date" className="input" value={extra.joiningDate || ''} onChange={(e) => setE('joiningDate', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('lastWorkingDate') && (
+              <div><label className="label">Last Working Date</label><input type="date" className="input" value={extra.lastWorkingDate || ''} onChange={(e) => setE('lastWorkingDate', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('incidentDate') && (
+              <div><label className="label">Incident Date</label><input type="date" className="input" value={extra.incidentDate || ''} onChange={(e) => setE('incidentDate', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('fromDate') && (
+              <div><label className="label">Leave From</label><input type="date" className="input" value={extra.fromDate || ''} onChange={(e) => setE('fromDate', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('toDate') && (
+              <div><label className="label">Leave To</label><input type="date" className="input" value={extra.toDate || ''} onChange={(e) => setE('toDate', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('resumeDate') && (
+              <div><label className="label">Resume Date</label><input type="date" className="input" value={extra.resumeDate || ''} onChange={(e) => setE('resumeDate', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('probation') && (
+              <div><label className="label">Probation Period</label><input className="input" placeholder="e.g. 3 months" value={extra.probation || ''} onChange={(e) => setE('probation', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('purpose') && (
+              <div><label className="label">Purpose</label><input className="input" placeholder="e.g. bank loan, visa" value={extra.purpose || ''} onChange={(e) => setE('purpose', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('showBreakdown') && (
+              <div className="flex items-center gap-2 pt-4">
+                <input type="checkbox" id="showBreakdown" checked={!!extra.showBreakdown} onChange={(e) => setE('showBreakdown', e.target.checked)} />
+                <label htmlFor="showBreakdown" className="text-sm text-pine cursor-pointer">Show salary breakdown</label>
+              </div>
+            )}
+            {selectedType.extraFields.includes('tenure') && (
+              <div><label className="label">Tenure</label><input className="input" placeholder="e.g. 2 years 3 months" value={extra.tenure || ''} onChange={(e) => setE('tenure', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('skills') && (
+              <div className="col-span-2"><label className="label">Skills / Qualities</label><input className="input" placeholder="e.g. excellent communication and technical skills" value={extra.skills || ''} onChange={(e) => setE('skills', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('additionalNote') && (
+              <div className="col-span-2"><label className="label">Additional Note</label><textarea className="input" rows={2} placeholder="Optional extra paragraph" value={extra.additionalNote || ''} onChange={(e) => setE('additionalNote', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('resignationType') && (
+              <div>
+                <label className="label">Separation Type</label>
+                <select className="input" value={extra.resignationType || 'RESIGNATION'} onChange={(e) => setE('resignationType', e.target.value)}>
+                  <option value="RESIGNATION">Resignation</option>
+                  <option value="TERMINATION">Termination</option>
+                </select>
+              </div>
+            )}
+            {selectedType.extraFields.includes('warningNo') && (
+              <div>
+                <label className="label">Warning Number</label>
+                <select className="input" value={extra.warningNo || '1st'} onChange={(e) => setE('warningNo', e.target.value)}>
+                  {['1st', '2nd', '3rd', 'Final'].map((v) => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+            )}
+            {selectedType.extraFields.includes('subject') && (
+              <div className="col-span-2"><label className="label">Subject</label><input className="input" placeholder="Brief subject of the letter" value={extra.subject || ''} onChange={(e) => setE('subject', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('description') && (
+              <div className="col-span-2"><label className="label">Description / Incident Details</label><textarea className="input" rows={2} placeholder="Describe the incident or misconduct" value={extra.description || ''} onChange={(e) => setE('description', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('allegation') && (
+              <div className="col-span-2"><label className="label">Allegation</label><input className="input" placeholder="e.g. violated company leave policy" value={extra.allegation || ''} onChange={(e) => setE('allegation', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('details') && (
+              <div className="col-span-2"><label className="label">Details / Instructions</label><textarea className="input" rows={2} placeholder="Detailed explanation of the notice" value={extra.details || ''} onChange={(e) => setE('details', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('replyDays') && (
+              <div><label className="label">Reply Within</label><input className="input" placeholder="e.g. 48 hours" value={extra.replyDays || ''} onChange={(e) => setE('replyDays', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('leaveType') && (
+              <div><label className="label">Leave Type</label><input className="input" placeholder="e.g. Annual Leave, Sick Leave" value={extra.leaveType || ''} onChange={(e) => setE('leaveType', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('reason') && (
+              <div className="col-span-2"><label className="label">Reason for Leave</label><input className="input" placeholder="Brief reason" value={extra.reason || ''} onChange={(e) => setE('reason', e.target.value)} /></div>
+            )}
+            {selectedType.extraFields.includes('addressDuringLeave') && (
+              <div className="col-span-2"><label className="label">Address During Leave</label><input className="input" placeholder="Where will the employee be during leave?" value={extra.addressDuringLeave || ''} onChange={(e) => setE('addressDuringLeave', e.target.value)} /></div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end pt-1">
+          <button className="btn-primary" onClick={openPrint}><Printer size={15} /> Preview &amp; Print</button>
+        </div>
+      </div>
+
+      {/* Quick-reference card */}
+      <div className="card p-4">
+        <p className="text-xs font-semibold text-pine/60 mb-3 uppercase tracking-wide">Available Letter Templates</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {LETTER_TYPES.map((t) => (
+            <button key={t.value} onClick={() => { setType(t.value); setExtra({}) }}
+              className={`rounded-lg border px-3 py-2 text-xs text-left transition-colors ${type === t.value ? 'border-forest bg-forest/10 text-forest font-semibold' : 'border-leaf text-pine/70 hover:bg-leaf/30'}`}>
+              <FileText size={12} className="inline mr-1" />{t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Print portal */}
+      {printDoc && (
+        <PrintPortal title={`${LETTER_TYPES.find((t) => t.value === printDoc.type)?.label} — ${printDoc.employee.full_name}`} onClose={() => setPrintDoc(null)}>
+          <HrLetterDoc type={printDoc.type} employee={printDoc.employee} extra={printDoc.extra} company={company} date={printDoc.date} />
+        </PrintPortal>
+      )}
     </div>
   )
 }
