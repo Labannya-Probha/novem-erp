@@ -19,9 +19,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['Fraunces', 'serif'],
-        body:    ['"IBM Plex Sans"', 'sans-serif'],
-        money:   ['"IBM Plex Mono"', 'monospace'],
+        display: ['Inter', 'sans-serif'],
+        body:    ['Inter', 'sans-serif'],
+        money:   ['Inter', 'sans-serif'],
       },
     },
   },
