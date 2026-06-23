@@ -130,25 +130,6 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   const removeLine = (idx) => setCart((prev) => prev.filter((_, i) => i !== idx))
   const visible = items.filter((i) =>  i.is_active &&  (activeCat === 'ALL' || i.category_id === activeCat) &&  (!itemSearch || i.name.toLowerCase().includes(itemSearch.toLowerCase())))
 
-  const allocate = () => {
-    const lines = cart.map((c) => ({ ...c, line_total: +(c.qty * c.unit_price).toFixed(2) }))
-    const keys = ['discount', 'service_charge', 'vat']
-    const out = lines.map((l) => {
-      const ratio = subtotal > 0 ? l.line_total / subtotal : 0
-      const o = { charge_date: todayISO(), charge_type: 'RESTAURANT', description: `${l.item_name} × ${l.qty}`, base_amount: l.line_total, status: 'PAID' }
-      keys.forEach((k) => { o[k] = +(t[k] * ratio).toFixed(2) })
-      return o
-    })
-    if (out.length > 0) {
-      keys.forEach((k) => {
-        const sum = out.reduce((a, o) => a + o[k], 0)
-        out[out.length - 1][k] = +(out[out.length - 1][k] + (t[k] - sum)).toFixed(2)
-      })
-    }
-    out.forEach((o) => { o.total = +(o.base_amount - o.discount + o.service_charge + o.vat).toFixed(2) })
-    return out
-  }
-
   const persist = async (statusFields) => {
     const payload = { order_type: meta.order_type, table_no: meta.table_no || null, notes: meta.notes || null, reservation_id: link.reservation_id, guest_name: link.guest_name || null, room_no: link.room_no || null, discount_pct: discountPct, base_amount: t.base_amount, discount: discountAmount, service_charge: t.service_charge, vat: t.vat, total: t.total, created_by: userName, ...statusFields }
     let order
