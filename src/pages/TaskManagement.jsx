@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase, SUPABASE_CONFIG } from '../supabase'
 import { fmtDate } from '../lib/helpers'
+import { parseWorkflowMeta, routeAiIntent, buildWorkflowDescription } from '../lib/aiTaskRouter'
+import KPICards from '../components/KPICards.jsx'
 import { ListChecks, Plus, Sparkles, Search, Clock, User, X } from 'lucide-react'
 
 const STATUSES = ['ALL', 'OPEN', 'IN_PROGRESS', 'DONE', 'CANCELLED']
@@ -61,6 +63,7 @@ export default function TaskManagement({ userName }) {
 
   return (
     <div>
+      <KPICards module="tasks" />
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <h1 className="font-display text-xl sm:text-2xl font-bold text-pine flex items-center gap-2">
           <ListChecks className="text-forest" /> Task Management
@@ -92,18 +95,22 @@ export default function TaskManagement({ userName }) {
         <div className="card p-8 text-center text-pine/40 text-sm">Loading tasks…</div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((t) => (
+          {filtered.map((t) => {
+            const wf = parseWorkflowMeta(t)
+            return (
             <div key={t.id} className="card p-4 flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="text-xs font-mono text-pine/40">{t.task_no}</span>
                   <span className={`status-chip ${PRIORITY_STYLE[t.priority]}`}>{t.priority}</span>
                   {t.category?.name && <span className="text-xs text-pine/50">· {t.category.name}</span>}
-                  {t.source === 'NLP' && (
+                  {(t.source === 'NLP' || t.source === 'AI_ROUTED') && (
                     <span className="text-[10px] flex items-center gap-0.5 text-forest font-medium">
                       <Sparkles size={10} /> AI
                     </span>
                   )}
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-pine/10 text-pine">{wf.department.replace('_', ' ')}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-sky-100 text-sky-700">{wf.stage}</span>
                 </div>
                 <div className="font-semibold text-sm truncate">{t.title}</div>
                 {t.description && <div className="text-xs text-pine/60 mt-0.5 line-clamp-2">{t.description}</div>}
@@ -126,7 +133,8 @@ export default function TaskManagement({ userName }) {
                 ))}
               </select>
             </div>
-          ))}
+            )
+          })}
           {filtered.length === 0 && (
             <div className="card p-8 text-center text-pine/40 text-sm">
               No tasks yet. Click <span className="font-semibold">+ New task</span> to begin.
@@ -199,9 +207,16 @@ function NewTask({ categories, employees, userName, close }) {
   const save = async () => {
     if (!f.title.trim()) { setErr('Title লাগবে।'); return }
     setBusy(true); setErr('')
+    const routed = routeAiIntent(`${f.title} ${f.description || ''}`)
+    const descriptionWithFlow = buildWorkflowDescription(f.description || '', {
+      department: routed.department,
+      stage: routed.stage,
+      workflow: routed.workflow,
+      intent: rawInput || `${f.title} ${f.description || ''}`,
+    })
     const { error } = await supabase.from('tasks').insert({
       title: f.title.trim(),
-      description: f.description || null,
+      description: descriptionWithFlow || null,
       category_id: f.category_id || null,
       priority: f.priority,
       assigned_to: f.assigned_to || null,
