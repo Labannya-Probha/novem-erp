@@ -235,6 +235,21 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
                 <Clock size={14} /> Close Day
               </Button>
             </div>
+      {dayMsg && <div className="mb-4 px-4 py-2 rounded-lg bg-forest/10 text-forest text-sm font-medium">{dayMsg}</div>}
+      <div className="card p-4 mb-6 border border-leaf/70">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            {foCloseRow && <p className="text-xs text-pine/50 mt-1">Closed by {foCloseRow.closed_by || '—'} at {fmtDate(foCloseRow.closed_at || foCloseRow.created_at || today)}.</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            {canOpenDay && foCloseRow && (
+              <button className="btn-ghost !py-1 text-red-600" onClick={openFrontOfficeDay} disabled={dayBusy}>
+                <XCircle size={14} /> Day Open
+              </button>
+            )}
+            <button className="btn-amber !py-1" onClick={closeFrontOfficeDay} disabled={dayBusy}>
+              <Clock size={14} /> Day Close
+            </button>
           </div>
         </CardContent>
       </Card>
