@@ -14,7 +14,7 @@ import Quotation from '../components/print/Quotation.jsx'
 import { exportXLSX } from '../lib/helpers'
 import {
   ArrowLeft, MessageCircle, Mail, CheckCircle2, LogIn, BedDouble,
-  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, BadgePercent, Pencil, Save,
+  Plus, Trash2, Printer, FileDown, Receipt, BadgeCheck, Ban, Pencil, Save,
   Users, Handshake,
 } from 'lucide-react'
 
@@ -1611,10 +1611,21 @@ function BillingsAndCheckOutTab({
   const editable     = isAdmin || !['CHECKED_OUT', 'SETTLED', 'CANCELLED'].includes(res.status)
   const pendingClearanceRooms = resRooms.filter((rr) => (rr.rooms?.hk_status || '').toLowerCase() !== 'inspected')
   const [c, setC]           = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
-  const [discAmt, setDiscAmt]     = useState('')
-  const [discReason, setDiscReason] = useState('')
-  const [discType, setDiscType]   = useState('ROOM')
+  const [discBusy, setDiscBusy] = useState(false)
+  const [discountForm, setDiscountForm] = useState({
+    discount_type: res.discount_type || 'percentage',
+    discount_pct: Number(res.discount_pct) || 0,
+    discount_val: Number(res.discount_val) || 0,
+  })
   const [p, setP]           = useState({ amount: '', method: 'CASH', reference: '', received_date: todayISO(), received_by: userName, paid_by_party: '', payment_class: 'SETTLEMENT' })
+
+  useEffect(() => {
+    setDiscountForm({
+      discount_type: res.discount_type || 'percentage',
+      discount_pct: Number(res.discount_pct) || 0,
+      discount_val: Number(res.discount_val) || 0,
+    })
+  }, [res.discount_type, res.discount_pct, res.discount_val])
 
   const printLiveInvoice = (type) => {
     setPrintDoc({
@@ -1782,34 +1793,24 @@ function BillingsAndCheckOutTab({
     }
   }
 
-  // ----------------------------------------------------------------
-  // Discount action — pure ৳ deduction, no VAT/Service Charge applied
-  // ----------------------------------------------------------------
-  const addDiscount = async () => {
-    const amt = +discAmt
-    if (!amt || amt <= 0) { flash('Enter a positive discount amount.'); return }
+  const saveReservationDiscount = async () => {
+    const isPct = discountForm.discount_type === 'percentage'
+    const pct = isPct ? Number(discountForm.discount_pct) : 0
+    const fixed = isPct ? 0 : Number(discountForm.discount_val)
+    if (isPct && (pct < 0 || pct > 100)) { flash('Discount % must be between 0 and 100.'); return }
+    if (!isPct && fixed < 0) { flash('Fixed discount cannot be negative.'); return }
 
-    const calc = {
-      base_amount: -amt,
-      discount: 0,
-      service_charge: 0,
-      vat: 0,
-      total: -amt,
-    }
-
-    const { error } = await supabase.from('folio_charges').insert({
-      reservation_id: res.id, charge_date: todayISO(), charge_type: 'DISCOUNT', status: 'PAID',
-      description: `Additional discount (${discType})${discReason ? ' — ' + discReason : ''}`,
-      ...calc, created_by: userName,
-    })
+    setDiscBusy(true)
+    const { error } = await supabase.from('reservations').update({
+      discount_type: discountForm.discount_type,
+      discount_pct: isPct ? pct : 0,
+      discount_val: isPct ? 0 : fixed,
+      updated_at: new Date().toISOString(),
+    }).eq('id', res.id)
+    setDiscBusy(false)
     if (error) { flash(error.message); return }
-    await supabase.from('audit_log').insert({
-      actor: userName, action: 'ADD_DISCOUNT', entity: 'reservation',
-      entity_id: res.res_no, details: { amount: amt, type: discType, reason: discReason },
-    })
-    setDiscAmt(''); setDiscReason('')
     await reload()
-    flash(`Additional discount of ${fmtBDT(amt)} applied.`)
+    flash('Reservation discount updated.')
   }
 
   // ----------------------------------------------------------------
@@ -2017,35 +2018,52 @@ function BillingsAndCheckOutTab({
         </div>
       )}
 
-      {/* 4. Admin Discount */}
+      {/* 4. Reservation Discount (Admin) */}
       {isAdmin && editable && (
         <div className="card p-4 border border-amber/30 bg-amber/5">
           <h3 className="font-display font-semibold text-pine flex items-center gap-2 mb-3">
-            <BadgePercent size={16} className="text-amber" /> Additional Discount (Admin)
+            Update Reservation Discount
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            <div>
-              <label className="label !text-xs">Amount (৳)</label>
-              <input type="number" min="0" className="input money"
-                placeholder="e.g. 500" value={discAmt}
-                onChange={(e) => setDiscAmt(e.target.value)} />
-            </div>
-            <div>
-              <label className="label !text-xs">Charge type</label>
-              <SearchableSelect
-                value={discType} onChange={setDiscType}
-                options={['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER']}
-                placeholder="Type…"
-              />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             <div className="sm:col-span-2">
-              <label className="label !text-xs">Reason</label>
-              <input className="input" placeholder="e.g. Loyal guest, goodwill…"
-                value={discReason} onChange={(e) => setDiscReason(e.target.value)} />
+              <label className="label !text-xs">Type</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDiscountForm((p) => ({ ...p, discount_type: 'percentage' }))}
+                  className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${discountForm.discount_type === 'percentage' ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`}
+                >%</button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountForm((p) => ({ ...p, discount_type: 'fixed' }))}
+                  className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${discountForm.discount_type === 'fixed' ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`}
+                >৳ Fixed</button>
+              </div>
+            </div>
+            <div>
+              <label className="label !text-xs">{discountForm.discount_type === 'percentage' ? 'Discount %' : 'Fixed discount (৳)'}</label>
+              {discountForm.discount_type === 'percentage' ? (
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  className="input money"
+                  value={discountForm.discount_pct}
+                  onChange={(e) => setDiscountForm((p) => ({ ...p, discount_pct: e.target.value }))}
+                />
+              ) : (
+                <input
+                  type="number"
+                  min="0"
+                  className="input money"
+                  value={discountForm.discount_val}
+                  onChange={(e) => setDiscountForm((p) => ({ ...p, discount_val: e.target.value }))}
+                />
+              )}
             </div>
             <div className="flex items-end">
-              <button className="btn-amber w-full justify-center" onClick={addDiscount}>
-                <BadgePercent size={15} /> Apply
+              <button className="btn-amber w-full justify-center" onClick={saveReservationDiscount} disabled={discBusy}>
+                {discBusy ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>

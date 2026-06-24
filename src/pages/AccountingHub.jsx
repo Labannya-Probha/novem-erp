@@ -1211,20 +1211,28 @@ function TransactionMappingTab({ accounts, flash, userName }) {
       .map((p) => p.charAt(0) + p.slice(1).toLowerCase())
       .join(' ')
 
-  const triggerDefaultSync = async () => {
+  const syncDefaultMappings = async ({ automated = false } = {}) => {
     setSyncBusy(true)
-    const existingTypes = new Set(mappings.map((m) => m.transaction_type))
+    const { data: current, error: loadErr } = await supabase
+      .from('accounting_transaction_mapping')
+      .select('transaction_type')
+    if (loadErr) {
+      setSyncBusy(false)
+      flash(loadErr.message)
+      return
+    }
+    const existingTypes = new Set((current || []).map((m) => m.transaction_type))
     const missing = allTxnTypes.filter((t) => !existingTypes.has(t))
     if (missing.length === 0) {
       setSyncBusy(false)
-      flash('All default transaction mappings already exist.')
+      if (!automated) flash('All default transaction mappings already exist.')
       return
     }
 
     const rows = missing.map((transaction_type) => ({
       transaction_type,
       label: toLabel(transaction_type),
-      notes: 'Added by manual trigger',
+      notes: automated ? 'Auto-synced on Accounting module open' : 'Added by manual trigger',
       created_by: userName,
       updated_by: userName,
     }))
@@ -1236,9 +1244,17 @@ function TransactionMappingTab({ accounts, flash, userName }) {
       return
     }
 
-    flash(`${missing.length} mapping row(s) added.`)
-    load()
+    flash(automated ? `${missing.length} default mapping row(s) auto-synced.` : `${missing.length} mapping row(s) added.`)
+    await load()
   }
+
+  const triggerDefaultSync = async () => {
+    await syncDefaultMappings({ automated: false })
+  }
+
+  useEffect(() => {
+    syncDefaultMappings({ automated: true })
+  }, [])
 
   const addMapping = async () => {
     if (!addF.transaction_type || !addF.label) {
@@ -1398,8 +1414,8 @@ function TransactionMappingTab({ accounts, flash, userName }) {
                 <div key={m.id} className="p-4">
                   {editId === m.id ? (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-[10px] text-pine/40 bg-pine/5 px-2 py-0.5 rounded">{m.transaction_type}</span>
                           <input
                             className="input !py-1 text-sm font-semibold flex-1 min-w-[160px]"
