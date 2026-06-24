@@ -1103,9 +1103,6 @@ const CHARGE_TYPE_META = {
   OTHER:          { label: 'Other Services',         icon: '🔧',  color: 'slate'  },
 }
 
-// All charge types available for manual configuration
-const ALL_CHARGE_TYPES = Object.keys(CHARGE_TYPE_META)
-
 const COLOR_CLASSES = {
   blue:   { bg: 'bg-blue-50',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-800',    head: 'bg-blue-100' },
   orange: { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-800', head: 'bg-orange-100' },
