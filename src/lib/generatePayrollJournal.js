@@ -2,21 +2,39 @@
 // ────────────────────────────────────────────────────────────────────────────
 // Payroll journal automation.
 //
-// Call generatePayrollJournal(payrollRunId) immediately after a payroll run is
-// set to APPROVED.  The underlying Postgres RPC is atomic and idempotent:
-//   • It verifies the run is APPROVED.
-//   • It reads the PAYROLL entry from accounting_transaction_mapping to resolve
-//     the debit (Salary Expense) and credit (Salary Payable) GL accounts.
-//   • It aggregates SUM(gross_salary) and SUM(net_payable) from payslips.
-//   • It inserts a balanced journal entry in journal_entries + journal_lines
-//     (wrapped in a single PL/pgSQL transaction).
-//   • It writes the new journal_entries.id back to payroll_runs.jv_id.
-//   • Subsequent calls for the same run return the existing jv_id unchanged.
+// approvePayrollAndPostJv(payrollRunId) — preferred, atomic RPC.
+//   Approves the run AND posts the double-entry journal in a single database
+//   transaction via the approve_payroll_and_post_jv Postgres function:
+//   • Rejects if the run is already APPROVED.
+//   • Reads PAYROLL entry from accounting_transaction_mapping.
+//   • Aggregates SUM(gross_salary) and SUM(net_payable) from payslips.
+//   • Inserts a balanced journal in journal_entries + journal_lines.
+//   • Sets payroll_runs.status = 'APPROVED', approved_at, and jv_id atomically.
+//
+// generatePayrollJournal(payrollRunId) — legacy helper (kept for compatibility).
+//   Call this when a run is already APPROVED and only the journal is missing.
+//   The underlying RPC is idempotent: subsequent calls return the existing jv_id.
 // ────────────────────────────────────────────────────────────────────────────
 import { supabase } from '../supabase'
 
 /**
- * Generate (or return the existing) payroll journal for an approved run.
+ * Atomically approve a payroll run and post its double-entry journal.
+ *
+ * @param {string} payrollRunId  UUID of the payroll_runs row.
+ * @returns {Promise<string>}    The new journal_entries.id (uuid).
+ * @throws {Error}               If the run is already Approved, has no payslips,
+ *                               or the PAYROLL mapping is not configured.
+ */
+export async function approvePayrollAndPostJv(payrollRunId) {
+  const { data, error } = await supabase.rpc('approve_payroll_and_post_jv', {
+    p_payroll_run_id: payrollRunId,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/**
+ * Generate (or return the existing) payroll journal for an already-approved run.
  *
  * @param {string} payrollRunId  UUID of the payroll_runs row.
  * @returns {Promise<string>}    The journal_entries.id (uuid).
