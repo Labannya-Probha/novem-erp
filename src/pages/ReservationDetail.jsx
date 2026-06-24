@@ -5,6 +5,7 @@ import {
   fmtBDT, fmtDate, todayISO, nightsBetween, eachNight,
   rateFor, computeCharge, sumCharges, applyRounding, STATUS_COLORS,
 } from '../lib/helpers'
+import { canManualCheckIn, getCheckInActionCopy } from '../lib/noShowAutomation'
 import PrintPortal from '../components/PrintPortal.jsx'
 import RegistrationCard from '../components/print/RegistrationCard.jsx'
 import GuestBill from '../components/print/GuestBill.jsx'
@@ -1459,16 +1460,27 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
       flash(`Check-in blocked: room(s) not ready/clean (${notReadyRooms.map((rr) => rr.rooms?.room_no).join(', ')}).`)
       return
     }
+    const wasNoShow = res.status === 'NO_SHOW'
     await setStatus('CHECKED_IN', {
       extra_pax: +f.extra_pax, extra_pax_rate: +f.extra_pax_rate,
       driver_accommodation: f.driver_accommodation, driver_count: +f.driver_count, driver_rate: +f.driver_rate,
       special_instructions: f.special_instructions,
       checked_in_at: new Date().toISOString(), checkin_by: userName,
     })
-    flash('Guest checked in. Print the Registration Card for signatures.')
+    if (wasNoShow) {
+      await supabase.from('audit_log').insert({
+        actor: userName,
+        action: 'NO_SHOW_OVERRIDE_CHECKIN',
+        entity: 'reservation',
+        entity_id: res.res_no,
+        details: { from_status: 'NO_SHOW', to_status: 'CHECKED_IN', source: 'MANUAL_OVERRIDE' },
+      })
+    }
+    flash(wasNoShow ? 'Guest checked in and no-show overridden. Print the Registration Card for signatures.' : 'Guest checked in. Print the Registration Card for signatures.')
   }
 
   const assignedIds = new Set(resRooms.map((r) => r.room_id))
+  const checkInAction = getCheckInActionCopy(res.status)
 
   return (
     <>
@@ -1569,8 +1581,8 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 pt-1">
-            {!['CHECKED_IN', 'CHECKED_OUT', 'SETTLED'].includes(res.status) ? (
-              <button className="btn-primary flex-1 justify-center" onClick={doCheckIn}><LogIn size={16} /> Check in guest</button>
+            {canManualCheckIn(res.status) ? (
+              <button className="btn-primary flex-1 justify-center" onClick={doCheckIn}><LogIn size={16} /> {checkInAction.label}</button>
             ) : (
               <div className="text-sm text-forest font-semibold flex items-center gap-2">
                 <BadgeCheck size={16} /> Checked in {res.checked_in_at && `· ${fmtDate(res.checked_in_at)}`} {res.checkin_by && `by ${res.checkin_by}`}
@@ -1578,6 +1590,7 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
             )}
             <button className="btn-amber flex-1 justify-center" onClick={openCard}><Printer size={16} /> Registration Card</button>
           </div>
+          {checkInAction.hint && canManualCheckIn(res.status) && <p className="text-xs text-pine/50">{checkInAction.hint}</p>}
           <p className="text-xs text-pine/50">
             Advance on record: <span className="money font-semibold">{fmtBDT(payments.filter((p) => p.payment_class === 'ADVANCE').reduce((a, p) => a + +p.amount, 0))}</span> — shown on the card.
           </p>
