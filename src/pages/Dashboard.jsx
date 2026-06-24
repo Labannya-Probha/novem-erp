@@ -181,8 +181,6 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
       <div className="card p-4 mb-6 border border-leaf/70">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <div className="font-display font-semibold text-pine flex items-center gap-2"><Clock size={15} className="text-amber" /> Front Office Day Close</div>
-            <p className="text-xs text-pine/60 mt-1">This closes Front Office (Reservation) day only.</p>
             {foCloseRow && <p className="text-xs text-pine/50 mt-1">Closed by {foCloseRow.closed_by || '—'} at {fmtDate(foCloseRow.closed_at || foCloseRow.created_at || today)}.</p>}
           </div>
           <div className="flex items-center gap-2">
@@ -192,7 +190,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
               </button>
             )}
             <button className="btn-amber !py-1" onClick={closeFrontOfficeDay} disabled={dayBusy}>
-              <Clock size={14} /> Close Day
+              <Clock size={14} /> Day Close
             </button>
           </div>
         </div>
