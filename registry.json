@@ -10,14 +10,14 @@
       "description": "Multi-room booking calendar with tap-to-move room shift, guest name/source display, colSpan bars, and mobile scroll. Includes ReservationDetail with room-shift dropdown.",
       "files": [
         {
-          "path": "src/components/BookingCalendar.jsx",
+          "path": "src/pages/BookingCalendar.jsx",
           "type": "registry:file",
-          "target": "~/src/components/BookingCalendar.jsx"
+          "target": "~/src/pages/BookingCalendar.jsx"
         },
         {
-          "path": "src/components/ReservationDetail.jsx",
+          "path": "src/pages/ReservationDetail.jsx",
           "type": "registry:file",
-          "target": "~/src/components/ReservationDetail.jsx"
+          "target": "~/src/pages/ReservationDetail.jsx"
         }
       ]
     },
