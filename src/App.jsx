@@ -87,7 +87,6 @@ const ALL_NAV_IDS = NAV_GROUPS.flatMap((g) => g.items.map((n) => n.id))
 const SIDEBAR_SETTINGS_SECTIONS = [
   { id: 'my-account',           label: 'My Account',              adminOnly: false, superuserOnly: false },
   { id: 'branding',             label: 'Branding',                adminOnly: true,  superuserOnly: false },
-  { id: 'tax',                  label: 'Tax Rates',               adminOnly: false, superuserOnly: false },
   { id: 'tax-policy',           label: 'Tax Policy',              adminOnly: false, superuserOnly: false },
   { id: 'allowance',            label: 'Allowance Configuration', adminOnly: false, superuserOnly: true  },
   { id: 'role-permissions',     label: 'Role Permissions',        adminOnly: false, superuserOnly: true  },
