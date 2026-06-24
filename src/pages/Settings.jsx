@@ -1102,7 +1102,7 @@ const CHARGE_TYPE_META = {
   TRANSPORT:      { label: 'Transport / Transfer',   icon: '🚗',  color: 'slate'  },
   OTHER:          { label: 'Other Services',         icon: '🔧',  color: 'slate'  },
 }
-
+const ALL_CHARGE_TYPES = Object.keys(CHARGE_TYPE_META)
 const COLOR_CLASSES = {
   blue:   { bg: 'bg-blue-50',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-800',    head: 'bg-blue-100' },
   orange: { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-800', head: 'bg-orange-100' },
@@ -1349,6 +1349,14 @@ function TaxPolicyCard({ tenantId, isAdmin }) {
 
         {/* Effective From */}
         <div className="flex items-center gap-4">
+          <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">📅 Effective From:</label>
+          <input
+            type="date"
+            value={effectiveFrom}
+            onChange={e => setEffectiveFrom(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          />
+        </div>
 
         {/* Charge Type Cards */}
         {loading ? (
