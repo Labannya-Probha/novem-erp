@@ -1079,47 +1079,411 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
     </div>
   )
 }
+// ─── COUNTRY FLAG EMOJI HELPER ────────────────────────────────────────────
+const COUNTRY_FLAG = { BD: '🇧🇩', IN: '🇮🇳', AE: '🇦🇪', SG: '🇸🇬', TH: '🇹🇭', MY: '🇲🇾', '00': '🚫' };
 
+// ─── CHARGE TYPE DISPLAY CONFIG ───────────────────────────────────────────
+const CHARGE_TYPE_META = {
+  ROOM:          { label: 'Room / Accommodation', icon: '🛏️', color: 'blue' },
+  RESTAURANT:    { label: 'Restaurant (F&B)',      icon: '🍽️', color: 'orange' },
+  FOOD:          { label: 'Food Service',          icon: '🥘', color: 'amber' },
+  LAUNDRY:       { label: 'Laundry',               icon: '👕', color: 'cyan' },
+  ROOM_CORPORATE:{ label: 'Corporate Room (TDS)',  icon: '🏢', color: 'purple' },
+  OTHER:         { label: 'Other Services',        icon: '🔧', color: 'slate' },
+};
 
-/* ------------------------------------------------------------------ */
-/*  TAX POLICY — editable policy statement stored in company_settings  */
-/* ------------------------------------------------------------------ */
-function TaxPolicyCard() {
-  const [c, setC]   = useState(null)
-  const [msg, setMsg] = useState('')
-  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
-  const load  = async () => {
-    const { data } = await supabase.from('company_settings').select('id, tax_policy_text').single()
-    setC(data)
+const COLOR_CLASSES = {
+  blue:   { bg: 'bg-blue-50',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-800',   head: 'bg-blue-100' },
+  orange: { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-800', head: 'bg-orange-100' },
+  amber:  { bg: 'bg-amber-50',  border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-800',  head: 'bg-amber-100' },
+  cyan:   { bg: 'bg-cyan-50',   border: 'border-cyan-200',   badge: 'bg-cyan-100 text-cyan-800',    head: 'bg-cyan-100' },
+  purple: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-800',head: 'bg-purple-100' },
+  slate:  { bg: 'bg-slate-50',  border: 'border-slate-200',  badge: 'bg-slate-100 text-slate-700',  head: 'bg-slate-100' },
+};
+
+function TaxPolicyCard({ tenantId, isAdmin }) {
+  const [countries, setCountries]         = React.useState([]);   // distinct countries from tax_policies
+  const [selectedCountry, setSelectedCountry] = React.useState(null); // { country_code, country_name }
+  const [templateRows, setTemplateRows]   = React.useState([]);   // rows from tax_policies for selected country
+  const [activeConfig, setActiveConfig]   = React.useState([]);   // current tenant's tax_config rows
+  const [editMap, setEditMap]             = React.useState({});   // { charge_type: { tax_pct, service_charge_pct, ... } }
+  const [saving, setSaving]               = React.useState(false);
+  const [saveMsg, setSaveMsg]             = React.useState('');
+  const [loading, setLoading]             = React.useState(true);
+  const [effectiveFrom, setEffectiveFrom] = React.useState(new Date().toISOString().split('T')[0]);
+
+  // ── Load distinct countries from tax_policies ──────────────────────────
+  React.useEffect(() => {
+    supabase
+      .from('tax_policies')
+      .select('country_code, country_name')
+      .order('country_name')
+      .then(({ data }) => {
+        if (!data) return;
+        const unique = [];
+        const seen = new Set();
+        for (const r of data) {
+          if (!seen.has(r.country_code)) {
+            seen.add(r.country_code);
+            unique.push(r);
+          }
+        }
+        setCountries(unique);
+      });
+  }, []);
+
+  // ── Load tenant's current tax_config ──────────────────────────────────
+  React.useEffect(() => {
+    if (!tenantId) return;
+    setLoading(true);
+    supabase
+      .from('tax_config')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('effective_from', { ascending: false })
+      .then(({ data }) => {
+        setLoading(false);
+        if (!data || data.length === 0) return;
+
+        // Keep only the latest row per charge_type
+        const latestMap = {};
+        for (const row of data) {
+          if (!latestMap[row.charge_type]) latestMap[row.charge_type] = row;
+        }
+        const latest = Object.values(latestMap);
+        setActiveConfig(latest);
+
+        // Pre-select country from existing config (use first row's country_code)
+        const cc = latest[0]?.country_code || 'BD';
+        const found = countries.find(c => c.country_code === cc);
+        if (found) setSelectedCountry(found);
+
+        // Build editMap from existing config
+        const em = {};
+        for (const row of latest) {
+          em[row.charge_type] = {
+            tax_pct:            Number(row.tax_pct ?? row.vat_pct ?? 0),
+            service_charge_pct: Number(row.service_charge_pct ?? 0),
+            tds_pct:            Number(row.tds_pct ?? 0),
+            vds_pct:            Number(row.vds_pct ?? 0),
+            sd_pct:             Number(row.sd_pct ?? 0),
+            is_tax_inclusive:   row.is_tax_inclusive ?? false,
+          };
+        }
+        setEditMap(em);
+        setEffectiveFrom(latest[0]?.effective_from ?? new Date().toISOString().split('T')[0]);
+      });
+  }, [tenantId, countries]);
+
+  // ── Load template rows when country changes ────────────────────────────
+  React.useEffect(() => {
+    if (!selectedCountry) return;
+    supabase
+      .from('tax_policies')
+      .select('*')
+      .eq('country_code', selectedCountry.country_code)
+      .order('charge_type')
+      .then(({ data }) => setTemplateRows(data || []));
+  }, [selectedCountry]);
+
+  // ── Apply country template → pre-fill editMap ─────────────────────────
+  function applyTemplate() {
+    const em = {};
+    for (const row of templateRows) {
+      em[row.charge_type] = {
+        tax_pct:            Number(row.tax_pct),
+        service_charge_pct: Number(row.service_charge_pct),
+        tds_pct:            Number(row.tds_pct),
+        vds_pct:            Number(row.vds_pct),
+        sd_pct:             Number(row.sd_pct),
+        is_tax_inclusive:   row.is_tax_inclusive,
+      };
+    }
+    setEditMap(em);
+    setSaveMsg('✅ Template applied — review and save to confirm.');
   }
-  useEffect(() => { load() }, [])
-  if (!c) return <div className="card p-5 text-pine/50">Loading…</div>
+
+  // ── Field change handler ───────────────────────────────────────────────
+  function handleField(chargeType, field, value) {
+    setEditMap(prev => ({
+      ...prev,
+      [chargeType]: { ...prev[chargeType], [field]: field === 'is_tax_inclusive' ? value : Number(value) },
+    }));
+  }
+
+  // ── Save all charge types ──────────────────────────────────────────────
+  async function handleSave() {
+    if (!selectedCountry) { setSaveMsg('❌ Please select a country first.'); return; }
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      const chargeTypes = Object.keys(editMap);
+      for (const ct of chargeTypes) {
+        const vals = editMap[ct];
+        const templateRow = templateRows.find(r => r.charge_type === ct);
+        const payload = {
+          tenant_id:          tenantId,
+          charge_type:        ct,
+          country_code:       selectedCountry.country_code,
+          tax_name:           templateRow?.tax_name ?? 'VAT',
+          tax_pct:            vals.tax_pct,
+          vat_pct:            vals.tax_pct,   // keep legacy column in sync
+          service_charge_pct: vals.service_charge_pct,
+          tds_pct:            vals.tds_pct,
+          vds_pct:            vals.vds_pct,
+          sd_pct:             vals.sd_pct,
+          is_tax_inclusive:   vals.is_tax_inclusive,
+          effective_from:     effectiveFrom,
+        };
+        const existing = activeConfig.find(r => r.charge_type === ct);
+        if (existing) {
+          await supabase.from('tax_config').update(payload).eq('id', existing.id);
+        } else {
+          await supabase.from('tax_config').insert(payload);
+        }
+      }
+      setSaveMsg('✅ Tax policy saved successfully.');
+      // Refresh active config
+      const { data } = await supabase.from('tax_config').select('*').eq('tenant_id', tenantId).order('effective_from', { ascending: false });
+      if (data) {
+        const latestMap = {};
+        for (const row of data) { if (!latestMap[row.charge_type]) latestMap[row.charge_type] = row; }
+        setActiveConfig(Object.values(latestMap));
+      }
+    } catch (e) {
+      setSaveMsg('❌ Save failed: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!isAdmin) return null;
+
+  const chargeTypesInEdit = Object.keys(editMap);
 
   return (
-    <div className="card p-5 space-y-4">
-      <div>
-        <h2 className="font-display font-semibold text-pine flex items-center gap-2 mb-1">
-          <FileText size={18} className="text-forest" /> Tax Policy
-        </h2>
-        <p className="text-xs text-pine/50">
-          Define how VAT, service charge, and supplementary duty apply to different charge types.
-          This statement is used for internal reference and printed documents.
-        </p>
+    <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+      {/* ── Header ── */}
+      <div className="bg-gradient-to-r from-green-700 to-emerald-600 px-6 py-4 flex items-center gap-3">
+        <span className="text-2xl">🏛️</span>
+        <div>
+          <h3 className="text-white font-bold text-lg">Tax Policy Configuration</h3>
+          <p className="text-green-100 text-sm">Country-wise tax rates applied to each charge type</p>
+        </div>
       </div>
-      {msg && <div className="px-3 py-2 rounded-lg bg-forest/10 text-forest text-sm">{msg}</div>}
-      <RichTextEditor
-        initialHtml={c.tax_policy_text || ''}
-        saveLabel="Save policy"
-        onSave={async (html) => {
-          const { error } = await supabase.from('company_settings').update({
-            tax_policy_text: html, updated_at: new Date().toISOString(),
-          }).eq('id', c.id)
-          if (error) flash(error.message)
-          else flash('Tax policy saved.')
-        }}
-      />
+
+      <div className="p-6 space-y-5">
+
+        {/* ── Country Selector ── */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <label className="block text-sm font-semibold text-blue-800 mb-2">
+            🌍 Select Country / Tax Jurisdiction
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {countries.map(c => (
+              <button
+                key={c.country_code}
+                onClick={() => setSelectedCountry(c)}
+                className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                  selectedCountry?.country_code === c.country_code
+                    ? 'bg-blue-700 text-white border-blue-700 shadow-md'
+                    : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:text-blue-700'
+                }`}
+              >
+                {COUNTRY_FLAG[c.country_code] || '🌐'} {c.country_name}
+                {c.country_code !== '00' && <span className="ml-1 text-xs opacity-70">({c.country_code})</span>}
+              </button>
+            ))}
+          </div>
+
+          {selectedCountry && templateRows.length > 0 && (
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                onClick={applyTemplate}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+              >
+                ⬇️ Load {selectedCountry.country_name} Template
+              </button>
+              <span className="text-xs text-blue-600">
+                Loads standard rates for {selectedCountry.country_name} — you can then edit before saving
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* ── Effective From ── */}
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">📅 Effective From:</label>
+          <input
+            type="date"
+            value={effectiveFrom}
+            onChange={e => setEffectiveFrom(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          />
+        </div>
+
+        {/* ── Charge Type Cards ── */}
+        {loading ? (
+          <div className="text-center py-8 text-gray-400">Loading current policy…</div>
+        ) : chargeTypesInEdit.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+            <div className="text-4xl mb-2">🌍</div>
+            <p className="font-medium text-gray-600">Select a country and click "Load Template" to begin</p>
+            <p className="text-sm mt-1">Or rates will load from your existing configuration</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {chargeTypesInEdit.map(ct => {
+              const meta   = CHARGE_TYPE_META[ct] || { label: ct, icon: '💰', color: 'slate' };
+              const colors = COLOR_CLASSES[meta.color] || COLOR_CLASSES.slate;
+              const vals   = editMap[ct] || {};
+              const tmpl   = templateRows.find(r => r.charge_type === ct);
+
+              return (
+                <div key={ct} className={`rounded-xl border ${colors.border} overflow-hidden`}>
+                  {/* Card Header */}
+                  <div className={`${colors.head} px-4 py-3 flex items-center justify-between`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{meta.icon}</span>
+                      <span className="font-semibold text-gray-800 text-sm">{meta.label}</span>
+                    </div>
+                    {tmpl && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors.badge}`}>
+                        {tmpl.tax_name}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Card Body */}
+                  <div className={`${colors.bg} p-4 space-y-3`}>
+                    {/* Tax % and Service Charge % */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Tax / VAT %</label>
+                        <input
+                          type="number" min="0" max="100" step="0.01"
+                          value={vals.tax_pct ?? 0}
+                          onChange={e => handleField(ct, 'tax_pct', e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-green-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Service Charge %</label>
+                        <input
+                          type="number" min="0" max="100" step="0.01"
+                          value={vals.service_charge_pct ?? 0}
+                          onChange={e => handleField(ct, 'service_charge_pct', e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-green-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* TDS / VDS / SD — only show if non-zero in template or current */}
+                    {(Number(vals.tds_pct) > 0 || Number(vals.vds_pct) > 0 || Number(vals.sd_pct) > 0 || ct === 'ROOM_CORPORATE') && (
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">TDS %</label>
+                          <input
+                            type="number" min="0" max="100" step="0.01"
+                            value={vals.tds_pct ?? 0}
+                            onChange={e => handleField(ct, 'tds_pct', e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">VDS %</label>
+                          <input
+                            type="number" min="0" max="100" step="0.01"
+                            value={vals.vds_pct ?? 0}
+                            onChange={e => handleField(ct, 'vds_pct', e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">SD %</label>
+                          <input
+                            type="number" min="0" max="100" step="0.01"
+                            value={vals.sd_pct ?? 0}
+                            onChange={e => handleField(ct, 'sd_pct', e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-green-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tax Inclusive toggle */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={vals.is_tax_inclusive ?? false}
+                        onChange={e => handleField(ct, 'is_tax_inclusive', e.target.checked)}
+                        className="w-4 h-4 rounded text-green-600"
+                      />
+                      <span className="text-xs text-gray-600">Tax inclusive in price</span>
+                    </label>
+
+                    {/* Template note */}
+                    {tmpl?.notes && (
+                      <p className="text-xs text-gray-500 italic bg-white/60 rounded px-2 py-1">
+                        ℹ️ {tmpl.notes}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Save Button & Message ── */}
+        {chargeTypesInEdit.length > 0 && (
+          <div className="flex items-center gap-4 pt-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-6 py-2.5 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50 transition flex items-center gap-2"
+            >
+              {saving ? '⏳ Saving…' : '💾 Save Tax Policy'}
+            </button>
+            {saveMsg && (
+              <span className={`text-sm font-medium ${saveMsg.startsWith('✅') ? 'text-green-700' : 'text-red-600'}`}>
+                {saveMsg}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Current Active Summary ── */}
+        {activeConfig.length > 0 && (
+          <div className="border-t border-gray-200 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Currently Active Policy
+              {activeConfig[0]?.country_code && (
+                <span className="ml-2 normal-case font-normal text-gray-400">
+                  — {COUNTRY_FLAG[activeConfig[0].country_code] || '🌐'} {activeConfig[0].country_code}
+                  &nbsp;| Effective: {activeConfig[0].effective_from}
+                </span>
+              )}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {activeConfig.map(r => {
+                const meta = CHARGE_TYPE_META[r.charge_type] || { label: r.charge_type, icon: '💰' };
+                return (
+                  <span key={r.charge_type} className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700">
+                    {meta.icon} {meta.label}:&nbsp;
+                    <strong>{Number(r.tax_pct ?? r.vat_pct ?? 0)}%</strong>
+                    {Number(r.service_charge_pct) > 0 && <> + {Number(r.service_charge_pct)}% SC</>}
+                    {Number(r.tds_pct) > 0 && <> + {Number(r.tds_pct)}% TDS</>}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
