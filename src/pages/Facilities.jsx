@@ -77,6 +77,8 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
 
   const catMeta = { outlet: 'Facilities & Shop' }
   const rate = rateFor(taxConfig, 'OTHER', todayISO())
+    || rateFor(taxConfig, 'FOOD', todayISO())
+    || { vat_pct: 0, service_charge_pct: 0 }
   const subtotal = cart.reduce((a, c) => a + c.qty * c.unit_price, 0)
   const t = computeCharge(subtotal, 0, rate)
   const addItem = (fi) => setCart((prev) => {
@@ -134,7 +136,7 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
       let mushakNo = null
       if (order.reservation_id) {
         const { data: fc, error: fe } = await supabase.from('folio_charges').insert({
-          reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: cat,
+          reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'OTHER',
           description: `${catMeta.outlet} ${order.order_no}`,
           base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge,
           vat: t.vat, total: t.total, status: 'PAID', created_by: userName,
@@ -208,7 +210,7 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
 
       <div className="xl:col-span-2 space-y-3">
         <div className="card p-4">
-          <h3 className="font-display font-semibold text-pine mb-2">{catMeta.label} — current sale</h3>
+          <h3 className="font-display font-semibold text-pine mb-2">Facilities & Shop — current sale</h3>
           {link.reservation_id ? (
             <div className="flex items-center justify-between bg-leaf/50 rounded-lg px-3 py-2 mb-2 text-sm">
               <span><b>{link.guest_name}</b> · Room {link.room_no}</span>
