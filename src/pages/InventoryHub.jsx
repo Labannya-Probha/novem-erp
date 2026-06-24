@@ -104,7 +104,7 @@ export default function InventoryHub({ userName, role, isAdmin }) {
       {tab === 'Items & Stock'     && <ItemsTab flash={flash} isAdmin={isAdmin} />}
       {tab === 'Vendors'           && <VendorsTab flash={flash} isAdmin={isAdmin} />}
       {tab === 'Requisitions'      && <RequisitionsTab flash={flash} userName={userName} canApprove={canApprove} onCreatePO={goCreatePO} onCreateTRF={goCreateTRF} />}
-      {tab === 'Purchase Orders'   && <POTab flash={flash} userName={userName} navReq={navReq} clearNav={() => setNavReq(null)} />}
+      {tab === 'Purchase Orders'   && <POTab flash={flash} userName={userName} canApprove={canApprove} navReq={navReq} clearNav={() => setNavReq(null)} />}
       {tab === 'Goods Receipt'     && <GRNTab flash={flash} userName={userName} />}
       {tab === 'Transfers'         && <TransfersTab flash={flash} userName={userName} navReq={navReq} clearNav={() => setNavReq(null)} />}
       {tab === 'Returns'           && <ReturnsTab flash={flash} userName={userName} />}
@@ -389,6 +389,35 @@ function RequisitionsTab({ flash, userName, canApprove, onCreatePO, onCreateTRF 
     load()
   }
 
+  // Approve + auto-route: check stock → Transfer if sufficient, PO if not
+  const approveWithRouting = async (r) => {
+    const { data: sb } = await supabase.from('v_stock_balance').select('*')
+    const stockMap = {}
+    ;(sb || []).forEach((s) => { stockMap[s.id] = +(s.on_hand ?? 0) })
+
+    const allInStock = (r.requisition_items || []).every(
+      (it) => (stockMap[it.item_id] ?? 0) >= +it.qty
+    )
+    const routeDecision = allInStock ? 'TRANSFER' : 'PO'
+
+    await supabase.from('requisitions').update({
+      status: 'APPROVED',
+      approved_by: userName,
+      approved_at: new Date().toISOString(),
+      route_decision: routeDecision,
+    }).eq('id', r.id)
+
+    await load()
+
+    if (allInStock) {
+      flash(`✓ ${r.req_no} approved — stock is available. Auto-routing to Stock Transfer.`)
+      onCreateTRF({ id: r.id, req_no: r.req_no, items: r.requisition_items })
+    } else {
+      flash(`✓ ${r.req_no} approved — insufficient stock. Auto-routing to Purchase Order.`)
+      onCreatePO({ id: r.id, req_no: r.req_no, items: r.requisition_items })
+    }
+  }
+
   const statusChip = (s) => ({ PENDING: 'bg-amber/20 text-amber', APPROVED: 'bg-forest/15 text-forest', REJECTED: 'bg-red-100 text-red-600', CLOSED: 'bg-stone-200 text-stone-500', CANCELLED: 'bg-red-100 text-red-600' }[s] || 'bg-stone-100 text-stone-500')
 
   const editReq = (r) => {
@@ -422,6 +451,13 @@ function RequisitionsTab({ flash, userName, canApprove, onCreatePO, onCreateTRF 
 
   return (
     <div className="space-y-4">
+      <div className="px-4 py-3 rounded-lg bg-forest/10 border border-forest/20 text-sm text-pine">
+        <div className="font-semibold text-forest mb-0.5">⚡ Approval &amp; Auto-routing workflow</div>
+        <div className="text-xs text-pine/70">
+          Create a requisition → ADMIN/MANAGER approves → system checks on-hand stock →
+          auto-routes to <b>Stock Transfer</b> (stock available) or <b>Purchase Order</b> (stock insufficient).
+        </div>
+      </div>
       <div className="card p-4 space-y-3">
         <h3 className="font-display font-semibold text-pine">{editId ? 'Edit Requisition' : 'New Requisition'}</h3>
         <div className="flex gap-3 flex-wrap">
@@ -471,7 +507,7 @@ function RequisitionsTab({ flash, userName, canApprove, onCreatePO, onCreateTRF 
                       <div className="flex justify-end gap-1 flex-wrap">
                         {r.status === 'PENDING' && canApprove && (
                           <>
-                            <button className="btn-ghost !py-0.5 !px-2 text-forest text-xs" onClick={() => setStatus(r.id, 'APPROVED')}><Check size={13} /> Approve</button>
+                            <button className="btn-ghost !py-0.5 !px-2 text-forest text-xs" onClick={() => approveWithRouting(r)}><Check size={13} /> Approve</button>
                             <button className="btn-ghost !py-0.5 !px-2 text-red-500 text-xs" onClick={() => setStatus(r.id, 'REJECTED')}><X size={13} /> Reject</button>
                           </>
                         )}
@@ -504,8 +540,11 @@ function RequisitionsTab({ flash, userName, canApprove, onCreatePO, onCreateTRF 
                               {it.notes && <span className="text-pine/40">{it.notes}</span>}
                             </div>
                           ))}
-                          {hasPO && <div className="mt-2 text-forest font-medium">PO: {(r.purchase_orders || []).map((p) => `${p.po_no} (${p.status})`).join(', ')}</div>}
+                          {r.route_decision === 'TRANSFER' && <div className="mt-2 flex items-center gap-1 text-forest font-medium"><ArrowLeftRight size={12} /> Auto-routed to: Stock Transfer</div>}
+                          {r.route_decision === 'PO' && <div className="mt-2 flex items-center gap-1 text-amber font-medium"><Truck size={12} /> Auto-routed to: Purchase Order</div>}
+                          {hasPO && <div className="mt-1 text-forest font-medium">PO: {(r.purchase_orders || []).map((p) => `${p.po_no} (${p.status})`).join(', ')}</div>}
                           {hasTRF && <div className="mt-1 text-pine font-medium">Transfer: {(r.stock_transfers || []).map((t) => t.trf_no).join(', ')}</div>}
+                          {r.approved_by && <div className="text-pine/50 mt-1">Approved by: {r.approved_by}</div>}
                           {r.notes && <div className="text-pine/50 mt-1">Notes: {r.notes}</div>}
                         </div>
                       </td>
@@ -523,7 +562,7 @@ function RequisitionsTab({ flash, userName, canApprove, onCreatePO, onCreateTRF 
 }
 
 /* ─── Purchase Orders ────────────────────────────────────────────────────── */
-function POTab({ flash, userName, navReq, clearNav }) {
+function POTab({ flash, userName, canApprove, navReq, clearNav }) {
   const [items, setItems] = useState([])
   const [vendors, setVendors] = useState([])
   const [rows, setRows] = useState([])
@@ -576,7 +615,7 @@ function POTab({ flash, userName, navReq, clearNav }) {
       flash('Purchase order updated.')
       return
     }
-    const { data: po, error } = await supabase.from('purchase_orders').insert({ vendor_id: vendor, requisition_id: reqId || null, notes: notes || null, created_by: userName }).select().single()
+    const { data: po, error } = await supabase.from('purchase_orders').insert({ vendor_id: vendor, requisition_id: reqId || null, notes: notes || null, created_by: userName, status: 'PENDING_APPROVAL' }).select().single()
     if (error) { flash(error.message, 'error'); return }
     await supabase.from('po_items').insert(lines.map((l) => ({ po_id: po.id, item_id: l.item_id, item_name: l.item_name, qty: +l.qty, unit_cost: +l.unit_cost, vat_pct: +l.vat_pct })))
     resetForm()
@@ -585,8 +624,13 @@ function POTab({ flash, userName, navReq, clearNav }) {
   }
 
   const setStatus = async (id, status) => { await supabase.from('purchase_orders').update({ status }).eq('id', id); load() }
+  const approvePO = async (id) => {
+    await supabase.from('purchase_orders').update({ status: 'OPEN', approved_by: userName, approved_at: new Date().toISOString() }).eq('id', id)
+    load()
+    flash('Purchase order approved — now OPEN for goods receipt.')
+  }
   const poTotal = (po) => (po.po_items || []).reduce((a, l) => a + +l.qty * +l.unit_cost, 0)
-  const statusChip = (s) => ({ OPEN: 'bg-amber/20 text-amber', PARTIAL: 'bg-sky-100 text-sky-700', RECEIVED: 'bg-forest/15 text-forest', CANCELLED: 'bg-red-100 text-red-600' }[s] || 'bg-stone-100 text-stone-500')
+  const statusChip = (s) => ({ PENDING_APPROVAL: 'bg-amber/20 text-amber', OPEN: 'bg-sky-100 text-sky-700', PARTIAL: 'bg-sky-100 text-sky-700', RECEIVED: 'bg-forest/15 text-forest', CANCELLED: 'bg-red-100 text-red-600' }[s] || 'bg-stone-100 text-stone-500')
 
   const editPO = (po) => {
     setEditId(po.id)
@@ -620,6 +664,12 @@ function POTab({ flash, userName, navReq, clearNav }) {
 
   return (
     <div className="space-y-4">
+      <div className="px-4 py-3 rounded-lg bg-amber/10 border border-amber/30 text-sm text-pine">
+        <div className="font-semibold text-amber mb-0.5">⚡ PO approval lifecycle</div>
+        <div className="text-xs text-pine/70">
+          <b>PENDING_APPROVAL</b> → ADMIN/MANAGER approves → <b>OPEN</b> → post GRN → <b>RECEIVED</b> &nbsp;|&nbsp; Cancel at any open stage → <b>CANCELLED</b>
+        </div>
+      </div>
       <div className="card p-4 space-y-3">
         <h3 className="font-display font-semibold text-pine flex items-center gap-2">
           <Truck size={18} /> {editId ? 'Edit Purchase Order' : 'New Purchase Order'}
@@ -673,11 +723,17 @@ function POTab({ flash, userName, navReq, clearNav }) {
                   <td className="td"><span className={`status-chip ${statusChip(po.status)}`}>{po.status}</span></td>
                   <td className="td text-right">
                     <div className="flex justify-end gap-1 flex-wrap">
-                      {['OPEN', 'PARTIAL'].includes(po.status) && (
+                      {po.status === 'PENDING_APPROVAL' && canApprove && (
+                        <button className="btn-ghost !py-0.5 !px-2 text-forest text-xs" onClick={() => approvePO(po.id)}><Check size={13} /> Approve</button>
+                      )}
+                      {po.status === 'PENDING_APPROVAL' && (
                         <>
                           <button className="btn-ghost !py-0.5 !px-2 text-pine text-xs" onClick={() => editPO(po)}><Pencil size={13} /> Edit</button>
                           <button className="btn-ghost !py-0.5 !px-2 text-red-500 text-xs" onClick={() => setStatus(po.id, 'CANCELLED')}><X size={13} /> Cancel</button>
                         </>
+                      )}
+                      {po.status === 'OPEN' && (
+                        <button className="btn-ghost !py-0.5 !px-2 text-red-500 text-xs" onClick={() => setStatus(po.id, 'CANCELLED')}><X size={13} /> Cancel</button>
                       )}
                       <button className="btn-ghost !py-0.5 !px-2 text-pine text-xs" onClick={() => printPO(po)}><Printer size={13} /> Print</button>
                     </div>
@@ -696,6 +752,7 @@ function POTab({ flash, userName, navReq, clearNav }) {
                             <span className="font-semibold">Total: {fmtBDT(+it.qty * +it.unit_cost)}</span>
                           </div>
                         ))}
+                        {po.approved_by && <div className="text-forest/70 mt-1">Approved by: {po.approved_by}</div>}
                         {po.notes && <div className="text-pine/40 mt-1">Notes: {po.notes}</div>}
                       </div>
                     </td>
