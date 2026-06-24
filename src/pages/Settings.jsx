@@ -1157,8 +1157,8 @@ const WIPE_MODULES = [
   {
     id: 'reservations',
     label: 'Reservations & Billing',
-    description: 'Reservations, guests, folio charges, payments, invoices, quotations, VAT sales register, night audits, guest IDs, loyalty ledger, companies',
-    tables: ['folio_charges', 'payments', 'invoices', 'quotations', 'reservation_addons', 'reservation_guests', 'reservation_rooms', 'reservations', 'guests', 'vat_sales_register', 'night_audits', 'guest_ids', 'loyalty_ledger', 'companies'],
+    description: 'Reservations, guests, folio charges, payments/refunds, invoices, quotations, VAT sales register, night audits, guest IDs, loyalty ledger, companies, agencies, shareholders',
+    tables: ['folio_charges', 'payments', 'refunds', 'invoices', 'quotations', 'reservation_addons', 'reservation_guests', 'reservation_rooms', 'reservations', 'guests', 'vat_sales_register', 'night_audits', 'guest_ids', 'loyalty_ledger', 'companies', 'agencies', 'shareholders'],
     // Each sequence only resets if ALL of its dependsOn tables are still checked —
     // resetting a number sequence while related rows are kept would cause duplicate/clashing numbers.
     sequences: [
@@ -1171,8 +1171,8 @@ const WIPE_MODULES = [
   {
     id: 'pos',
     label: 'Restaurant POS',
-    description: 'POS orders and order items',
-    tables: ['pos_order_items', 'pos_orders'],
+    description: 'POS orders, order items, day close summaries, menu categories/items, recipe items',
+    tables: ['pos_order_items', 'pos_orders', 'day_closes', 'recipe_items', 'menu_items', 'menu_categories'],
     sequences: [
       { id: 'pos_no_seq', dependsOn: ['pos_orders'] },
     ],
@@ -1180,8 +1180,8 @@ const WIPE_MODULES = [
   {
     id: 'facilities',
     label: 'Facilities',
-    description: 'Facility sales (tea, pickle, sports, etc.)',
-    tables: ['facility_sales'],
+    description: 'Facility sales and facility item definitions',
+    tables: ['facility_sales', 'facility_items'],
     sequences: [
       { id: 'fac_no_seq', dependsOn: ['facility_sales'] },
     ],
@@ -1189,8 +1189,8 @@ const WIPE_MODULES = [
   {
     id: 'hr',
     label: 'HR & Attendance',
-    description: 'Employees, attendance records, leave applications, compensatory leave register, incident register',
-    tables: ['comp_leave_register', 'leave_applications', 'attendance_records', 'employees', 'incident_register'],
+    description: 'Employees, attendance, leave, incidents, payroll runs/payslips, allowances, employee compliance records',
+    tables: ['comp_leave_register', 'leave_applications', 'leave_types', 'attendance_records', 'employees', 'incident_register', 'allowance_config', 'payroll_runs', 'payslips', 'employee_compliance_records'],
     sequences: [
       { id: 'emp_no_seq', dependsOn: ['employees'] },
     ],
@@ -1198,8 +1198,8 @@ const WIPE_MODULES = [
   {
     id: 'inventory',
     label: 'Inventory & Procurement',
-    description: 'Requisitions, purchase orders, goods receipts, stock transfers, stock returns, VAT purchase register, vendors, inventory stock items',
-    tables: ['return_items', 'stock_returns', 'transfer_items', 'stock_transfers', 'grn_items', 'goods_receipts', 'po_items', 'purchase_orders', 'requisition_items', 'requisitions', 'vat_purchase_register', 'vendors', 'inv_items'],
+    description: 'Requisitions, purchase orders, goods receipts, stock transfers/returns, VAT purchase register, vendors, vendor payments, stock items/locations',
+    tables: ['return_items', 'stock_returns', 'transfer_items', 'stock_transfers', 'grn_items', 'goods_receipts', 'po_items', 'purchase_orders', 'requisition_items', 'requisitions', 'vat_purchase_register', 'vendors', 'vendor_payments', 'inv_items', 'store_locations'],
     sequences: [
       { id: 'req_no_seq', dependsOn: ['requisitions'] },
       { id: 'po_no_seq',  dependsOn: ['purchase_orders'] },
@@ -1211,14 +1211,28 @@ const WIPE_MODULES = [
   {
     id: 'accounting',
     label: 'Accounting',
-    description: 'Journal entries, journal lines, VAT registers, document register, fixed assets, depreciation, VDS certificates',
-    tables: ['journal_lines', 'journal_entries', 'vat_sales_register', 'vat_purchase_register', 'doc_register', 'fixed_assets', 'asset_depreciation', 'vds_certificates'],
+    description: 'Journal entries/lines, VAT registers, document register, fixed assets/depreciation, VDS certificates, transaction mappings',
+    tables: ['journal_lines', 'journal_entries', 'vat_sales_register', 'vat_purchase_register', 'doc_register', 'fixed_assets', 'asset_depreciation', 'vds_certificates', 'accounting_transaction_mapping'],
     sequences: [
       { id: 'jv_no_seq',  dependsOn: ['journal_entries'] },
       { id: 'doc_no_seq', dependsOn: ['doc_register'] },
       { id: 'fa_no_seq',  dependsOn: ['fixed_assets'] },
       { id: 'vds_certificates_id_seq', dependsOn: ['vds_certificates'] },
     ],
+  },
+  {
+    id: 'operations',
+    label: 'Operations & Tasks',
+    description: 'Task categories/tasks and consumption entries/lines',
+    tables: ['task_categories', 'tasks', 'consumption_lines', 'consumption_entries'],
+    sequences: [],
+  },
+  {
+    id: 'compliance',
+    label: 'Compliance',
+    description: 'Statutory compliance items and statutory filings',
+    tables: ['statutory_filings', 'statutory_compliance_items'],
+    sequences: [],
   },
 ]
 
