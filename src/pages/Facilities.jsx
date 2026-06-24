@@ -8,11 +8,6 @@ import { PosReceipt } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
 import { Plus, Minus, Trash2, Banknote, BedDouble, Leaf, Printer } from 'lucide-react'
 
-const CATS = [
-  { key: 'TEA', label: 'Tea Sale', outlet: 'Tea Sale' },
-  { key: 'PICKLE', label: 'Pickle Sale', outlet: 'Pickle Sale' },
-  { key: 'SPORTS', label: 'Sports Rental', outlet: 'Sports Rental' },
-]
 const TABS = ['New Sale', 'Sales', 'Items']
 
 export default function Facilities({ userName, isAdmin }) {
@@ -72,7 +67,7 @@ export default function Facilities({ userName, isAdmin }) {
 
 /* ================= NEW SALE ================= */
 function NewSale({ items, taxConfig, userName, flash, onDone }) {
-  const [cat, setCat] = useState('TEA')
+  const cat = 'OTHER'
   const [cart, setCart] = useState([]) // {facility_item_id, item_name, unit, qty, unit_price}
   const [link, setLink] = useState({ reservation_id: null, guest_name: '', room_no: '' })
   const [payMethod, setPayMethod] = useState('CASH')
@@ -80,16 +75,10 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
   const [showPicker, setShowPicker] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const catMeta = CATS.find((c) => c.key === cat)
-  const rate = rateFor(taxConfig, cat, todayISO())
+  const catMeta = { outlet: 'Facilities & Shop' }
+  const rate = rateFor(taxConfig, 'OTHER', todayISO())
   const subtotal = cart.reduce((a, c) => a + c.qty * c.unit_price, 0)
   const t = computeCharge(subtotal, 0, rate)
-
-  const switchCat = (k) => {
-    if (k !== cat && cart.length > 0) { setCart([]); flash('Category changed — cart cleared (one category per sale keeps the VAT rate correct).') }
-    setCat(k)
-  }
-
   const addItem = (fi) => setCart((prev) => {
     const f = prev.find((c) => c.facility_item_id === fi.id)
     if (f) return prev.map((c) => (c.facility_item_id === fi.id ? { ...c, qty: c.qty + 1 } : c))
@@ -195,20 +184,12 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
     setBusy(false)
   }
 
-  const visible = items.filter((i) => i.is_active && i.category === cat)
+  const visible = items.filter((i) => i.is_active)
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
       <div className="xl:col-span-3">
-        <div className="flex gap-2 mb-3">
-          {CATS.map((c) => (
-            <button key={c.key} onClick={() => switchCat(c.key)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold ${cat === c.key ? 'bg-pine text-white' : 'bg-white border border-leaf text-pine/70'}`}>
-              {c.label}
-            </button>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {visible.map((fi) => (
             <button key={fi.id} onClick={() => addItem(fi)}
               className="card p-3 text-left hover:border-forest hover:shadow transition-all active:scale-[0.98]">
@@ -220,8 +201,8 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
             <Plus size={15} className="mb-1" /><div className="text-sm font-semibold">Custom item / price</div>
           </button>
         </div>
-        {rateFor(taxConfig, cat, todayISO()) && (
-          <p className="text-xs text-pine/50 mt-3">Applied rates for {catMeta.label}: VAT {rate.vat_pct}% · SC {rate.service_charge_pct}% (Settings → Tax configuration)</p>
+        {rate && (
+          <p className="text-xs text-pine/50 mt-3">VAT {rate.vat_pct}% · SC {rate.service_charge_pct}% (Settings → Tax Policy)</p>
         )}
       </div>
 
@@ -350,11 +331,10 @@ function SalesList({ setPrintDoc, isAdmin, flash }) {
 
 /* ================= ITEMS MANAGER ================= */
 function ItemsManager({ items, reload, isAdmin }) {
-  const [n, setN] = useState({ category: 'TEA', name: '', unit: 'pc', default_price: '' })
-  const add = async () => {
+ const add = async () => {
     if (!n.name.trim() || n.default_price === '') return
-    await supabase.from('facility_items').insert({ ...n, default_price: +n.default_price })
-    setN({ category: n.category, name: '', unit: 'pc', default_price: '' }); reload()
+    await supabase.from('facility_items').insert({ ...n, default_price: +n.default_price, category: 'OTHER' })
+    setN({ name: '', unit: 'pc', default_price: '' }); reload()
   }
   const updatePrice = async (it, price) => {
     if (price === '' || +price === +it.default_price) return
@@ -368,11 +348,7 @@ function ItemsManager({ items, reload, isAdmin }) {
       <h3 className="font-display font-semibold text-pine mb-1 flex items-center gap-2"><Leaf size={17} /> Facility items (default prices)</h3>
       <p className="text-xs text-pine/50 mb-3">Defaults only — the price stays editable on every sale. {!isAdmin && 'Changing the catalog requires administrator access.'}</p>
       {isAdmin && (
-        <div className="grid grid-cols-5 gap-2 mb-4 items-end">
-          <div><label className="label">Category</label>
-            <select className="input" value={n.category} onChange={(e) => setN({ ...n, category: e.target.value })}>
-              {CATS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-            </select></div>
+        <div className="grid grid-cols-4 gap-2 mb-4 items-end">
           <div><label className="label">Item name</label><input className="input" value={n.name} onChange={(e) => setN({ ...n, name: e.target.value })} /></div>
           <div><label className="label">Unit</label>
             <select className="input" value={n.unit} onChange={(e) => setN({ ...n, unit: e.target.value })}>
@@ -383,12 +359,11 @@ function ItemsManager({ items, reload, isAdmin }) {
         </div>
       )}
       <table className="w-full">
-        <thead><tr><th className="th">Item</th><th className="th">Category</th><th className="th">Unit</th><th className="th text-right">Default price</th><th className="th">Status</th><th className="th"></th></tr></thead>
+        <thead><tr><th className="th">Item</th><th className="th">Unit</th><th className="th text-right">Default price</th><th className="th">Status</th><th className="th"></th></tr></thead>
         <tbody>
           {items.map((it) => (
             <tr key={it.id}>
               <td className="td font-medium text-sm">{it.name}</td>
-              <td className="td text-xs text-pine/60">{CATS.find((c) => c.key === it.category)?.label}</td>
               <td className="td text-xs">{it.unit}</td>
               <td className="td text-right">
                 {isAdmin ? (
