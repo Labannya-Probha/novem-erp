@@ -62,10 +62,13 @@ export default function Facilities({ userName, isAdmin }) {
         </PrintPortal>
       )}
     </div>
+      </div>
+      {showPicker && <GuestPicker close={() => setShowPicker(false)} pick={(g) => { setLink(g); setShowPicker(false) }} />}
+    </div>
   )
 }
 
-/* ================= NEW SALE ================= */
+/* ================= SALES LIST ================= */
 function NewSale({ items, taxConfig, userName, flash, onDone }) {
   const cat = 'OTHER'
   const [cart, setCart] = useState([]) // {facility_item_id, item_name, unit, qty, unit_price}
