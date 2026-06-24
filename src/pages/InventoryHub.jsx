@@ -391,21 +391,37 @@ function RequisitionsTab({ flash, userName, canApprove, onCreatePO, onCreateTRF 
 
   // Approve + auto-route: check stock → Transfer if sufficient, PO if not
   const approveWithRouting = async (r) => {
-    const { data: sb } = await supabase.from('v_stock_balance').select('*')
+    const itemIds = [...new Set((r.requisition_items || []).map((it) => it.item_id).filter(Boolean))]
+    let sb = []
+    if (itemIds.length > 0) {
+      const { data, error: sbError } = await supabase
+        .from('v_stock_balance')
+        .select('id,on_hand')
+        .in('id', itemIds)
+      if (sbError) { flash(sbError.message, 'error'); return }
+      sb = data || []
+    }
+
     const stockMap = {}
-    ;(sb || []).forEach((s) => { stockMap[s.id] = +(s.on_hand ?? 0) })
+    sb.forEach((s) => { stockMap[s.id] = +(s.on_hand ?? 0) })
 
     const allInStock = (r.requisition_items || []).every(
       (it) => (stockMap[it.item_id] ?? 0) >= +it.qty
     )
     const routeDecision = allInStock ? 'TRANSFER' : 'PO'
 
-    await supabase.from('requisitions').update({
+    const { data: approvedReq, error: approveError } = await supabase.from('requisitions').update({
       status: 'APPROVED',
       approved_by: userName,
       approved_at: new Date().toISOString(),
       route_decision: routeDecision,
-    }).eq('id', r.id)
+    }).eq('id', r.id).eq('status', 'PENDING').select('id').maybeSingle()
+    if (approveError) { flash(approveError.message, 'error'); return }
+    if (!approvedReq) {
+      flash(`${r.req_no} is no longer pending approval.`, 'error')
+      await load()
+      return
+    }
 
     await load()
 
@@ -625,7 +641,18 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
 
   const setStatus = async (id, status) => { await supabase.from('purchase_orders').update({ status }).eq('id', id); load() }
   const approvePO = async (id) => {
-    await supabase.from('purchase_orders').update({ status: 'OPEN', approved_by: userName, approved_at: new Date().toISOString() }).eq('id', id)
+    const { data: approvedPO, error } = await supabase.from('purchase_orders')
+      .update({ status: 'OPEN', approved_by: userName, approved_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('status', 'PENDING_APPROVAL')
+      .select('id')
+      .maybeSingle()
+    if (error) { flash(error.message, 'error'); return }
+    if (!approvedPO) {
+      flash('Purchase order is no longer pending approval.', 'error')
+      await load()
+      return
+    }
     load()
     flash('Purchase order approved — now OPEN for goods receipt.')
   }
@@ -667,7 +694,7 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
       <div className="px-4 py-3 rounded-lg bg-amber/10 border border-amber/30 text-sm text-pine">
         <div className="font-semibold text-amber mb-0.5">⚡ PO approval lifecycle</div>
         <div className="text-xs text-pine/70">
-          <b>PENDING_APPROVAL</b> → ADMIN/MANAGER approves → <b>OPEN</b> → post GRN → <b>RECEIVED</b> &nbsp;|&nbsp; Cancel at any open stage → <b>CANCELLED</b>
+          <b>PENDING_APPROVAL</b> → ADMIN/MANAGER approves → <b>OPEN</b> → post GRN → <b>RECEIVED</b> &nbsp;|&nbsp; Cancel at <b>PENDING_APPROVAL</b> or <b>OPEN</b> stage → <b>CANCELLED</b>
         </div>
       </div>
       <div className="card p-4 space-y-3">
