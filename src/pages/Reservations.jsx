@@ -845,23 +845,6 @@ function NewReservation({ close, openReservation, userName, prefill }) {
             <div><label className="label">Children</label><input type="number" min="0" className="input" value={f.pax_children} onChange={(e) => set('pax_children', e.target.value)} /></div>
 
             <div className="col-span-2">
-              <div className="flex items-center justify-between mb-1">
-                <label className="label !mb-0">Discount</label>
-                {selectedPolicyId && (() => {
-                  const policy = reservationCfg.discountPolicies.find(p => p.id === selectedPolicyId)
-                  return policy ? (
-                    <span className="text-xs text-forest font-medium flex items-center gap-1">
-                      ✓ {policy.name} applied
-                      <button onClick={() => { setSelectedPolicyId(''); set('discount_val', 0) }}
-                        className="text-pine/40 hover:text-red-500 ml-1">
-                        <X size={11} />
-                      </button>
-                    </span>
-                  ) : null
-                })()}
-              </div>
-
-            <div className="col-span-2">
               <label className="label">Discount</label>
               <div className="flex gap-2">
                 <div className="flex gap-1 h-[38px] items-center shrink-0">
