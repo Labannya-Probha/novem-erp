@@ -26,6 +26,7 @@ const STATUS_BG = {
   QUERY:       '#dbeafe',
   QUOTED:      '#e7d9b0',
   CONFIRMED:   '#fcd9a6',
+  NO_SHOW:     '#fecaca',
   CHECKED_IN:  '#2E7D32',
   CHECKED_OUT: '#c7d6cb',
   SETTLED:     '#bfe3c4',
@@ -60,7 +61,7 @@ export default function BookingCalendar({ openReservation, onNewReservation, onO
           'reservations!inner(id, res_no, reservation_name, status, check_in, check_out, source, ' +
           'guests:primary_guest_id(full_name, phone))'
         )
-        .in('reservations.status', ['QUERY','QUOTED','CONFIRMED','CHECKED_IN','CHECKED_OUT','SETTLED'])
+        .in('reservations.status', ['QUERY','QUOTED','CONFIRMED','NO_SHOW','CHECKED_IN','CHECKED_OUT','SETTLED'])
         .lte('from_date', end)
         .gte('to_date', start),
     ])

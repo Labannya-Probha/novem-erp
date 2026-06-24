@@ -156,7 +156,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
   const markNoShow = async (res) => {
     if (!window.confirm(`Mark ${res.res_no} (${res.reservation_name || res.guests?.full_name || ''}) as NO-SHOW?`)) return
     await supabase.from('reservations').update({ status: 'NO_SHOW' }).eq('id', res.id)
-    await supabase.from('audit_log').insert({ actor: userName, action: 'NO_SHOW', entity: 'reservation', entity_id: res.res_no, details: { audit_date: auditDate } })
+    await supabase.from('audit_log').insert({ actor: userName, action: 'NO_SHOW', entity: 'reservation', entity_id: res.res_no, details: { audit_date: auditDate, source: 'MANUAL' } })
     await loadAll()
   }
 

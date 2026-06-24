@@ -6,10 +6,11 @@ import { Search, Trash2, UserSearch, X, CheckCircle2 } from 'lucide-react'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import KPICards from '../components/KPICards.jsx'
 
-const STATUSES = ['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED', 'CANCELLED']
+const STATUSES = ['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'NO_SHOW', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED', 'CANCELLED']
 
 const STATUS_TO_TAB = {
   QUERY: 'Overview', QUOTED: 'Overview', CONFIRMED: 'Check-In',
+  NO_SHOW: 'Check-In',
   CHECKED_IN: 'Billings & Check-Out', CHECKED_OUT: 'Billings & Check-Out',
   SETTLED: 'Billings & Check-Out', CANCELLED: 'Overview',
 }
