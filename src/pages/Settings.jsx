@@ -12,7 +12,6 @@ import {
 export const SETTINGS_SECTIONS = [
   { id: 'my-account', label: 'My Account' },
   { id: 'branding', label: 'Branding', adminOnly: true },
-  { id: 'tax', label: 'Tax Rates' },
   { id: 'tax-policy', label: 'Tax Policy' },
   { id: 'allowance', label: 'Allowance Configuration', superuserOnly: true },
   { id: 'role-permissions', label: 'Role Permissions', superuserOnly: true },
@@ -77,7 +76,6 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
   const sections = [
     { id: 'my-account', title: 'My Account', icon: KeyRound, visible: true, content: <MyAccountCard userName={userName} /> },
     { id: 'branding', title: 'Branding', icon: Image, visible: isAdminPlus, content: <BrandingCard reloadCompany={reloadCompany} /> },
-    { id: 'tax', title: 'Tax Rates', visible: true, content: <TaxCard /> },
     { id: 'tax-policy', title: 'Tax Policy', icon: FileText, visible: true, content: <TaxPolicyCard tenantId={myTenantId} isAdmin={isAdminPlus} /> },
     { id: 'allowance', title: 'Allowance Configuration', icon: Percent, visible: isSuperuser, content: <AllowanceCard /> },
     { id: 'role-permissions', title: 'Role Permissions', icon: ShieldCheck, visible: isSuperuser, content: <RolePrivilegesCard /> },
@@ -1093,13 +1091,20 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
 const COUNTRY_FLAG = { BD: '🇧🇩', IN: '🇮🇳', AE: '🇦🇪', SG: '🇸🇬', TH: '🇹🇭', MY: '🇲🇾', '00': '🚫' }
 
 const CHARGE_TYPE_META = {
-  ROOM:          { label: 'Room / Accommodation', icon: '🛏️', color: 'blue' },
-  RESTAURANT:    { label: 'Restaurant (F&B)',      icon: '🍽️', color: 'orange' },
-  FOOD:          { label: 'Food Service',          icon: '🥘', color: 'amber' },
-  LAUNDRY:       { label: 'Laundry',               icon: '👕', color: 'cyan' },
-  ROOM_CORPORATE:{ label: 'Corporate Room (TDS)',  icon: '🏢', color: 'purple' },
-  OTHER:         { label: 'Other Services',        icon: '🔧', color: 'slate' },
+  ROOM:           { label: 'Room / Accommodation',  icon: '🛏️',  color: 'blue'   },
+  ROOM_CORPORATE: { label: 'Corporate Room (TDS)',   icon: '🏢',  color: 'purple' },
+  RESTAURANT:     { label: 'Restaurant (F&B)',       icon: '🍽️',  color: 'orange' },
+  FOOD:           { label: 'Food Service',           icon: '🥘',  color: 'amber'  },
+  BEVERAGE:       { label: 'Beverage',               icon: '🥤',  color: 'cyan'   },
+  MINIBAR:        { label: 'Mini Bar',               icon: '🍾',  color: 'purple' },
+  LAUNDRY:        { label: 'Laundry',                icon: '👕',  color: 'cyan'   },
+  SPA:            { label: 'Spa & Wellness',         icon: '💆',  color: 'amber'  },
+  TRANSPORT:      { label: 'Transport / Transfer',   icon: '🚗',  color: 'slate'  },
+  OTHER:          { label: 'Other Services',         icon: '🔧',  color: 'slate'  },
 }
+
+// All charge types available for manual configuration
+const ALL_CHARGE_TYPES = Object.keys(CHARGE_TYPE_META)
 
 const COLOR_CLASSES = {
   blue:   { bg: 'bg-blue-50',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-800',    head: 'bg-blue-100' },
@@ -1285,11 +1290,12 @@ function TaxPolicyCard({ tenantId, isAdmin }) {
               <button
                 key={c.country_code}
                 onClick={() => setSelectedCountry(c)}
-                className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                className="px-4 py-2 rounded-full text-sm font-medium border transition-all"
+                style={
                   selectedCountry?.country_code === c.country_code
-                    ? 'bg-blue-700 text-white border-blue-700 shadow-md'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:text-blue-700'
-                }`}
+                    ? { backgroundColor: '#1d4ed8', color: '#ffffff', borderColor: '#1d4ed8', boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }
+                    : { backgroundColor: '#ffffff', color: '#374151', borderColor: '#d1d5db' }
+                }
               >
                 {COUNTRY_FLAG[c.country_code] || '🌐'} {c.country_name}
                 {c.country_code !== '00' && <span className="ml-1 text-xs opacity-70">({c.country_code})</span>}
@@ -1309,16 +1315,43 @@ function TaxPolicyCard({ tenantId, isAdmin }) {
           )}
         </div>
 
+        {/* Charge Type Toggle — add/remove which types to configure */}
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <p className="text-sm font-semibold text-gray-700 mb-2">⚙️ Active Charge Types</p>
+          <div className="flex flex-wrap gap-2">
+            {ALL_CHARGE_TYPES.map(ct => {
+              const meta = CHARGE_TYPE_META[ct]
+              const active = ct in editMap
+              return (
+                <button
+                  key={ct}
+                  onClick={() => {
+                    if (active) {
+                      setEditMap(prev => { const n = { ...prev }; delete n[ct]; return n })
+                    } else {
+                      setEditMap(prev => ({
+                        ...prev,
+                        [ct]: { tax_pct: 0, service_charge_pct: 0, tds_pct: 0, vds_pct: 0, sd_pct: 0, is_tax_inclusive: false }
+                      }))
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all"
+                  style={active
+                    ? { backgroundColor: '#14532d', color: '#ffffff', borderColor: '#14532d' }
+                    : { backgroundColor: '#ffffff', color: '#6b7280', borderColor: '#d1d5db' }
+                  }
+                >
+                  {meta.icon} {meta.label}
+                  {active ? ' ✓' : ' +'}
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-xs text-gray-400 mt-2">Active types দেখাবে নিচে। + click করে নতুন type যোগ করো, ✓ click করে সরাও।</p>
+        </div>
+
         {/* Effective From */}
         <div className="flex items-center gap-4">
-          <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">📅 Effective From:</label>
-          <input
-            type="date"
-            value={effectiveFrom}
-            onChange={e => setEffectiveFrom(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          />
-        </div>
 
         {/* Charge Type Cards */}
         {loading ? (
