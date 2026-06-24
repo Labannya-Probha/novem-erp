@@ -104,7 +104,6 @@ const SIDEBAR_CMS_ENTITY_TABS = [
   { id: 'inv_items',            label: 'Inventory Items' },
   { id: 'menu_categories',      label: 'Menu Categories' },
   { id: 'menu_items',           label: 'Menu Items' },
-  { id: 'facility_items',       label: 'Facility Items' },
   { id: 'chart_of_accounts',    label: 'Chart of Accounts' },
   { id: 'rooms',                label: 'Rooms' },
   { id: 'reservation_policies', label: 'Reservation Policies' },

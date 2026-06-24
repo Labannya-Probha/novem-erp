@@ -4,11 +4,16 @@ import { fmtBDT, fmtDate, todayISO, rateFor, computeCharge } from '../lib/helper
 import KPICards from '../components/KPICards.jsx'
 import PrintPortal from '../components/PrintPortal.jsx'
 import GuestPicker from '../components/GuestPicker.jsx'
+import { getTenantId, withTenantInsert, withTenantInsertMany } from '../lib/tenant'
 import { PosReceipt } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
 import { Plus, Minus, Trash2, Banknote, BedDouble, Leaf, Printer } from 'lucide-react'
 
 const TABS = ['New Sale', 'Sales', 'Items']
+const withTenant = (q) => {
+  const tenantId = getTenantId()
+  return tenantId ? q.eq('tenant_id', tenantId) : q
+}
 
 export default function Facilities({ userName, isAdmin }) {
   const [tab, setTab] = useState('New Sale')
@@ -21,9 +26,9 @@ export default function Facilities({ userName, isAdmin }) {
 
   const load = async () => {
     const [{ data: it }, { data: tc }, { data: co }] = await Promise.all([
-      supabase.from('facility_items').select('*').order('category').order('name'),
-      supabase.from('tax_config').select('*'),
-      supabase.from('company_settings').select('*').eq('id', 1).single(),
+      withTenant(supabase.from('facility_items').select('*')).order('category').order('name'),
+      withTenant(supabase.from('tax_config').select('*')),
+      withTenant(supabase.from('company_settings').select('*')).eq('id', 1).single(),
     ])
     setItems(it || []); setTaxConfig(tc || []); setCompany(co)
   }
@@ -118,13 +123,13 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
       service_charge: t.service_charge, vat: t.vat, total: t.total,
       created_by: userName, ...statusFields,
     }
-    const { data: order, error } = await supabase.from('pos_orders').insert(payload).select().single()
+    const { data: order, error } = await supabase.from('pos_orders').insert(withTenantInsert(payload)).select().single()
     if (error) throw error
     const lineRows = cart.map((c) => ({
       order_id: order.id, menu_item_id: null, item_name: c.item_name,
       qty: c.qty, unit_price: c.unit_price, line_total: +(c.qty * c.unit_price).toFixed(2),
     }))
-    const { data: savedItems, error: ie } = await supabase.from('pos_order_items').insert(lineRows).select()
+    const { data: savedItems, error: ie } = await supabase.from('pos_order_items').insert(withTenantInsertMany(lineRows)).select()
     if (ie) throw ie
     return { order, items: savedItems }
   }
@@ -164,28 +169,28 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
       })
       let mushakNo = null
       if (order.reservation_id) {
-        const { data: fc, error: fe } = await supabase.from('folio_charges').insert({
+        const { data: fc, error: fe } = await supabase.from('folio_charges').insert(withTenantInsert({
           reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'OTHER',
           description: `${catMeta.outlet} ${order.order_no}`,
           base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge,
           vat: t.vat, total: t.total, status: 'PAID', created_by: userName,
-        }).select().single()
+        })).select().single()
         if (fe) throw fe
-        await supabase.from('payments').insert({
+        await supabase.from('payments').insert(withTenantInsert({
           reservation_id: order.reservation_id, received_date: todayISO(), amount: t.total,
           method: primaryMethod, reference: order.order_no, received_by: userName, notes: catMeta.outlet,
-        })
-        await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
+        }))
+        await withTenant(supabase.from('pos_orders').update({ folio_charge_id: fc.id })).eq('id', order.id)
       } else if (issueMushak) {
-        const { data: inv, error: ve } = await supabase.from('invoices').insert({
+        const { data: inv, error: ve } = await supabase.from('invoices').insert(withTenantInsert({
           invoice_type: 'MUSHAK_63', pos_order_id: order.id,
           buyer_name: order.guest_name || 'Walk-in Customer', buyer_address: '', buyer_bin: '',
           totals: { base: t.base_amount, discount: t.discount, taxable_value: +(t.base_amount - t.discount).toFixed(2), service_charge: t.service_charge, vat: t.vat, grand_total: t.total, paid: t.total, due: 0 },
           line_snapshot: snapshot(), created_by: userName,
-        }).select().single()
+        })).select().single()
         if (ve) throw ve
         mushakNo = inv.invoice_no
-        await supabase.from('pos_orders').update({ invoice_id: inv.id }).eq('id', order.id)
+        await withTenant(supabase.from('pos_orders').update({ invoice_id: inv.id })).eq('id', order.id)
       }
       setCart([])
       setLink({ reservation_id: null, guest_name: '', room_no: '' })
@@ -202,14 +207,14 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
     setBusy(true)
     try {
       const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
-      const { data: fc, error: fe } = await supabase.from('folio_charges').insert({
+      const { data: fc, error: fe } = await supabase.from('folio_charges').insert(withTenantInsert({
         reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'OTHER',
         description: `${catMeta.outlet} ${order.order_no}`,
         base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge,
         vat: t.vat, total: t.total, status: 'DUE', created_by: userName,
-      }).select().single()
+      })).select().single()
       if (fe) throw fe
-      await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
+      await withTenant(supabase.from('pos_orders').update({ folio_charge_id: fc.id })).eq('id', order.id)
       setCart([])
       setLink({ reservation_id: null, guest_name: '', room_no: '' })
       setPayments([{ method: 'CASH', amount: '' }])
@@ -382,23 +387,23 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
 function SalesList({ setPrintDoc, isAdmin, flash }) {
   const [rows, setRows] = useState([])
   const load = async () => {
-    const { data } = await supabase.from('pos_orders').select('*')
+    const { data } = await withTenant(supabase.from('pos_orders').select('*'))
       .neq('outlet', 'Restaurant').order('created_at', { ascending: false }).limit(150)
     setRows(data || [])
   }
   useEffect(() => { load() }, [])
 
-  const withItems = async (o) => (await supabase.from('pos_order_items').select('*').eq('order_id', o.id)).data || []
+  const withItems = async (o) => (await withTenant(supabase.from('pos_order_items').select('*')).eq('order_id', o.id)).data || []
   const printReceipt = async (o) => setPrintDoc({ type: 'RECEIPT', order: o, items: await withItems(o), mushakNo: null })
   const printMushak = async (o) => {
-    const { data: inv } = await supabase.from('invoices').select('*').eq('id', o.invoice_id).single()
+    const { data: inv } = await withTenant(supabase.from('invoices').select('*')).eq('id', o.invoice_id).single()
     if (inv) setPrintDoc({ type: 'MUSHAK', invoice: inv, refNo: o.order_no })
   }
   const voidSale = async (o) => {
-    if (o.folio_charge_id) await supabase.from('folio_charges').delete().eq('id', o.folio_charge_id)
-    if (o.reservation_id) await supabase.from('payments').delete().eq('reservation_id', o.reservation_id).eq('reference', o.order_no)
-    if (o.invoice_id) await supabase.from('invoices').delete().eq('id', o.invoice_id)
-    await supabase.from('pos_orders').update({ status: 'CANCELLED', notes: '[VOIDED by admin]' }).eq('id', o.id)
+    if (o.folio_charge_id) await withTenant(supabase.from('folio_charges').delete()).eq('id', o.folio_charge_id)
+    if (o.reservation_id) await withTenant(supabase.from('payments').delete()).eq('reservation_id', o.reservation_id).eq('reference', o.order_no)
+    if (o.invoice_id) await withTenant(supabase.from('invoices').delete()).eq('id', o.invoice_id)
+    await withTenant(supabase.from('pos_orders').update({ status: 'CANCELLED', notes: '[VOIDED by admin]' })).eq('id', o.id)
     flash(`${o.order_no} voided & reversed.`); load()
   }
 
@@ -461,18 +466,18 @@ function ItemsManager({ items, reload, isAdmin }) {
 
   const add = async () => {
     if (!n.name.trim() || n.default_price === '') return
-    await supabase.from('facility_items').insert({ ...n, default_price: +n.default_price, category: 'OTHER' })
+    await supabase.from('facility_items').insert(withTenantInsert({ ...n, default_price: +n.default_price, category: 'OTHER' }))
     setN({ name: '', unit: 'pc', default_price: '' }); reload()
   }
   const updatePrice = async (it, price) => {
     if (price === '' || +price === +it.default_price) return
-    await supabase.from('facility_items').update({ default_price: +price }).eq('id', it.id); reload()
+    await withTenant(supabase.from('facility_items').update({ default_price: +price })).eq('id', it.id); reload()
   }
   const toggle = async (it) => {
-    await supabase.from('facility_items').update({ is_active: !it.is_active }).eq('id', it.id); reload()
+    await withTenant(supabase.from('facility_items').update({ is_active: !it.is_active })).eq('id', it.id); reload()
   }
   const del = async (it) => {
-    await supabase.from('facility_items').delete().eq('id', it.id); reload()
+    await withTenant(supabase.from('facility_items').delete()).eq('id', it.id); reload()
   }
 
   return (

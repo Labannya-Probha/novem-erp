@@ -6,7 +6,7 @@ import { fmtBDT } from '../lib/helpers'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import {
   Plus, Pencil, Trash2, Save, ShieldCheck, Search, X,
-  Building2, Truck, Package, FolderTree, UtensilsCrossed, Sparkles, Calculator, Handshake, Users, BedDouble, CalendarRange,
+  Building2, Truck, Package, FolderTree, UtensilsCrossed, Calculator, Handshake, Users, BedDouble, CalendarRange,
 } from 'lucide-react'
 
 /* ------------------------------------------------------------------ */
@@ -75,18 +75,6 @@ const CMS_ENTITIES = [
       { key: 'price', label: 'Price', type: 'number', required: true, default: 0, format: 'money' },
       { key: 'measuring_units', label: 'Unit', type: 'text' },
       { key: 'sort_order', label: 'Sort order', type: 'number', default: 0 },
-    ],
-  },
-  {
-    id: 'facility_items', table: 'facility_items', label: 'Facility Items', icon: Sparkles, orderBy: 'name', hasIsActive: true,
-    fields: [
-      { key: 'category', label: 'Category', type: 'select', required: true, options: ['TEA', 'PICKLE', 'SPORTS'] },
-      { key: 'name', label: 'Item name', type: 'text', required: true },
-      { key: 'unit', label: 'Unit', type: 'text', default: 'pc' },
-      { key: 'default_price', label: 'Default price', type: 'number', default: 0, format: 'money' },
-      { key: 'charge_type', label: 'Charge type', type: 'text', default: 'OTHER' },
-      { key: 'pricing_mode', label: 'Pricing mode', type: 'text', default: 'PER_UNIT' },
-      { key: 'is_rental', label: 'Rental item', type: 'checkbox' },
     ],
   },
   {

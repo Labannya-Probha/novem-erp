@@ -1,8 +1,11 @@
 import { supabase } from '../supabase'   // file lives at src/lib/pms.api.js; supabase.js is at src/supabase.js
-import { TENANT_ID, withTenantInsert, withTenantInsertMany } from './tenant'
+import { getTenantId, withTenantInsert, withTenantInsertMany } from './tenant'
 
 /** tenant helpers */
-const withTenant = (q) => (TENANT_ID ? q.eq('tenant_id', TENANT_ID) : q)
+const withTenant = (q) => {
+  const tenantId = getTenantId()
+  return tenantId ? q.eq('tenant_id', tenantId) : q
+}
 
 /* ---------- Company / config ---------- */
 export const getCompany   = () => withTenant(supabase.from('company_settings').select('*').order('id').limit(1)).single()
