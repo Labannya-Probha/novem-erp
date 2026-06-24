@@ -1159,6 +1159,10 @@ function TransactionMappingTab({ accounts, flash, userName }) {
     notes: '',
   })
 
+  // ── PAYROLL quick-setup state ──────────────────────────────────────────
+  const [payrollF, setPayrollF] = useState({ debit_account_id: '', credit_account_id: '' })
+  const [payrollBusy, setPayrollBusy] = useState(false)
+
   const load = async () => {
     const { data } = await supabase
       .from('accounting_transaction_mapping')
@@ -1171,8 +1175,51 @@ function TransactionMappingTab({ accounts, flash, userName }) {
       `)
       .order('transaction_type')
     setMappings(data || [])
+
+    // Pre-load existing PAYROLL mapping accounts
+    const payrollRow = (data || []).find((m) => m.transaction_type === 'PAYROLL')
+    if (payrollRow) {
+      setPayrollF({
+        debit_account_id: payrollRow.debit_account_id || '',
+        credit_account_id: payrollRow.credit_account_id || '',
+      })
+    }
   }
   useEffect(() => { load() }, [])
+
+  const savePayrollMapping = async () => {
+    if (!payrollF.debit_account_id || !payrollF.credit_account_id) {
+      flash('Please select both a Debit and a Credit account for the PAYROLL mapping.')
+      return
+    }
+    setPayrollBusy(true)
+    const existing = mappings.find((m) => m.transaction_type === 'PAYROLL')
+    let error
+    if (existing) {
+      ;({ error } = await supabase
+        .from('accounting_transaction_mapping')
+        .update({
+          debit_account_id: payrollF.debit_account_id,
+          credit_account_id: payrollF.credit_account_id,
+          updated_by: userName,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id))
+    } else {
+      ;({ error } = await supabase.from('accounting_transaction_mapping').insert({
+        transaction_type: 'PAYROLL',
+        label: 'Payroll',
+        debit_account_id: payrollF.debit_account_id,
+        credit_account_id: payrollF.credit_account_id,
+        notes: 'Configured via Accounting → Transaction Mapping quick setup.',
+        created_by: userName,
+        updated_by: userName,
+      }))
+    }
+    setPayrollBusy(false)
+    if (error) flash(error.message)
+    else { load(); flash('PAYROLL mapping saved.') }
+  }
 
   const startEdit = (m) => {
     setEditId(m.id)
@@ -1337,6 +1384,68 @@ function TransactionMappingTab({ accounts, flash, userName }) {
 
   return (
     <div className="space-y-5">
+
+      {/* ── PAYROLL Account Quick Setup ─────────────────────────────────────── */}
+      <div className="card p-4 space-y-3 border-l-4 border-amber-400">
+        <div>
+          <h3 className="font-display font-semibold text-pine flex items-center gap-2">
+            <span className="font-mono text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">PAYROLL</span>
+            Payroll Account Configuration
+          </h3>
+          <p className="text-xs text-pine/50 mt-0.5">
+            Required for payroll journal approval. Select the Salary Expense (Debit) and Salary Payable / Bank (Credit)
+            accounts that the system will use when posting monthly payroll journals.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div>
+            <label className="label !text-xs flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-sky-400 inline-block" /> Default Debit Account (Salary Expense)
+            </label>
+            <AccountSelect
+              value={payrollF.debit_account_id}
+              onChange={(v) => setPayrollF((p) => ({ ...p, debit_account_id: v }))}
+              placeholder="Salary Expense"
+            />
+          </div>
+          <div>
+            <label className="label !text-xs flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-forest inline-block" /> Default Credit Account (Salary Payable / Bank)
+            </label>
+            <AccountSelect
+              value={payrollF.credit_account_id}
+              onChange={(v) => setPayrollF((p) => ({ ...p, credit_account_id: v }))}
+              placeholder="Salary Payable / Bank"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              className="btn-primary w-full justify-center"
+              onClick={savePayrollMapping}
+              disabled={payrollBusy}
+            >
+              <Save size={14} /> {payrollBusy ? 'Saving…' : 'Save PAYROLL Mapping'}
+            </button>
+          </div>
+        </div>
+        {(() => {
+          const pr = mappings.find((m) => m.transaction_type === 'PAYROLL')
+          if (!pr || (!pr.debit_account_id && !pr.credit_account_id)) {
+            return (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                ⚠ PAYROLL mapping is not yet configured — payroll journal approval will fail until both accounts are set.
+              </p>
+            )
+          }
+          return (
+            <p className="text-xs text-forest bg-forest/5 border border-forest/20 rounded px-3 py-2">
+              ✓ Current mapping — Dr: <strong>{pr.debit ? `${pr.debit.code} · ${pr.debit.name}` : '—'}</strong>
+              {' '}/ Cr: <strong>{pr.credit ? `${pr.credit.code} · ${pr.credit.name}` : '—'}</strong>
+            </p>
+          )
+        })()}
+      </div>
+
       <div className="card p-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
