@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
+import { generatePayrollJournal } from '../lib/generatePayrollJournal'
 import KPICards from '../components/KPICards.jsx'
 import { Users, Plus, Check, X, CalendarDays, FileText, Wallet, Printer } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
@@ -325,7 +326,15 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
   const approveRun = async () => {
     if (!window.confirm(`Approve payroll for ${MONTH_NAMES[active.period_month - 1]} ${active.period_year}? Net amounts will be locked for payout.`)) return
     const { error } = await supabase.from('payroll_runs').update({ status: 'APPROVED', approved_by: userName, approved_at: new Date().toISOString() }).eq('id', active.id)
-    if (error) flash(error.message); else { await loadRuns(); setActive((a) => ({ ...a, status: 'APPROVED' })) }
+    if (error) { flash(error.message); return }
+    // Auto-generate the payroll journal entry atomically
+    try {
+      await generatePayrollJournal(active.id)
+    } catch (e) {
+      flash(`Payroll approved. Warning: journal entry could not be created automatically — ${e.message}`)
+    }
+    await loadRuns()
+    setActive((a) => ({ ...a, status: 'APPROVED' }))
   }
 
   const markPaid = async () => {

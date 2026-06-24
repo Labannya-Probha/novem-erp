@@ -8,7 +8,7 @@
 // maintenance mode, and audit-stamped — so a journal can never land
 // half-written or out of balance.
 // ────────────────────────────────────────────────────────────────────────────
-import { supabase } from './supabase'
+import { supabase } from '../supabase'
 
 /**
  * Post a balanced journal entry to the ledger.

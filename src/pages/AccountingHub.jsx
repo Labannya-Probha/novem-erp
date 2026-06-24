@@ -1122,7 +1122,14 @@ const TRANSACTION_GROUPS = [
   },
   {
     title: 'Payments Received',
-    types: ['PAYMENT_CASH', 'PAYMENT_BKASH', 'PAYMENT_NAGAD', 'PAYMENT_CARD', 'PAYMENT_BANK', 'PAYMENT_ADVANCE'],
+    // PAYMENT is the generic fallback used by the DB trigger;
+    // PAYMENT_<METHOD> entries are matched first by method name.
+    types: ['PAYMENT', 'PAYMENT_CASH', 'PAYMENT_BKASH', 'PAYMENT_NAGAD', 'PAYMENT_CARD', 'PAYMENT_BANK', 'PAYMENT_ADVANCE'],
+  },
+  {
+    title: 'Payroll',
+    // Used by generate_payroll_journal() to post the monthly salary journal.
+    types: ['PAYROLL'],
   },
   {
     title: 'Adjustments',
