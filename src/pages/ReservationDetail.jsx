@@ -2161,7 +2161,7 @@ function BillingsAndCheckOutTab({
                 placeholder="Method…"
               />
             </div>
-            </div>
+            <div>
               <label className="label !text-xs">Date</label>
               <input type="date" className="input" value={p.received_date}
                 onChange={(e) => setP({ ...p, received_date: e.target.value })} />
