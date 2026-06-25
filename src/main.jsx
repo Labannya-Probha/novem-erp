@@ -3,8 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import { SUPABASE_CONFIGURED } from './supabase.js'
-import { ToastProvider } from './components/Toast.jsx'
+import { ToastProvider } from './components/Toast'
 
+// Catch any React render-tree error and show a helpful message rather than a
+// blank page.  Module-level failures (e.g. missing env vars) are handled below
+// before React mounts, so this boundary covers all in-tree runtime errors.
 class ErrorBoundary extends React.Component {
   state = { error: null }
   static getDerivedStateFromError(error) { return { error } }
@@ -32,6 +35,8 @@ class ErrorBoundary extends React.Component {
 }
 
 if (!SUPABASE_CONFIGURED) {
+  // VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY were not set at build time.
+  // Show a clear message instead of a blank page.
   document.getElementById('root').innerHTML = `
     <div style="display:flex;min-height:100vh;align-items:center;justify-content:center;
                 font-family:'IBM Plex Sans',sans-serif;background:#F7F5F2;">
