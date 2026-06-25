@@ -2038,126 +2038,50 @@ function BillingsAndCheckOutTab({
               )}
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-2">
-          <div className="min-w-0 sm:col-span-2 xl:col-span-1">
-            <ChargeTypeSelect
-              value={c.charge_type}
-              items={facilityItems}
-              onChange={(id, item) => setC(prev => ({
-                ...prev,
-                charge_type: item?.name || id,
-                description: prev.description || item?.name || '',
-                base_amount: prev.base_amount || String(item?.default_price ?? ''),
-              }))}
-            />
-          </div>
-        
-          <div className="min-w-0 sm:col-span-2 xl:col-span-2">
-            <input
-              className="input w-full"
-              placeholder="Description"
-              value={c.description}
-              onChange={(e) => setC({ ...c, description: e.target.value })}
-            />
-          </div>
-        
-          <div className="min-w-0">
-            <input
-              type="number"
-              className="input money w-full"
-              placeholder="Base ৳"
-              value={c.base_amount}
-              onChange={(e) => setC({ ...c, base_amount: e.target.value })}
-            />
-          </div>
-        
-          <div className="min-w-0">
-            <input
-              type="number"
-              min="0"
-              max="100"
-              className="input money w-full"
-              placeholder="Disc %"
-              value={c.discount_pct}
-              onChange={(e) => setC({ ...c, discount_pct: e.target.value })}
-            />
-          </div>
-        
-          <div className="min-w-0 sm:col-span-2 xl:col-span-1">
-            <button className="btn-primary justify-center w-full" onClick={addCharge}>
-              <Plus size={15} /> Add
-            </button>
-          </div>
-        </div>
-        </div>
-      )}
-
-      {/* 3. Record Payment */}
-      {editable && (
-        <div className="card p-4">
-          <h3 className="font-display font-semibold text-pine mb-3 flex items-center gap-2">
-            <Receipt size={16} className="text-forest" /> Record Payment
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Row 1: Amount + Method */}
-            <div>
-              <label className="label !text-xs">Amount (৳) *</label>
-              <input type="number" className="input money"
-                placeholder="0.00" value={p.amount}
-                onChange={(e) => setP({ ...p, amount: e.target.value })} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-2 items-end">
+            <div className="sm:col-span-2 xl:col-span-1">
+              <ChargeTypeSelect
+                value={c.charge_type}
+                items={facilityItems}
+                onChange={(id, item) => setC(prev => ({
+                  ...prev,
+                  charge_type: item?.name || id,
+                  description: prev.description || item?.name || '',
+                  base_amount: prev.base_amount || String(item?.default_price ?? ''),
+                }))}
+              />
             </div>
-            <div>
-              <label className="label !text-xs">Payment method</label>
-              <SearchableSelect
-                value={p.method}
-                onChange={v => setP({ ...p, method: v })}
-                options={['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']}
-                placeholder="Method…"
+            <div className="sm:col-span-2 xl:col-span-2">
+              <input
+                className="input w-full"
+                placeholder="Description"
+                value={c.description}
+                onChange={(e) => setC({ ...c, description: e.target.value })}
               />
             </div>
             <div>
-              <label className="label !text-xs">Date</label>
-              <input type="date" className="input" value={p.received_date}
-                onChange={(e) => setP({ ...p, received_date: e.target.value })} />
-            </div>
-            <div>
-              <label className="label !text-xs">Reference / TrxID</label>
-              <input className="input" placeholder="Optional"
-                value={p.reference} onChange={(e) => setP({ ...p, reference: e.target.value })} />
-            </div>
-            {/* Row 2: Paid by party + Class */}
-            <div className="sm:col-span-2">
-              <label className="label !text-xs">Paid by</label>
-              <SearchableSelect
-                value={p.paid_by_party || ''}
-                onChange={v => setP({ ...p, paid_by_party: v })}
-                options={[
-                  { value: guest?.full_name || 'Guest', label: `👤 ${guest?.full_name || 'Guest'} (Guest)` },
-                  ...(res.agencies ? [{ value: res.agencies.name, label: `🤝 ${res.agencies.name} (Agency)` }] : []),
-                  ...(res.shareholders ? [{ value: res.shareholders.name, label: `👥 ${res.shareholders.name} (Shareholder)` }] : []),
-                  ...(res.company_id && guest ? [] : []),
-                ].filter(Boolean)}
-                placeholder="Select who is paying…"
-                allowCreate
-                onCreate={async (v) => v}
+              <input
+                type="number"
+                className="input money w-full"
+                placeholder="Base ৳"
+                value={c.base_amount}
+                onChange={(e) => setC({ ...c, base_amount: e.target.value })}
               />
             </div>
             <div>
-              <label className="label !text-xs">Payment class</label>
-              <SearchableSelect
-                value={p.payment_class || 'SETTLEMENT'}
-                onChange={v => setP({ ...p, payment_class: v })}
-                options={[
-                  { value: 'ADVANCE', label: 'Advance' },
-                  { value: 'SETTLEMENT', label: 'Settlement' },
-                  { value: 'PARTIAL', label: 'Partial' },
-                ]}
-                placeholder="Class…"
+              <input
+                type="number"
+                min="0"
+                max="100"
+                className="input money w-full"
+                placeholder="Disc %"
+                value={c.discount_pct}
+                onChange={(e) => setC({ ...c, discount_pct: e.target.value })}
               />
             </div>
-            <div className="sm:col-span-4 flex justify-end">
-              <button className="btn-primary" onClick={addPayment} disabled={!p.amount || +p.amount <= 0}>
-                <Receipt size={15} /> Save payment
+            <div className="sm:col-span-2 xl:col-span-1">
+              <button className="btn-primary justify-center w-full" onClick={addCharge}>
+                <Plus size={15} /> Add
               </button>
             </div>
           </div>
