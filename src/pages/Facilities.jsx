@@ -7,6 +7,7 @@ import GuestPicker from '../components/GuestPicker.jsx'
 import { getTenantId, withTenantInsert, withTenantInsertMany } from '../lib/tenant'
 import { PosReceipt } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
+import { useToast } from '../components/Toast.jsx'
 import { Plus, Minus, Trash2, Banknote, BedDouble, Leaf, Printer } from 'lucide-react'
 
 const TABS = ['New Sale', 'Sales', 'Items']
@@ -21,8 +22,8 @@ export default function Facilities({ userName, isAdmin }) {
   const [taxConfig, setTaxConfig] = useState([])
   const [company, setCompany] = useState(null)
   const [printDoc, setPrintDoc] = useState(null)
-  const [msg, setMsg] = useState('')
-  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4500) }
+  const toast = useToast()
+  const flash = (m, type = 'success') => toast(m, type)
 
   const load = async () => {
     const [{ data: it }, { data: tc }, { data: co }] = await Promise.all([
@@ -39,8 +40,6 @@ export default function Facilities({ userName, isAdmin }) {
       <h1 className="font-display text-2xl font-bold text-pine mb-1">Facilities &amp; Shop</h1>
       <p className="text-sm text-pine/60 mb-4">Tea sale · Pickle sale · Sports items rental — prices editable at the counter; charge to room or settle on the spot.</p>
       <KPICards module="facilities" />
-
-      {msg && <div className="mb-4 px-4 py-2 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
 
       <div className="flex gap-1 border-b border-leaf mb-6 flex-wrap overflow-x-auto">
         {TABS.map((t) => (
@@ -61,7 +60,7 @@ export default function Facilities({ userName, isAdmin }) {
         />
       )}
       {tab === 'Sales' && <SalesList setPrintDoc={setPrintDoc} isAdmin={isAdmin} flash={flash} />}
-      {tab === 'Items' && <ItemsManager items={items} reload={load} isAdmin={isAdmin} />}
+      {tab === 'Items' && <ItemsManager items={items} reload={load} isAdmin={isAdmin} flash={flash} />}
 
       {printDoc?.type === 'RECEIPT' && (
         <PrintPortal
@@ -152,11 +151,11 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
   }
 
   const payNow = async () => {
-    if (cart.length === 0) { flash('Add at least one item.'); return }
+    if (cart.length === 0) { flash('Add at least one item.', 'warning'); return }
     const validPayments = payments.filter(p => Number(p.amount) > 0)
-    if (validPayments.length === 0) { flash('Enter at least one payment amount.'); return }
+    if (validPayments.length === 0) { flash('Enter at least one payment amount.', 'warning'); return }
     const totalPaid = validPayments.reduce((a, p) => a + Number(p.amount), 0)
-    if (totalPaid < t.total - 0.01) { flash(`Amount short by ${fmtBDT(t.total - totalPaid)} — add more payment.`); return }
+    if (totalPaid < t.total - 0.01) { flash(`Amount short by ${fmtBDT(t.total - totalPaid)} — add more payment.`, 'warning'); return }
     const primaryMethod = [...validPayments].sort((a, b) => Number(b.amount) - Number(a.amount))[0].method
     const paymentSummary = validPayments.map(p => `${p.method}:${Number(p.amount).toFixed(2)}`).join(', ')
     setBusy(true)
@@ -196,14 +195,14 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
       setLink({ reservation_id: null, guest_name: '', room_no: '' })
       setPayments([{ method: 'CASH', amount: '' }])
       onDone({ type: 'RECEIPT', order: { ...order, status: 'SETTLED', payment_method: primaryMethod }, items: oi, mushakNo })
-      flash(`${order.order_no} settled — ${paymentSummary}.${mushakNo ? ` Mushak-6.3 ${mushakNo} issued.` : ''}`)
-    } catch (e) { flash(e.message) }
+      flash(`${order.order_no} settled — ${paymentSummary}.${mushakNo ? ` Mushak-6.3 ${mushakNo} issued.` : ''}`, 'success')
+    } catch (e) { flash(e.message, 'error') }
     setBusy(false)
   }
 
   const chargeToRoom = async () => {
-    if (cart.length === 0) { flash('Add at least one item.'); return }
-    if (!link.reservation_id) { flash('Link an in-house guest first.'); return }
+    if (cart.length === 0) { flash('Add at least one item.', 'warning'); return }
+    if (!link.reservation_id) { flash('Link an in-house guest first.', 'warning'); return }
     setBusy(true)
     try {
       const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
@@ -219,8 +218,8 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
       setLink({ reservation_id: null, guest_name: '', room_no: '' })
       setPayments([{ method: 'CASH', amount: '' }])
       onDone({ type: 'RECEIPT', order: { ...order, status: 'CHARGED_TO_ROOM' }, items: oi })
-      flash(`${order.order_no} charged to Room ${order.room_no} as DUE.`)
-    } catch (e) { flash(e.message) }
+      flash(`${order.order_no} charged to Room ${order.room_no} as DUE.`, 'info')
+    } catch (e) { flash(e.message, 'error') }
     setBusy(false)
   }
 
@@ -250,7 +249,6 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
 
       {/* ── Cart + Payment ── */}
       <div className="xl:col-span-2 space-y-3">
-        {/* Cart card */}
         <div className="card p-4">
           <h3 className="font-display font-semibold text-pine mb-2">Facilities &amp; Shop — current sale</h3>
 
@@ -307,9 +305,7 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
           </div>
         </div>
 
-        {/* Payment card */}
         <div className="card p-4 space-y-3">
-          {/* Split payment rows */}
           <div className="space-y-2">
             {payments.map((p, i) => (
               <div key={i} className="flex gap-2 items-center flex-wrap sm:flex-nowrap">
@@ -343,7 +339,6 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
             <Plus size={13} /> Add payment method
           </button>
 
-          {/* Paid / Due summary */}
           {(() => {
             const paid = payments.reduce((a, p) => a + (Number(p.amount) || 0), 0)
             const due  = Math.max(0, t.total - paid)
@@ -404,7 +399,7 @@ function SalesList({ setPrintDoc, isAdmin, flash }) {
     if (o.reservation_id) await withTenant(supabase.from('payments').delete()).eq('reservation_id', o.reservation_id).eq('reference', o.order_no)
     if (o.invoice_id) await withTenant(supabase.from('invoices').delete()).eq('id', o.invoice_id)
     await withTenant(supabase.from('pos_orders').update({ status: 'CANCELLED', notes: '[VOIDED by admin]' })).eq('id', o.id)
-    flash(`${o.order_no} voided & reversed.`); load()
+    flash(`${o.order_no} voided & reversed.`, 'warning'); load()
   }
 
   const chip = {
@@ -461,7 +456,7 @@ function SalesList({ setPrintDoc, isAdmin, flash }) {
 }
 
 /* ================= ITEMS MANAGER ================= */
-function ItemsManager({ items, reload, isAdmin }) {
+function ItemsManager({ items, reload, isAdmin, flash }) {
   const [n, setN] = useState({ name: '', unit: 'pc', default_price: '' })
 
   const add = async () => {
@@ -469,22 +464,27 @@ function ItemsManager({ items, reload, isAdmin }) {
     const { error } = await supabase
       .from('facility_items')
       .insert(withTenantInsert({ ...n, default_price: +n.default_price }))
-    if (error) {
-      alert('Add failed: ' + error.message)
-      return
-    }
+    if (error) { flash(error.message, 'error'); return }
     setN({ name: '', unit: 'pc', default_price: '' })
+    flash('Item added successfully!', 'success')
     reload()
   }
   const updatePrice = async (it, price) => {
     if (price === '' || +price === +it.default_price) return
-    await withTenant(supabase.from('facility_items').update({ default_price: +price })).eq('id', it.id); reload()
+    const { error } = await withTenant(supabase.from('facility_items').update({ default_price: +price })).eq('id', it.id)
+    if (error) { flash(error.message, 'error'); return }
+    flash('Price updated.', 'success')
+    reload()
   }
   const toggle = async (it) => {
-    await withTenant(supabase.from('facility_items').update({ is_active: !it.is_active })).eq('id', it.id); reload()
+    await withTenant(supabase.from('facility_items').update({ is_active: !it.is_active })).eq('id', it.id)
+    flash(`${it.name} ${!it.is_active ? 'activated' : 'deactivated'}.`, 'info')
+    reload()
   }
   const del = async (it) => {
-    await withTenant(supabase.from('facility_items').delete()).eq('id', it.id); reload()
+    await withTenant(supabase.from('facility_items').delete()).eq('id', it.id)
+    flash(`${it.name} deleted.`, 'warning')
+    reload()
   }
 
   return (
