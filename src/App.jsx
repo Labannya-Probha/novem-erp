@@ -15,7 +15,7 @@ import ReservationDetail from './pages/ReservationDetail.jsx'
 import BookingCalendar from './pages/BookingCalendar.jsx'
 import HousekeepingHub from './pages/HousekeepingHub.jsx'
 import RestaurantPOS, { GuestPosKiosk } from './pages/RestaurantPOS.jsx'
-import ServiceBills from './pages/ServiceBills.jsx'
+import Facilities from './pages/ServiceBills.jsx'
 import InventoryHub from './pages/InventoryHub.jsx'
 import VatCenter from './pages/VatCenter.jsx'
 import AccountingHub from './pages/AccountingHub.jsx'
@@ -53,7 +53,7 @@ const NAV_GROUPS = [
     { id: 'dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
     { id: 'nightaudit',   label: 'Night Audit',  icon: MoonStar },
     { id: 'housekeeping', label: 'Housekeeping', icon: BedDouble },
-    { id: 'facilities',   label: 'Facilities',   icon: ShoppingBasket },
+    { id: 'service-bills', label: 'Service Bills', icon: ShoppingBasket },
   ]},
   { title: 'Restaurant POS', items: [
     { id: 'pos',             label: 'Restaurant POS',  icon: UtensilsCrossed },
@@ -339,9 +339,9 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
               <HousekeepingHub userName={userName} role={role} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
-          <Route path="/facilities" element={
+          <Route path="/service-bills" element={
             <GuardedRoute role={role} navId="facilities" privileges={privileges}>
-              <Facilities userName={userName} isAdmin={isAdmin} />
+              <ServiceBills userName={userName} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
 
