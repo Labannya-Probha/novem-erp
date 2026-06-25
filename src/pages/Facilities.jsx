@@ -468,7 +468,7 @@ function ItemsManager({ items, reload, isAdmin }) {
     if (!n.name.trim() || n.default_price === '') return
     const { error } = await supabase
       .from('facility_items')
-      .insert(withTenantInsert({ ...n, default_price: +n.default_price, category: 'OTHER' }))
+      .insert(withTenantInsert({ ...n, default_price: +n.default_price }))
     if (error) {
       alert('Add failed: ' + error.message)
       return
