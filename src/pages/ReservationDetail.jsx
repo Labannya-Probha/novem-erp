@@ -2089,6 +2089,7 @@ function BillingsAndCheckOutTab({
             </button>
           </div>
         </div>
+        </div>
       )}
 
       {/* 3. Record Payment */}
