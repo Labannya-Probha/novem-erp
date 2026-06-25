@@ -17,86 +17,8 @@ import {
   Users, Handshake,
 } from 'lucide-react'
 import Quotation from '../components/print/Quotation.jsx'
+import SearchableSelect from '../components/SearchableSelect.jsx'
 const TABS = ['Overview', 'Check-In', 'Billings & Check-Out']
-
-/* ------------------------------------------------------------------ */
-/*  SEARCHABLE SELECT — reusable, no external lib                       */
-/* ------------------------------------------------------------------ */
-function SearchableSelect({ value, onChange, options, placeholder = 'Select…', disabled = false, className = '' }) {
-  // options: [{ value, label }] or plain strings
-  const normalised = options.map(o =>
-    typeof o === 'string' ? { value: o, label: o } : o
-  )
-  const [open, setOpen]     = useState(false)
-  const [query, setQuery]   = useState('')
-  const containerRef        = useRef(null)
-  const inputRef            = useRef(null)
-
-  const selected = normalised.find(o => o.value === value)
-  const filtered = query
-    ? normalised.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
-    : normalised
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e) => { if (containerRef.current && !containerRef.current.contains(e.target)) { setOpen(false); setQuery('') } }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  // Focus search when opened
-  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 30) }, [open])
-
-  const select = (opt) => { onChange(opt.value); setOpen(false); setQuery('') }
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen(v => !v)}
-        className={`input w-full text-left flex items-center justify-between gap-2 ${disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'}`}
-      >
-        <span className={selected ? 'text-pine' : 'text-pine/40'}>{selected?.label || placeholder}</span>
-        <svg className={`w-4 h-4 text-pine/40 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-leaf rounded-xl shadow-lg overflow-hidden">
-          {/* Search input */}
-          <div className="p-2 border-b border-leaf">
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search…"
-              className="w-full text-sm px-2 py-1.5 rounded-lg border border-leaf focus:outline-none focus:ring-2 focus:ring-forest/30"
-              onKeyDown={e => {
-                if (e.key === 'Escape') { setOpen(false); setQuery('') }
-                if (e.key === 'Enter' && filtered.length === 1) select(filtered[0])
-              }}
-            />
-          </div>
-          {/* Options */}
-          <div className="max-h-48 overflow-y-auto">
-            {filtered.length === 0 && <div className="px-3 py-2 text-sm text-pine/40">No results</div>}
-            {filtered.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => select(opt)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-leaf/40 transition-colors ${opt.value === value ? 'bg-forest/10 text-forest font-semibold' : 'text-pine'}`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 const generateInvoiceNo = (resNo) => `INV-${resNo}-${Date.now().toString().slice(-6)}`
 

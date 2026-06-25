@@ -5,6 +5,7 @@ import { loadReservationConfig } from '../lib/reservationConfig'
 import { Search, Trash2, UserSearch, X, CheckCircle2 } from 'lucide-react'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import KPICards from '../components/KPICards.jsx'
+import { Combobox } from '../components/ui/combobox'
 
 const STATUSES = ['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'NO_SHOW', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED', 'CANCELLED']
 
@@ -277,106 +278,23 @@ function GuestSearchPopup({ onSelect, onClose }) {
 /*  SERVICE COMBOBOX                                                    */
 /* ================================================================== */
 function ServiceCombobox({ items, addons, onSelect }) {
-  const [open, setOpen]   = useState(false)
-  const [query, setQuery] = useState('')
-  const ref               = useRef(null)
-  const inputRef          = useRef(null)
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 30)
-  }, [open])
-
-  const filtered      = query ? items.filter(it => it.name.toLowerCase().includes(query.toLowerCase())) : items
   const selectedCount = Object.values(addons).filter(a => a.selected).length
+  const comboboxItems = items.map((it) => ({
+    value: it.id,
+    label: `${addons[it.id]?.selected ? '✓ ' : ''}${it.name}`,
+    sublabel: `${it.unit} · ${fmtBDT(it.default_price)}`,
+  }))
 
   return (
-    <div ref={ref} className="relative">
-      {/* Trigger */}
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="input w-full text-left flex items-center justify-between gap-2 cursor-pointer"
-      >
-        <span className={selectedCount > 0 ? 'text-pine' : 'text-pine/40'}>
-          {selectedCount > 0
-            ? `${selectedCount} service${selectedCount > 1 ? 's' : ''} selected`
-            : 'Search and select services…'}
-        </span>
-        <svg
-          className={`w-4 h-4 text-pine/40 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-leaf rounded-xl shadow-lg overflow-hidden">
-          {/* Search */}
-          <div className="p-2 border-b border-leaf">
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search services…"
-              className="w-full text-sm px-2 py-1.5 rounded-lg border border-leaf focus:outline-none focus:ring-2 focus:ring-forest/30"
-              onKeyDown={e => e.key === 'Escape' && setOpen(false)}
-            />
-          </div>
-
-          {/* Options */}
-          <div className="max-h-52 overflow-y-auto">
-            {filtered.length === 0 && (
-              <div className="px-3 py-3 text-sm text-pine/40 text-center">No services found</div>
-            )}
-            {filtered.map(it => {
-              const selected = addons[it.id]?.selected
-              return (
-                <button
-                  key={it.id}
-                  type="button"
-                  onClick={() => onSelect(it.id)}
-                  className={`w-full text-left px-3 py-2.5 text-sm flex items-center justify-between gap-2 hover:bg-leaf/40 transition-colors ${selected ? 'bg-forest/[0.08] text-forest' : 'text-pine'}`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-forest border-forest' : 'border-leaf'}`}>
-                      {selected && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </span>
-                    <span className="font-medium">{it.name}</span>
-                    <span className="text-pine/40 text-xs">/{it.unit}</span>
-                  </span>
-                  <span className="money text-xs text-pine/60 shrink-0">{fmtBDT(it.default_price)}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Footer */}
-          <div className="px-3 py-2 border-t border-leaf flex justify-between items-center">
-            <span className="text-xs text-pine/40">{selectedCount} selected</span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="text-xs text-forest font-semibold hover:underline"
-            >Done</button>
-          </div>
-        </div>
-      )}
-    </div>
+    <Combobox
+      items={comboboxItems}
+      value={undefined}
+      onChange={(v) => onSelect(v)}
+      placeholder={selectedCount > 0 ? `${selectedCount} service${selectedCount > 1 ? 's' : ''} selected` : 'Search and select services…'}
+      searchPlaceholder="Search services…"
+      emptyText="No services found"
+      closeOnSelect={false}
+    />
   )
 }
 
@@ -913,12 +831,19 @@ function NewReservation({ close, openReservation, userName, prefill }) {
                   ) : null
                 })()}
                 {!selectedPolicyId && discountPolicies.length > 0 && (
-                  <select className="text-xs border border-leaf rounded px-2 py-1 text-pine/70" value="" onChange={e => applyDiscountPolicy(e.target.value)}>
-                    <option value="">Apply policy…</option>
-                    {discountPolicies.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} · {p.type === 'fixed' ? `৳${p.value}` : `${p.value}%`}</option>
-                    ))}
-                  </select>
+                  <div className="w-56">
+                    <Combobox
+                      items={discountPolicies.map((p) => ({
+                        value: p.id,
+                        label: p.name,
+                        sublabel: p.type === 'fixed' ? `৳${p.value}` : `${p.value}%`,
+                      }))}
+                      value=""
+                      onChange={(v) => applyDiscountPolicy(v)}
+                      placeholder="Apply policy…"
+                      searchPlaceholder="Search policy…"
+                    />
+                  </div>
                 )}
               </div>
               <div className="flex gap-2">

@@ -4,6 +4,7 @@ import { supabase } from '../supabase'
 import { loadReservationConfig, saveReservationConfig } from '../lib/reservationConfig'
 import { fmtBDT } from '../lib/helpers'
 import SearchableSelect from '../components/SearchableSelect.jsx'
+import { Combobox } from '../components/ui/combobox'
 import {
   Plus, Pencil, Trash2, Save, ShieldCheck, Search, X,
   Building2, Truck, Package, FolderTree, UtensilsCrossed, Calculator, Handshake, Users, BedDouble, CalendarRange,
@@ -228,12 +229,17 @@ function EntityManager({ entity }) {
     if (fld.type === 'select') {
       const opts = fld.fkTable ? (fkOptions[fld.key] || []) : (fld.options || [])
       return (
-        <select className="input" value={state[fld.key] ?? ''} onChange={(e) => onChange(e.target.value)}>
-          <option value="">Select…</option>
-          {fld.fkTable
-            ? opts.map((o) => <option key={o.id} value={o.id}>{o[fld.fkLabel || 'name']}</option>)
-            : opts.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        <Combobox
+          items={[
+            { value: '', label: 'Select…' },
+            ...(fld.fkTable
+              ? opts.map((o) => ({ value: o.id, label: o[fld.fkLabel || 'name'] }))
+              : opts.map((o) => ({ value: o, label: o }))),
+          ]}
+          value={state[fld.key] ?? ''}
+          onChange={(v) => onChange(v)}
+          placeholder="Select…"
+        />
       )
     }
     if (fld.type === 'checkbox') {
