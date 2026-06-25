@@ -388,13 +388,13 @@ function NewReservation({ close, openReservation, userName, prefill }) {
           }))
         }
       })
-    supabase.from('facility_items').select('*').eq('is_active', true).order('category').order('name')
+    supabase.from('facility_items').select('*').eq('is_active', true).order('name')
       .then(({ data }) => {
         const items = data || []
         setFacilityItems(items)
         setAddons(Object.fromEntries(items.map((it) => [
           it.id,
-          { selected: false, label: it.name, price: String(it.default_price ?? ''), qty: 1, category: it.category, unit: it.unit },
+          { selected: false, label: it.name, price: String(it.default_price ?? ''), qty: 1, unit: it.unit },
         ])))
       })
   }, [])
