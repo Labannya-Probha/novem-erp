@@ -37,8 +37,7 @@ export default function Facilities({ userName, isAdmin }) {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold text-pine mb-1">Facilities &amp; Shop</h1>
-      <p className="text-sm text-pine/60 mb-4">Tea sale · Pickle sale · Sports items rental — prices editable at the counter; charge to room or settle on the spot.</p>
+      <h1 className="font-display text-2xl font-bold text-pine mb-1">Facilities &amp; Shop</h1>      
       <KPICards module="facilities" />
 
       <div className="flex gap-1 border-b border-leaf mb-6 flex-wrap overflow-x-auto">
@@ -96,7 +95,7 @@ function NewSale({ items, taxConfig, userName, flash, onDone }) {
   const [showPicker, setShowPicker] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const catMeta = { outlet: 'Facilities & Shop' }
+  const catMeta = { outlet: 'Service Bill' }
   const rate = rateFor(taxConfig, 'OTHER', todayISO())
     || rateFor(taxConfig, 'FOOD', todayISO())
     || { vat_pct: 0, service_charge_pct: 0 }
@@ -490,12 +489,8 @@ function ItemsManager({ items, reload, isAdmin, flash }) {
   return (
     <div className="card p-5">
       <h3 className="font-display font-semibold text-pine mb-1 flex items-center gap-2">
-        <Leaf size={17} /> Facility items (default prices)
+        <Leaf size={17} /> Other Services
       </h3>
-      <p className="text-xs text-pine/50 mb-3">
-        Defaults only — the price stays editable on every sale.
-        {!isAdmin && ' Changing the catalog requires administrator access.'}
-      </p>
       {isAdmin && (
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-4 items-end">
           <div>
