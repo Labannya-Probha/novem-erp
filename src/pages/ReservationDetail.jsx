@@ -864,7 +864,7 @@ function Overview({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
       {/* Guest & stay */}
-      <div className="card p-5 lg:col-span-2">
+      <div className="card p-5 lg:col-span-3">
         <h3 className="font-display font-semibold text-pine mb-3">Guest & stay</h3>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div><dt className="label">Primary guest</dt><dd className="font-semibold">{res.salutation ? `${res.salutation} ` : ''}{guest?.full_name || '—'}</dd></div>
@@ -932,7 +932,7 @@ function Overview({
       </div>      
 
       {/* QUOTATION TABLE — single latest row */}
-      <div className="card p-5 lg:col-span-2">
+      <div className="card p-5 lg:col-span-3">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-semibold text-pine">Quotation</h3>
           <button className="btn-ghost !py-1.5 text-xs" onClick={() => openQuoteEditor(false)}>
