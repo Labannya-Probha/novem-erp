@@ -2038,7 +2038,8 @@ function BillingsAndCheckOutTab({
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-2">
+          <div className="min-w-0 sm:col-span-2 xl:col-span-1">
             <ChargeTypeSelect
               value={c.charge_type}
               items={facilityItems}
@@ -2049,13 +2050,43 @@ function BillingsAndCheckOutTab({
                 base_amount: prev.base_amount || String(item?.default_price ?? ''),
               }))}
             />
-            <input className="input col-span-2" placeholder="Description"
-              value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
-            <input type="number" className="input money" placeholder="Base ৳"
-              value={c.base_amount} onChange={(e) => setC({ ...c, base_amount: e.target.value })} />
-            <input type="number" min="0" max="100" className="input money" placeholder="Disc %"
-              value={c.discount_pct} onChange={(e) => setC({ ...c, discount_pct: e.target.value })} />
-            <button className="btn-primary justify-center" onClick={addCharge}><Plus size={15} /> Add</button>
+          </div>
+        
+          <div className="min-w-0 sm:col-span-2 xl:col-span-2">
+            <input
+              className="input w-full"
+              placeholder="Description"
+              value={c.description}
+              onChange={(e) => setC({ ...c, description: e.target.value })}
+            />
+          </div>
+        
+          <div className="min-w-0">
+            <input
+              type="number"
+              className="input money w-full"
+              placeholder="Base ৳"
+              value={c.base_amount}
+              onChange={(e) => setC({ ...c, base_amount: e.target.value })}
+            />
+          </div>
+        
+          <div className="min-w-0">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              className="input money w-full"
+              placeholder="Disc %"
+              value={c.discount_pct}
+              onChange={(e) => setC({ ...c, discount_pct: e.target.value })}
+            />
+          </div>
+        
+          <div className="min-w-0 sm:col-span-2 xl:col-span-1">
+            <button className="btn-primary justify-center w-full" onClick={addCharge}>
+              <Plus size={15} /> Add
+            </button>
           </div>
         </div>
       )}
