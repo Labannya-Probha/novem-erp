@@ -1211,8 +1211,8 @@ const WIPE_MODULES = [
   {
     id: 'accounting',
     label: 'Accounting',
-    description: 'Journal entries/lines, VAT registers, document register, fixed assets/depreciation, VDS certificates, transaction mappings',
-    tables: ['journal_lines', 'journal_entries', 'vat_sales_register', 'vat_purchase_register', 'doc_register', 'fixed_assets', 'asset_depreciation', 'vds_certificates', 'accounting_transaction_mapping'],
+    description: 'Journal entries/lines, VAT registers, document register, fixed assets/depreciation, VDS certificates, transaction mappings, chart of accounts',
+    tables: ['journal_lines', 'journal_entries', 'vat_sales_register', 'vat_purchase_register', 'doc_register', 'fixed_assets', 'asset_depreciation', 'vds_certificates', 'accounting_transaction_mapping', 'chart_of_accounts'],
     sequences: [
       { id: 'jv_no_seq',  dependsOn: ['journal_entries'] },
       { id: 'doc_no_seq', dependsOn: ['doc_register'] },
@@ -1223,8 +1223,8 @@ const WIPE_MODULES = [
   {
     id: 'operations',
     label: 'Operations & Tasks',
-    description: 'Task categories/tasks and consumption entries/lines',
-    tables: ['task_categories', 'tasks', 'consumption_lines', 'consumption_entries'],
+    description: 'Task categories/tasks, consumption entries/lines, audit log and report definitions',
+    tables: ['task_categories', 'tasks', 'consumption_lines', 'consumption_entries', 'audit_log', 'report_definitions'],
     sequences: [],
   },
   {
@@ -1232,6 +1232,13 @@ const WIPE_MODULES = [
     label: 'Compliance',
     description: 'Statutory compliance items and statutory filings',
     tables: ['statutory_filings', 'statutory_compliance_items'],
+    sequences: [],
+  },
+  {
+    id: 'property-setup',
+    label: 'Property Setup',
+    description: 'Rooms inventory, cancellation policies and discount policies',
+    tables: ['rooms', 'cancellation_policies', 'discount_policies'],
     sequences: [],
   },
 ]
