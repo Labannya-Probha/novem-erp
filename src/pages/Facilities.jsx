@@ -37,7 +37,7 @@ export default function Facilities({ userName, isAdmin }) {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold text-pine mb-1">Facilities &amp; Shop</h1>      
+      <h1 className="font-display text-2xl font-bold text-pine mb-1">Service Bills</h1>      
       <KPICards module="facilities" />
 
       <div className="flex gap-1 border-b border-leaf mb-6 flex-wrap overflow-x-auto">
