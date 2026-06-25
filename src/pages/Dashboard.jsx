@@ -5,9 +5,9 @@ import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle
 import KPICards from '../components/KPICards.jsx'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Badge, badgeVariants } from '../components/ui/badge'
-import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert'
+import { Badge } from '../components/ui/badge'
 import { Separator } from '../components/ui/separator'
+import { useToast } from '../components/Toast'
 import { cn } from '../lib/utils'
 
 const HK_STYLE = {
@@ -53,12 +53,12 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
   const [boardBusy, setBoardBusy] = useState(false)
   const [dayBusy, setDayBusy] = useState(false)
   const [foCloseRow, setFoCloseRow] = useState(null)
-  const [dayMsg, setDayMsg] = useState('')
   const [reqBusy, setReqBusy] = useState({})
+  const toast = useToast()
   const today = todayISO()
   const canCloseFrontDay = isAdmin || role === 'MANAGER' || role === 'FRONT_OFFICE' || role === 'ACCOUNTS'
   const canOpenDay = role === 'SUPERUSER'
-  const flashDay = (m) => { setDayMsg(m); setTimeout(() => setDayMsg(''), 4000) }
+  const flashDay = (m, type = 'info') => { toast(m, type) }
 
   const loadBoard = async () => {
     setBoardBusy(true)
@@ -113,24 +113,40 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
   }
 
   const closeFrontOfficeDay = async () => {
-    if (!canCloseFrontDay) { flashDay('Front Office day-close requires Front Office, Accounts, Manager, Admin or SUPERUSER access.'); return }
+    if (!canCloseFrontDay) {
+      flashDay('Front Office day-close requires Front Office, Accounts, Manager, Admin or SUPERUSER access.', 'warning')
+      return
+    }
     setDayBusy(true)
     const payload = { close_date: today, type: 'RESERVATION', closed_by: userName, closed_at: new Date().toISOString() }
     const { error: delErr } = await supabase.from('day_closes').delete().eq('close_date', today).eq('type', 'RESERVATION')
-    if (delErr) { setDayBusy(false); flashDay(delErr.message); return }
+    if (delErr) {
+      setDayBusy(false)
+      flashDay(delErr.message, 'error')
+      return
+    }
     const { error } = await supabase.from('day_closes').insert(payload)
     setDayBusy(false)
-    if (error) flashDay(error.message)
-    else { flashDay(`Front Office day closed for ${today}.`); loadFrontOfficeClose() }
+    if (error) flashDay(error.message, 'error')
+    else {
+      flashDay(`Front Office day closed for ${today}.`, 'success')
+      loadFrontOfficeClose()
+    }
   }
 
   const openFrontOfficeDay = async () => {
-    if (!canOpenDay) { flashDay('Only SUPERUSER can open a closed day.'); return }
+    if (!canOpenDay) {
+      flashDay('Only SUPERUSER can open a closed day.', 'warning')
+      return
+    }
     setDayBusy(true)
     const { error } = await supabase.from('day_closes').delete().eq('close_date', today).eq('type', 'RESERVATION')
     setDayBusy(false)
-    if (error) flashDay(error.message)
-    else { flashDay(`Front Office day opened for ${today}.`); loadFrontOfficeClose() }
+    if (error) flashDay(error.message, 'error')
+    else {
+      flashDay(`Front Office day opened for ${today}.`, 'success')
+      loadFrontOfficeClose()
+    }
   }
 
   const requestCheckoutClearance = async (room, occupancy) => {
@@ -145,7 +161,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
         .in('status', ['OPEN', 'IN_PROGRESS'])
         .limit(1)
       if (existing && existing.length) {
-        flashDay(`Clearance request already pending for Room ${room.room_no}.`)
+        flashDay(`Clearance request already pending for Room ${room.room_no}.`, 'warning')
         return
       }
       const reservationBits = occupancy
@@ -170,9 +186,9 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
         created_by: userName,
       })
       if (error) throw error
-      flashDay(`Checkout clearance request sent to Housekeeping for Room ${room.room_no}.`)
+      flashDay(`Checkout clearance request sent to Housekeeping for Room ${room.room_no}.`, 'success')
     } catch (e) {
-      flashDay(e.message || 'Failed to send clearance request.')
+      flashDay(e.message || 'Failed to send clearance request.', 'error')
     } finally {
       setReqBusy((p) => ({ ...p, [room.id]: false }))
     }
@@ -237,13 +253,6 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
       </Card>
 
       <KPICards module="dashboard" />
-
-      {dayMsg && (
-        <Alert variant="success" className="mb-4 shadow-sm">
-          <AlertTitle>Update</AlertTitle>
-          <AlertDescription>{dayMsg}</AlertDescription>
-        </Alert>
-      )}
 
       <Card className="mb-6 border-leaf/70 shadow-sm">
         <CardContent className="p-4">
