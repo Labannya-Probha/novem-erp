@@ -456,7 +456,7 @@ function SalesList({ setPrintDoc, isAdmin, flash }) {
 
 /* ================= ITEMS MANAGER ================= */
 function ItemsManager({ items, reload, isAdmin, flash }) {
-  const [n, setN] = useState({ name: '', unit: 'pc', default_price: '' })
+  const [n, setN] = useState({ name: '', unit: 'pc', category: 'GENERAL', default_price: '' })
 
   const add = async () => {
     if (!n.name.trim() || n.default_price === '') return
@@ -464,7 +464,7 @@ function ItemsManager({ items, reload, isAdmin, flash }) {
       .from('facility_items')
       .insert(withTenantInsert({ ...n, default_price: +n.default_price }))
     if (error) { flash(error.message, 'error'); return }
-    setN({ name: '', unit: 'pc', default_price: '' })
+    setN({ name: '', unit: 'pc', category: 'GENERAL', default_price: '' })
     flash('Item added successfully!', 'success')
     reload()
   }
