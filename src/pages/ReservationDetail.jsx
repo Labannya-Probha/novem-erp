@@ -2949,7 +2949,6 @@ function ChargeTypeSelect({ value, onChange, items = [] }) {
     setOpen(true)
     setTimeout(() => inputRef.current?.focus(), 30)
   }
-
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
