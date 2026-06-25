@@ -1790,6 +1790,15 @@ function BillingsAndCheckOutTab({
   const editable     = isAdmin || !['CHECKED_OUT', 'SETTLED', 'CANCELLED'].includes(res.status)
   const pendingClearanceRooms = resRooms.filter((rr) => (rr.rooms?.hk_status || '').toLowerCase() !== 'inspected')
   const [c, setC]           = useState({ charge_type: 'OTHER', description: '', base_amount: '', discount_pct: 0, charge_date: todayISO() })
+  const [facilityItems, setFacilityItems] = useState([])
+
+  useEffect(() => {
+    supabase.from('facility_items')
+      .select('id, name, default_price, unit')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => setFacilityItems(data || []))
+  }, [])
   const [discBusy, setDiscBusy] = useState(false)
   const [discountForm, setDiscountForm] = useState({
     discount_type: res.discount_type || 'percentage',
@@ -2108,11 +2117,15 @@ function BillingsAndCheckOutTab({
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-            <SearchableSelect
+            <ChargeTypeSelect
               value={c.charge_type}
-              onChange={v => setC({ ...c, charge_type: v })}
-              options={['ROOM', 'RESTAURANT', 'LAUNDRY', 'TEA', 'PICKLE', 'SPORTS', 'OTHER']}
-              placeholder="Type…"
+              items={facilityItems}
+              onChange={(id, item) => setC(prev => ({
+                ...prev,
+                charge_type: item?.name || id,
+                description: prev.description || item?.name || '',
+                base_amount: prev.base_amount || String(item?.default_price ?? ''),
+              }))}
             />
             <input className="input col-span-2" placeholder="Description"
               value={c.description} onChange={(e) => setC({ ...c, description: e.target.value })} />
@@ -2144,11 +2157,11 @@ function BillingsAndCheckOutTab({
               <SearchableSelect
                 value={p.method}
                 onChange={v => setP({ ...p, method: v })}
-                options={['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'CHEQUE', 'OTHER']}
+                options={['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']}
                 placeholder="Method…"
               />
             </div>
-            <div>
+            </div>
               <label className="label !text-xs">Date</label>
               <input type="date" className="input" value={p.received_date}
                 onChange={(e) => setP({ ...p, received_date: e.target.value })} />
@@ -2990,5 +3003,97 @@ function GuestRefundCard({ res, payments, charges, totals, paid, resRooms = [], 
         </div>
       )}
     </div>
+  )
+}
+/* ── Charge Type Select (fixed-position, pulls from facility_items) ── */
+function ChargeTypeSelect({ value, onChange, items = [] }) {
+  const [open, setOpen]   = useState(false)
+  const [query, setQuery] = useState('')
+  const btnRef            = useRef(null)
+  const inputRef          = useRef(null)
+  const [pos, setPos]     = useState({ top: 0, left: 0, width: 0 })
+
+  const selected = items.find(it => it.name === value) || null
+
+  const filtered = query
+    ? items.filter(it => it.name.toLowerCase().includes(query.toLowerCase()))
+    : items
+
+  const openDropdown = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + window.scrollY + 4, left: r.left + window.scrollX, width: r.width })
+    }
+    setOpen(true)
+    setTimeout(() => inputRef.current?.focus(), 30)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => {
+      if (!btnRef.current?.contains(e.target)) { setOpen(false); setQuery('') }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={openDropdown}
+        className="input flex items-center justify-between gap-2 cursor-pointer text-sm font-medium w-full"
+      >
+        <span className={value ? 'text-pine truncate' : 'text-pine/40'}>
+          {value || 'Select service…'}
+        </span>
+        <svg className={`w-4 h-4 text-pine/40 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+          className="bg-white border border-leaf rounded-xl shadow-xl overflow-hidden"
+        >
+          <div className="p-2 border-b border-leaf">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search service…"
+              className="w-full text-sm px-2 py-1.5 rounded-lg border border-leaf focus:outline-none focus:ring-2 focus:ring-forest/30"
+              onKeyDown={e => e.key === 'Escape' && setOpen(false)}
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {items.length === 0 && (
+              <div className="px-3 py-3 text-sm text-pine/40 text-center">
+                No services — add in Configuration → Facility Items
+              </div>
+            )}
+            {filtered.length === 0 && items.length > 0 && (
+              <div className="px-3 py-3 text-sm text-pine/40 text-center">No match</div>
+            )}
+            {filtered.map(it => (
+              <button
+                key={it.id}
+                type="button"
+                onClick={() => { onChange(it.name, it); setOpen(false); setQuery('') }}
+                className={`w-full text-left px-3 py-2.5 text-sm hover:bg-leaf/40 transition-colors
+                  ${value === it.name ? 'bg-forest/[0.08] text-forest' : 'text-pine'}`}
+              >
+                <div className="font-medium">{it.name}</div>
+                <div className="text-xs text-pine/40">{fmtBDT(it.default_price)} / {it.unit}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
