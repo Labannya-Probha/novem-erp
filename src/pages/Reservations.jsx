@@ -278,7 +278,109 @@ function GuestSearchPopup({ onSelect, onClose }) {
 /*  NEW RESERVATION FORM                                                */
 /* ================================================================== */
 const SALUTATIONS = ['Mr.', 'Ms.', 'Mrs.', 'Dr.', 'Prof.', 'Engr.']
+/* ── Service Combobox ── */
+function ServiceCombobox({ items, addons, onSelect }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useRef(null)
+  const inputRef = useRef(null)
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 30)
+  }, [open])
+
+  const filtered = query
+    ? items.filter(it => it.name.toLowerCase().includes(query.toLowerCase()))
+    : items
+
+  const selectedCount = Object.values(addons).filter(a => a.selected).length
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="input w-full text-left flex items-center justify-between gap-2 cursor-pointer"
+      >
+        <span className={selectedCount > 0 ? 'text-pine' : 'text-pine/40'}>
+          {selectedCount > 0 ? `${selectedCount} service${selectedCount > 1 ? 's' : ''} selected` : 'Search and select services…'}
+        </span>
+        <svg className={`w-4 h-4 text-pine/40 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-leaf rounded-xl shadow-lg overflow-hidden">
+          {/* Search input */}
+          <div className="p-2 border-b border-leaf">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search services…"
+              className="w-full text-sm px-2 py-1.5 rounded-lg border border-leaf focus:outline-none focus:ring-2 focus:ring-forest/30"
+              onKeyDown={e => e.key === 'Escape' && setOpen(false)}
+            />
+          </div>
+
+          {/* Options */}
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 && (
+              <div className="px-3 py-3 text-sm text-pine/40 text-center">No services found</div>
+            )}
+            {filtered.map(it => {
+              const selected = addons[it.id]?.selected
+              return (
+                <button
+                  key={it.id}
+                  type="button"
+                  onClick={() => onSelect(it.id)}
+                  className={`w-full text-left px-3 py-2.5 text-sm flex items-center justify-between gap-2 hover:bg-leaf/40 transition-colors ${selected ? 'bg-forest/8 text-forest' : 'text-pine'}`}
+                >
+                  <span className="flex items-center gap-2">
+                    {/* Checkbox indicator */}
+                    <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-forest border-forest' : 'border-leaf'}`}>
+                      {selected && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="font-medium">{it.name}</span>
+                    <span className="text-pine/40 text-xs">/{it.unit}</span>
+                  </span>
+                  <span className="money text-xs text-pine/60 shrink-0">{fmtBDT(it.default_price)}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="px-3 py-2 border-t border-leaf flex justify-between items-center">
+            <span className="text-xs text-pine/40">{selectedCount} selected</span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="text-xs text-forest font-semibold hover:underline"
+            >Done</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 function NewReservation({ close, openReservation, userName, prefill }) {
   const t        = todayISO()
   const tomorrow = (d) => { const dt = new Date(d); dt.setDate(dt.getDate() + 1); return dt.toISOString().slice(0, 10) }
@@ -752,44 +854,56 @@ function NewReservation({ close, openReservation, userName, prefill }) {
               )}
             </div>
 
-            {/* Included Services — searchable, #3 */}
+            {/* Included Services — Combobox style */}
             <div className="col-span-2">
-              <label className="label">Included Services</label>              
+              <label className="label">Included Services</label>
+              <p className="text-xs text-pine/50 mb-2">Select services included with this booking.</p>
+            
+              {facilityItems.length === 0 && (
+                <p className="text-xs text-amber py-2">No active Facility Items — add in Configuration → Facility Items.</p>
+              )}
+            
               {facilityItems.length > 0 && (
                 <>
-                  {/* Search + Add */}
-                  <div className="flex gap-2 mb-3">
-                    <div className="relative flex-1">
-                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pine/30" />
-                      <input
-                        className="input !pl-8 text-sm"
-                        placeholder="Search services…"
-                        value={serviceSearch}
-                        onChange={(e) => setServiceSearch(e.target.value)}
-                      />
-                      {serviceSearch && (
-                        <button onClick={() => setServiceSearch('')}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-pine/30 hover:text-pine">
-                          <X size={13} />
-                        </button>
-                      )}
+                  {/* Combobox dropdown */}
+                  <ServiceCombobox
+                    items={facilityItems}
+                    addons={addons}
+                    onSelect={(id) => { toggleAddon(id) }}
+                  />
+            
+                  {/* Selected services */}
+                  {Object.values(addons).some(a => a.selected) && (
+                    <div className="space-y-2 mt-3">
+                      {facilityItems.filter(it => addons[it.id]?.selected).map(it => (
+                        <div key={it.id} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-forest bg-forest/5">
+                          <span className="text-sm flex-1 font-medium text-pine">
+                            {it.name}
+                            <span className="text-pine/40 text-xs ml-1">/{it.unit}</span>
+                          </span>
+                          <input type="number" min="0" step="0.01"
+                            className="input !w-24 !py-1 money text-right"
+                            placeholder="Price ৳"
+                            value={addons[it.id].price}
+                            onChange={(e) => updAddon(it.id, 'price', e.target.value)} />
+                          <input type="number" min="1"
+                            className="input !w-14 !py-1 money text-right"
+                            placeholder="Qty"
+                            value={addons[it.id].qty}
+                            onChange={(e) => updAddon(it.id, 'qty', e.target.value)} />
+                          <button onClick={() => toggleAddon(it.id)} className="text-red-300 hover:text-red-600 shrink-0">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                    {/* Add matched item */}
-                    {serviceSearch && (() => {
-                      const match = facilityItems.find(it =>
-                        it.name.toLowerCase().includes(serviceSearch.toLowerCase()) && !addons[it.id]?.selected
-                      )
-                      return match ? (
-                        <button
-                          type="button"
-                          onClick={() => { toggleAddon(match.id); setServiceSearch('') }}
-                          className="btn-primary !py-1.5 text-xs shrink-0"
-                        >
-                          + Add "{match.name}"
-                        </button>
-                      ) : null
-                    })()}
-                  </div>
+                  )}
+                  {!Object.values(addons).some(a => a.selected) && (
+                    <p className="text-xs text-pine/40 mt-2">No services selected yet.</p>
+                  )}
+                </>
+              )}
+            </div>
 
                   {/* Selected services chips */}
                   {Object.values(addons).some(a => a.selected) && (
