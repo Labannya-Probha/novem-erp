@@ -29,7 +29,23 @@ import AccountingHub, {
   TransactionMappingPage,
   VendorPaymentPage,
 } from './pages/AccountingHub.jsx'
-import HrOffice from './pages/HrOffice.jsx'
+import HrOffice, {
+  HrEmployeeEntryPage,
+  HrServiceBookPage,
+  HrNomineePage,
+  HrLeaveEntryPage,
+  HrCompLeavePage,
+  HrFestivalLeavePage,
+  HrPayrollConfigPage,
+  HrPayrollGenPage,
+  HrPayrollRegisterPage,
+  HrLetterPage,
+  HrAttendanceRegisterPage,
+  HrEmployeeRegisterPage,
+  HrServiceBookRegPage,
+  HrIncidentsPage,
+  HrCompliancePage,
+} from './pages/HrOffice.jsx'
 import NightAudit from './pages/NightAudit.jsx'
 import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
@@ -41,6 +57,7 @@ import {
   FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, Building2,
   Menu, X, ListChecks, ChevronDown, Bot, ChefHat, ClipboardList,
   BookOpen, Scale, BookMarked, Landmark, Lock, ArrowLeftRight, CreditCard, Wallet,
+  UserCog, CalendarCheck, BadgeDollarSign, FileStack, ClipboardCheck,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -78,8 +95,8 @@ const NAV_GROUPS = [
     { id: 'inventory',   label: 'Inventory',         icon: Boxes },
     { id: 'consumption', label: 'Consumption Entry', icon: ClipboardList },
   ]},
-  { title: 'HR & Admin', items: [
-    { id: 'hr', label: 'HR & Office', icon: Users },
+  { title: 'HR & Payroll', items: [
+    { id: 'hr', label: 'HR & Payroll', icon: Users },
   ]},
   { title: 'Insight', items: [
     { id: 'reports', label: 'Reports', icon: BarChart3 },
@@ -142,6 +159,62 @@ const SIDEBAR_ACCOUNTING_TABS = [
   { id: 'vat',                 label: 'VAT Centre',          icon: Wallet,         path: '/vat' },
 ]
 
+const SIDEBAR_HR_TABS = [
+  {
+    id: 'employee-mgmt', label: 'Employee Mgmt', icon: UserCog,
+    children: [
+      { id: 'employee-entry',   label: 'Employee Entry',          path: '/hr/employee-entry' },
+      { id: 'service-book',     label: 'Service Book Entry',      path: '/hr/service-book' },
+      { id: 'nominee',          label: 'Nominee Declaration',     path: '/hr/nominee' },
+    ],
+  },
+  {
+    id: 'leave-mgmt', label: 'Leave Mgmt', icon: CalendarCheck,
+    children: [
+      { id: 'leave-entry',      label: 'Leave Entry',             path: '/hr/leave-entry' },
+      { id: 'comp-leave',       label: 'Comp Leave Mgmt',         path: '/hr/comp-leave' },
+      { id: 'festival-leave',   label: 'Festival Leave Mgmt',     path: '/hr/festival-leave' },
+    ],
+  },
+  {
+    id: 'payroll-mgmt', label: 'Payroll Mgmt', icon: BadgeDollarSign,
+    children: [
+      { id: 'payroll-config',   label: 'Payroll Configuration',   path: '/hr/payroll-config' },
+      { id: 'payroll-gen',      label: 'Payroll Generation',      path: '/hr/payroll-gen' },
+      { id: 'payroll-register', label: 'Payroll Register',        path: '/hr/payroll-register' },
+    ],
+  },
+  {
+    id: 'hr-letters', label: 'HR Letters', icon: FileStack,
+    children: [
+      { id: 'offer-letter',        label: 'Offer Letter',            path: '/hr/offer-letter' },
+      { id: 'appointment-letter',  label: 'Appointment Letter',      path: '/hr/appointment-letter' },
+      { id: 'joining-letter',      label: 'Joining Letter',          path: '/hr/joining-letter' },
+      { id: 'confirmation-letter', label: 'Confirmation Letter',     path: '/hr/confirmation-letter' },
+      { id: 'increment-letter',    label: 'Salary Increment Letter', path: '/hr/increment-letter' },
+      { id: 'promotion-letter',    label: 'Promotion Letter',        path: '/hr/promotion-letter' },
+      { id: 'objection-letter',    label: 'Objection Letter',        path: '/hr/objection-letter' },
+      { id: 'show-cause',          label: 'Show Cause Letter',       path: '/hr/show-cause' },
+      { id: 'warning-letter',      label: 'Warning Letter',          path: '/hr/warning-letter' },
+      { id: 'dismissal-letter',    label: 'Letter of Dismissal',     path: '/hr/dismissal-letter' },
+      { id: 'noc',                 label: 'No Objection Certificate',path: '/hr/noc' },
+      { id: 'experience-cert',     label: 'Experience Certificate',  path: '/hr/experience-cert' },
+      { id: 'employment-cert',     label: 'Employment Certificate',  path: '/hr/employment-cert' },
+      { id: 'final-payment',       label: 'Final Payment Letter',    path: '/hr/final-payment' },
+    ],
+  },
+  {
+    id: 'register', label: 'Register', icon: ClipboardCheck,
+    children: [
+      { id: 'attendance-register', label: 'Attendance Register',    path: '/hr/attendance-register' },
+      { id: 'employee-register',   label: 'Employee Register (Form-8)', path: '/hr/employee-register' },
+      { id: 'service-book-reg',    label: 'Service Book',           path: '/hr/service-book-reg' },
+      { id: 'incidents',           label: 'Incidents',              path: '/hr/incidents' },
+      { id: 'compliance',          label: 'Compliance',             path: '/hr/compliance' },
+    ],
+  },
+]
+
 function firstAccessiblePath(role, privileges) {
   for (const id of ALL_NAV_IDS) {
     if (id === 'dashboard' || can(role, id, privileges)) return `/${id}`
@@ -152,7 +225,39 @@ function firstAccessiblePath(role, privileges) {
 /* ------------------------------------------------------------------ */
 /*  APP SHELL                                                           */
 /* ------------------------------------------------------------------ */
-function AppShell({ company, role, isAdmin, userName, loadCompany, privileges }) {
+  function HrSubGroup({ grp, navigate, location }) {
+    const [open, setOpen] = useState(grp.active)
+    return (
+      <div>
+        <button
+          onClick={() => setOpen((p) => !p)}
+          className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center justify-between gap-2 ${
+            grp.active ? 'text-white font-semibold' : 'text-white/65 hover:text-white'
+          }`}>
+          <span className="flex items-center gap-2">
+            {grp.icon && <grp.icon size={12} className="shrink-0 opacity-70" />}
+            {grp.label}
+          </span>
+          <ChevronDown size={10} className={`transition-transform ${open ? '' : '-rotate-90'}`} />
+        </button>
+        {open && (
+          <div className="ml-4 space-y-0.5 mt-0.5">
+            {grp.children.map((c) => (
+              <button key={c.id}
+                className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
+                  c.active ? 'bg-white/14 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+                onClick={() => navigate(c.path)}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+  
+  function AppShell({ company, role, isAdmin, userName, loadCompany, privileges }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileNavOpen,  setMobileNavOpen]  = useState(false)
@@ -175,10 +280,12 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
   }, [currentTopId])
   useEffect(() => {
     const isAccountingRoute = location.pathname.startsWith('/accounting') || location.pathname === '/vat'
-    if (['settings', 'cms', 'inventory', 'consumption'].includes(currentTopId) || isAccountingRoute) {
+    const isHrRoute = location.pathname.startsWith('/hr')
+    if (['settings', 'cms', 'inventory', 'consumption'].includes(currentTopId) || isAccountingRoute || isHrRoute) {
       setOpenSystemMenu(
         ['inventory', 'consumption'].includes(currentTopId) ? 'inventory' :
         isAccountingRoute ? 'accounting' :
+        isHrRoute ? 'hr' :
         currentTopId
       )
     } else setOpenSystemMenu(null)
@@ -225,7 +332,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
                     // Items that are folded into a parent's sub-nav are hidden at top level
                     if (n.id === 'consumption' || n.id === 'vat') return null
 
-                    const isExpandable = ['settings', 'cms', 'inventory', 'accounting'].includes(n.id)
+                    const isExpandable = ['settings', 'cms', 'inventory', 'accounting', 'hr'].includes(n.id)
                     if (!isExpandable) {
                       return (
                         <button key={n.id}
@@ -268,6 +375,15 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
                             ? currentTopId === 'vat'
                             : location.pathname === s.path,
                         }))
+                    } else if (n.id === 'hr') {
+                      nested = SIDEBAR_HR_TABS.map((grp) => ({
+                        ...grp,
+                        active: grp.children.some((c) => location.pathname === c.path),
+                        children: grp.children.map((c) => ({
+                          ...c,
+                          active: location.pathname === c.path,
+                        })),
+                      }))
                     }
 
                     return (
@@ -291,16 +407,20 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
                         </button>
                         {isOpen && (
                           <div className="ml-6 space-y-0.5">
-                            {nested.map((child) => (
-                              <button key={child.id}
-                                className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
-                                  child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
-                                }`}
-                                onClick={() => navigate(child.path)}>
-                                {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
-                                {child.label}
-                              </button>
-                            ))}
+                            {nested.map((child) =>
+                              child.children ? (
+                                <HrSubGroup key={child.id} grp={child} navigate={navigate} location={location} />
+                              ) : (
+                                <button key={child.id}
+                                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
+                                    child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
+                                  }`}
+                                  onClick={() => navigate(child.path)}>
+                                  {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
+                                  {child.label}
+                                </button>
+                              )
+                            )}
                           </div>
                         )}
                       </div>
@@ -487,12 +607,36 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
             </GuardedRoute>
           } />
 
-          {/* HR */}
-          <Route path="/hr" element={
-            <GuardedRoute role={role} navId="hr" privileges={privileges}>
-              <HrOffice userName={userName} role={role} isAdmin={isAdmin} company={company} />
-            </GuardedRoute>
-          } />
+          {/* HR & Payroll */}
+          <Route path="/hr" element={<Navigate to="/hr/employee-entry" replace />} />
+          <Route path="/hr/employee-entry"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrEmployeeEntryPage      userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/service-book"        element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrServiceBookPage         userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/nominee"             element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrNomineePage             userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/leave-entry"         element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLeaveEntryPage          userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/comp-leave"          element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrCompLeavePage           userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/festival-leave"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrFestivalLeavePage       userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/payroll-config"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrPayrollConfigPage       userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/payroll-gen"         element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrPayrollGenPage          userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/payroll-register"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrPayrollRegisterPage     userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
+          <Route path="/hr/offer-letter"        element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="OFFER_LETTER"        company={company} /></GuardedRoute>} />
+          <Route path="/hr/appointment-letter"  element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="APPOINTMENT"        company={company} /></GuardedRoute>} />
+          <Route path="/hr/joining-letter"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="JOINING"            company={company} /></GuardedRoute>} />
+          <Route path="/hr/confirmation-letter" element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="CONFIRMATION"       company={company} /></GuardedRoute>} />
+          <Route path="/hr/increment-letter"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="SALARY_INCREMENT"   company={company} /></GuardedRoute>} />
+          <Route path="/hr/promotion-letter"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="PROMOTION"          company={company} /></GuardedRoute>} />
+          <Route path="/hr/objection-letter"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="OBJECTION"          company={company} /></GuardedRoute>} />
+          <Route path="/hr/show-cause"          element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="SHOW_CAUSE"         company={company} /></GuardedRoute>} />
+          <Route path="/hr/warning-letter"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="WARNING"            company={company} /></GuardedRoute>} />
+          <Route path="/hr/dismissal-letter"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="RELIEVING"          company={company} /></GuardedRoute>} />
+          <Route path="/hr/noc"                 element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="NOC"                company={company} /></GuardedRoute>} />
+          <Route path="/hr/experience-cert"     element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="EXP_CERT"           company={company} /></GuardedRoute>} />
+          <Route path="/hr/employment-cert"     element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="SALARY_CERT"        company={company} /></GuardedRoute>} />
+          <Route path="/hr/final-payment"       element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="FINAL_PAYMENT"      company={company} /></GuardedRoute>} />
+          <Route path="/hr/attendance-register" element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrAttendanceRegisterPage flash={(m)=>m} /></GuardedRoute>} />
+          <Route path="/hr/employee-register"   element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrEmployeeRegisterPage   role={role} /></GuardedRoute>} />
+          <Route path="/hr/service-book-reg"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrServiceBookRegPage      userName={userName} /></GuardedRoute>} />
+          <Route path="/hr/incidents"           element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrIncidentsPage           userName={userName} flash={(m)=>m} /></GuardedRoute>} />
+          <Route path="/hr/compliance"          element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrCompliancePage          role={role} /></GuardedRoute>} />
 
           {/* Reports */}
           <Route path="/reports" element={
