@@ -269,7 +269,7 @@ function firstAccessiblePath(role, privileges) {
     } else setOpenSystemMenu(null)
   }, [currentTopId, location.pathname])
 
-  const SidebarContent = (
+    const SidebarContent = (
     <>
       <div className="px-5 py-5 flex items-center gap-3 border-b border-white/10">
         <BrandLogo url={company?.logo_url} />
@@ -282,7 +282,7 @@ function firstAccessiblePath(role, privileges) {
         </button>
       </div>
 
-            <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
         {NAV_GROUPS.map((g) => {
           const items = g.items.filter((n) => {
             if (n.superuserOnly)            return role === 'SUPERUSER'
@@ -363,9 +363,9 @@ function firstAccessiblePath(role, privileges) {
                           }`}
                           onClick={() => {
                             setOpenSystemMenu(isOpen ? null : n.id)
-                            if (!isOpen && ['inventory', 'accounting'].includes(n.id)) {
+                            if (!isOpen && ['inventory', 'accounting', 'hr'].includes(n.id)) {
                               navigate(`/${n.id}`)
-                            } else if (!['inventory', 'accounting'].includes(n.id)) {
+                            } else if (!['inventory', 'accounting', 'hr'].includes(n.id)) {
                               navigate(`/${n.id}`)
                             }
                           }}
@@ -398,6 +398,7 @@ function firstAccessiblePath(role, privileges) {
           )
         })}
       </nav>
+
       <div className="px-5 py-4 border-t border-white/10 text-xs text-white/65">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -407,7 +408,7 @@ function firstAccessiblePath(role, privileges) {
           <button title="Sign out" onClick={async () => {
             const tenantId = getTenantId()
             await supabase.auth.signOut()
-              const { data: prop } = await supabase
+            const { data: prop } = await supabase
               .from('properties')
               .select('slug')
               .eq('id', tenantId)
