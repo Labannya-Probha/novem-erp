@@ -538,7 +538,7 @@ function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
         const updatePayload = {
           jv_date: head.jv_date,
           narration: head.narration,
-          source: head.voucher_type === 'JV' ? 'MANUAL' : `MANUAL_${head.voucher_type}`,
+          source: head.voucher_type === 'JV' ? 'MANUAL' : `MANUAL_${head.voucher_type}`, 
         }
         if (existing?.jv_no) updatePayload.jv_no = voucherNoForType(existing.jv_no, head.voucher_type)
         const { error: ue } = await supabase.from('journal_entries')
