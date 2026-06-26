@@ -42,10 +42,22 @@ export default function AccountingHub({ userName, isAdmin, role }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   const loadAccounts = async () => {
-    const { data } = await supabase.from('chart_of_accounts').select('*').eq('is_active', true).order('code')
-    setAccounts(data || [])
-  }
+  const tenantId = getTenantId()
+  let q = supabase
+    .from('chart_of_accounts')
+    .select('*')
+    .eq('is_active', true)
 
+  if (tenantId) q = q.eq('tenant_id', tenantId)
+
+  const { data, error } = await q.order('code')
+  if (error) {
+    console.error('loadAccounts error:', error)
+    setAccounts([])
+    return
+  }
+  setAccounts(data || [])
+}
   useEffect(() => {
     loadAccounts()
     supabase.from('company_settings').select('*').limit(1).single()
@@ -1594,9 +1606,22 @@ export function ChartOfAccountsPage({ isAdmin }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   const loadAccounts = async () => {
-    const { data } = await supabase.from('chart_of_accounts').select('*').eq('is_active', true).order('code')
-    setAccounts(data || [])
+  const tenantId = getTenantId()
+  let q = supabase
+    .from('chart_of_accounts')
+    .select('*')
+    .eq('is_active', true)
+
+  if (tenantId) q = q.eq('tenant_id', tenantId)
+
+  const { data, error } = await q.order('code')
+  if (error) {
+    console.error('loadAccounts error:', error)
+    setAccounts([])
+    return
   }
+  setAccounts(data || [])
+}
   useEffect(() => { loadAccounts() }, [])
 
   return (
