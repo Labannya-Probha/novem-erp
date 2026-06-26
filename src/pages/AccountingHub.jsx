@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
+import { getTenantId } from '../lib/tenant'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
 import {
   Calculator, Plus, Trash2, Scale, Building2, Printer, Pencil,
@@ -42,22 +43,17 @@ export default function AccountingHub({ userName, isAdmin, role }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   const loadAccounts = async () => {
-  const tenantId = getTenantId()
-  let q = supabase
-    .from('chart_of_accounts')
-    .select('*')
-    .eq('is_active', true)
-
-  if (tenantId) q = q.eq('tenant_id', tenantId)
-
-  const { data, error } = await q.order('code')
-  if (error) {
-    console.error('loadAccounts error:', error)
-    setAccounts([])
-    return
+    const tenantId = getTenantId()
+    let q = supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .eq('is_active', true)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    const { data, error } = await q.order('code')
+    if (error) { console.error('loadAccounts error:', error); setAccounts([]); return }
+    setAccounts(data || [])
   }
-  setAccounts(data || [])
-}
+
   useEffect(() => {
     loadAccounts()
     supabase.from('company_settings').select('*').limit(1).single()
@@ -1567,9 +1563,16 @@ export function VoucherEntryPage({ userName, isAdmin, role }) {
   const [msg, setMsg]           = useState('')
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
+  const loadAccounts = async () => {
+    const tenantId = getTenantId()
+    let q = supabase.from('chart_of_accounts').select('*').eq('is_active', true)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    const { data } = await q.order('code')
+    setAccounts(data || [])
+  }
+
   useEffect(() => {
-    supabase.from('chart_of_accounts').select('*').eq('is_active', true).order('code')
-      .then(({ data }) => setAccounts(data || []))
+    loadAccounts()
     supabase.from('company_settings').select('*').limit(1).single()
       .then(({ data }) => setCompany(data))
   }, [])
@@ -1606,22 +1609,16 @@ export function ChartOfAccountsPage({ isAdmin }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   const loadAccounts = async () => {
-  const tenantId = getTenantId()
-  let q = supabase
-    .from('chart_of_accounts')
-    .select('*')
-    .eq('is_active', true)
-
-  if (tenantId) q = q.eq('tenant_id', tenantId)
-
-  const { data, error } = await q.order('code')
-  if (error) {
-    console.error('loadAccounts error:', error)
-    setAccounts([])
-    return
+    const tenantId = getTenantId()
+    let q = supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .eq('is_active', true)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    const { data, error } = await q.order('code')
+    if (error) { console.error('loadAccounts error:', error); setAccounts([]); return }
+    setAccounts(data || [])
   }
-  setAccounts(data || [])
-}
   useEffect(() => { loadAccounts() }, [])
 
   return (
@@ -1643,8 +1640,10 @@ export function FixedAssetsPage({ userName }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   useEffect(() => {
-    supabase.from('chart_of_accounts').select('*').eq('is_active', true).order('code')
-      .then(({ data }) => setAccounts(data || []))
+    const tenantId = getTenantId()
+    let q = supabase.from('chart_of_accounts').select('*').eq('is_active', true)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    q.order('code').then(({ data }) => setAccounts(data || []))
   }, [])
 
   return (
@@ -1666,8 +1665,10 @@ export function OpeningBalancePage({ userName }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   useEffect(() => {
-    supabase.from('chart_of_accounts').select('*').eq('is_active', true).order('code')
-      .then(({ data }) => setAccounts(data || []))
+    const tenantId = getTenantId()
+    let q = supabase.from('chart_of_accounts').select('*').eq('is_active', true)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    q.order('code').then(({ data }) => setAccounts(data || []))
   }, [])
 
   return (
@@ -1689,8 +1690,10 @@ export function TransactionMappingPage({ userName }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   useEffect(() => {
-    supabase.from('chart_of_accounts').select('*').eq('is_active', true).order('code')
-      .then(({ data }) => setAccounts(data || []))
+    const tenantId = getTenantId()
+    let q = supabase.from('chart_of_accounts').select('*').eq('is_active', true)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    q.order('code').then(({ data }) => setAccounts(data || []))
   }, [])
 
   return (
