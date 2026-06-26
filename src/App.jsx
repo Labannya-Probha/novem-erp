@@ -306,7 +306,7 @@ function firstAccessiblePath(role, privileges) {
 
               {isOpenGroup && (
                 <div className="space-y-0.5 mb-1">
-                  {items.map((n) => {
+                                    {items.map((n) => {
                     // Items that are folded into a parent's sub-nav are hidden at top level
                     if (n.id === 'consumption' || n.id === 'vat') return null
 
@@ -395,9 +395,18 @@ function firstAccessiblePath(role, privileges) {
                             ))}
                           </div>
                         )}
+                      </div>
+                    )
+                  })}
+                  </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )
         })}
+      </div>
       </nav>
 
       <div className="px-5 py-4 border-t border-white/10 text-xs text-white/65">
