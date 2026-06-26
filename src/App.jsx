@@ -511,7 +511,7 @@ function AppRoot() {
       applyBrandTheme(fallbackTheme)
       return
     }
-    supabase.from('app_users').select('*').eq('id', session.user.id).maybeSingle()
+    supabase.from('app_users').select('*').eq('auth_id', session.user.id).maybeSingle()
       .then(({ data }) => {
         const fallbackProfile = { role: 'FRONT_OFFICE', full_name: session.user.email?.split('@')[0] }
         const nextProfile = data || fallbackProfile
