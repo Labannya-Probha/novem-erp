@@ -35,11 +35,12 @@ import ReportsHub from './pages/ReportsHub.jsx'
 import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
-import VendorPaymentTab from '../components/VendorPaymentTab.jsx'
+import VendorPaymentTab from './components/VendorPaymentTab.jsx'
 import {
   Leaf, LayoutDashboard, CalendarDays, UtensilsCrossed, ShoppingBasket, Boxes,
   FileSpreadsheet, Calculator, Users, MoonStar, BarChart3, Settings2, LogOut, BedDouble, Building2,
   Menu, X, ListChecks, ChevronDown, Bot, ChefHat, ClipboardList,
+  BookOpen, Scale, BookMarked, Landmark, Lock, ArrowLeftRight, CreditCard, Wallet,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -71,14 +72,7 @@ const NAV_GROUPS = [
     { id: 'menu-management', label: 'Menu Management', icon: ChefHat },
   ]},
   { title: 'Accounting', items: [
-    { id: 'Journal Vouchers',    label: 'Journal Vouchers' },
-    { id: 'Trial Balance',       label: 'Trial Balance' },
-    { id: 'Chart of Accounts',   label: 'Chart of Accounts' },
-    { id: 'Fixed Assets',        label: 'Fixed Assets' },
-    { id: 'Opening Balance',     label: 'Opening Balance',    adminOnly: true },
-    { id: 'Transaction Mapping', label: 'Transaction Mapping', adminOnly: true },
-    { id: 'Vendor Payments',     label: 'Vendor Payments' },
-    { id: 'vat',        label: 'VAT Center',  icon: FileSpreadsheet },
+    { id: 'accounting', label: 'Accounting', icon: Calculator },
   ]},
   { title: 'Inventory', items: [
     { id: 'inventory',   label: 'Inventory',         icon: Boxes },
@@ -273,9 +267,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
                           active: s.id === 'vat'
                             ? currentTopId === 'vat'
                             : location.pathname === s.path,
-                        })),
-                        { id: 'vat', label: 'VAT Centre', path: '/vat', active: currentTopId === 'vat' },
-                      ]
+                        }))
                     }
 
                     return (
@@ -301,10 +293,11 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
                           <div className="ml-6 space-y-0.5">
                             {nested.map((child) => (
                               <button key={child.id}
-                                className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                                className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
                                   child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
                                 }`}
                                 onClick={() => navigate(child.path)}>
+                                {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
                                 {child.label}
                               </button>
                             ))}
