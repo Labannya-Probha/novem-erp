@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
 import KPICards from '../components/KPICards.jsx'
@@ -40,7 +41,7 @@ function printInventoryDoc({ title, docNo, meta = [], lines = [] }) {
         <td>${esc(l.item_name || '—')}</td>
         <td style="text-align:right">${Number(l.qty || 0)}</td>
         <td style="text-align:right">${Number(l.unit_cost || 0).toFixed(2)}</td>
-        <td style="text-align:right">${Number(l.vat_amount ?? l.vat_pct ?? 0).toFixed(2)}</td>
+        <td style="text-align:right">${(Number(l.qty || 0) * Number(l.unit_cost || 0)).toFixed(2)}</td>
       </tr>`).join('')
   const metaRows = meta.map((m) => `<div><b>${esc(m.label)}:</b> ${esc(m.value)}</div>`).join('')
   const html = `<!doctype html>
@@ -58,7 +59,7 @@ function printInventoryDoc({ title, docNo, meta = [], lines = [] }) {
     <div class="muted"><b>Document:</b> ${esc(docNo)} | <b>Printed:</b> ${new Date().toLocaleString()}</div>
     ${metaRows}
     <table>
-      <thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Unit Cost</th><th>VAT</th></tr></thead>
+      <thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Unit Cost</th><th>Total</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="5">No lines</td></tr>'}</tbody>
     </table>
     <script>window.print();</script>
@@ -70,10 +71,19 @@ function printInventoryDoc({ title, docNo, meta = [], lines = [] }) {
 
 /* ─── main component ─────────────────────────────────────────────────────── */
 export default function InventoryHub({ userName, role, isAdmin }) {
-  const [tab, setTab] = useState('Items & Stock')
+  const location = useLocation()
+  const urlTab = new URLSearchParams(location.search).get('tab')
+  const initialTab = TABS.includes(urlTab) ? urlTab : 'Items & Stock'
+  const [tab, setTab] = useState(initialTab)
   const [msg, setMsg] = useState(null)
   const flash = flash_fn(setMsg)
   const canApprove = isAdmin || role === 'MANAGER'
+
+  // Sync tab with URL param when navigating via sidebar sub-items
+  useEffect(() => {
+    const t = new URLSearchParams(location.search).get('tab')
+    if (t && TABS.includes(t)) setTab(t)
+  }, [location.search])
 
   // Cross-tab navigation: Requisitions can push user to PO or Transfer tab
   // with a pre-selected requisition
@@ -295,7 +305,7 @@ function VendorsTab({ flash, isAdmin }) {
 
 /* ─── shared LineEditor ──────────────────────────────────────────────────── */
 function LineEditor({ items, lines, setLines, withCost = false, readOnly = false }) {
-  const add = () => setLines([...lines, { item_id: '', item_name: '', qty: 1, unit_cost: 0, vat_pct: 0, unit: '' }])
+  const add = () => setLines([...lines, { item_id: '', item_name: '', qty: 1, unit_cost: 0, unit: '' }])
   const upd = (i, k, v) => {
     const n = [...lines]; n[i] = { ...n[i], [k]: v }
     if (k === 'item_id') { const it = items.find((x) => x.id === v); n[i].item_name = it?.name || ''; n[i].unit = it?.unit || '' }
@@ -310,7 +320,7 @@ function LineEditor({ items, lines, setLines, withCost = false, readOnly = false
       <div className="grid grid-cols-12 gap-1 text-xs text-pine/50 font-semibold px-1">
         <span className="col-span-5">Item</span>
         <span className="col-span-2 text-right">Qty</span>
-        {withCost && <><span className="col-span-2 text-right">Unit cost</span><span className="col-span-2 text-right">VAT (Tk)</span></>}
+        {withCost && <><span className="col-span-2 text-right">Unit cost</span><span className="col-span-2 text-right">Total</span></>}
       </div>
       {lines.map((l, i) => (
         <div key={i} className="grid grid-cols-12 gap-1 items-center">
@@ -326,7 +336,7 @@ function LineEditor({ items, lines, setLines, withCost = false, readOnly = false
           {withCost && (
             <>
               <input type="number" readOnly={readOnly} className={`input col-span-2 money text-right text-sm ${readOnly ? 'bg-leaf/20' : ''}`} value={l.unit_cost} onChange={(e) => upd(i, 'unit_cost', e.target.value)} />
-              <input type="number" readOnly={readOnly} className={`input col-span-2 money text-right text-sm ${readOnly ? 'bg-leaf/20' : ''}`} value={l.vat_pct} onChange={(e) => upd(i, 'vat_pct', e.target.value)} />
+              <span className={`col-span-2 money text-right text-sm px-1 py-1 ${readOnly ? 'text-pine/60' : 'text-pine'}`}>{(Number(l.qty || 0) * Number(l.unit_cost || 0)).toFixed(2)}</span>
             </>
           )}
           {!readOnly && <button className="text-red-300 hover:text-red-600 col-span-1 flex justify-center" onClick={() => del(i)}><Trash2 size={14} /></button>}
@@ -625,7 +635,7 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
       const { error } = await supabase.from('purchase_orders').update({ vendor_id: vendor, notes: notes || null }).eq('id', editId)
       if (error) { flash(error.message, 'error'); return }
       await supabase.from('po_items').delete().eq('po_id', editId)
-      await supabase.from('po_items').insert(lines.map((l) => ({ po_id: editId, item_id: l.item_id, item_name: l.item_name, qty: +l.qty, unit_cost: +l.unit_cost, vat_pct: +l.vat_pct })))
+      await supabase.from('po_items').insert(lines.map((l) => ({ po_id: editId, item_id: l.item_id, item_name: l.item_name, qty: +l.qty, unit_cost: +l.unit_cost })))
       resetForm()
       load()
       flash('Purchase order updated.')
@@ -633,7 +643,7 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
     }
     const { data: po, error } = await supabase.from('purchase_orders').insert({ vendor_id: vendor, requisition_id: reqId || null, notes: notes || null, created_by: userName, status: 'PENDING_APPROVAL' }).select().single()
     if (error) { flash(error.message, 'error'); return }
-    await supabase.from('po_items').insert(lines.map((l) => ({ po_id: po.id, item_id: l.item_id, item_name: l.item_name, qty: +l.qty, unit_cost: +l.unit_cost, vat_pct: +l.vat_pct })))
+    await supabase.from('po_items').insert(lines.map((l) => ({ po_id: po.id, item_id: l.item_id, item_name: l.item_name, qty: +l.qty, unit_cost: +l.unit_cost })))
     resetForm()
     load()
     flash(`✓ ${po.po_no} তৈরি হয়েছে${reqNo ? ` (REQ: ${reqNo})` : ''}.`)
@@ -670,7 +680,6 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
       item_name: it.item_name || '',
       qty: Number(it.qty || 0),
       unit_cost: Number(it.unit_cost || 0),
-      vat_pct: Number(it.vat_pct || 0),
       unit: '',
     })))
   }
@@ -715,13 +724,18 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
             <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
           </div>
         </div>
-        <p className="text-xs text-pine/40">Unit cost (৳) + VAT amount (৳) per line — feeds the Mushak-6.1 purchase register.</p>
+        <p className="text-xs text-pine/40">Unit cost (৳) per line — total amount auto-calculated.</p>
         <LineEditor items={items} lines={lines} setLines={setLines} withCost={true} />
-        <div className="flex gap-2">
-          <button className="btn-primary" onClick={create}>
-            {editId ? <><Save size={15} /> Update PO</> : <><Truck size={15} /> Create PO</>}
-          </button>
-          {editId && <button className="btn-ghost" onClick={resetForm}>Cancel edit</button>}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <button className="btn-primary" onClick={create}>
+              {editId ? <><Save size={15} /> Update PO</> : <><Truck size={15} /> Create PO</>}
+            </button>
+            {editId && <button className="btn-ghost" onClick={resetForm}>Cancel edit</button>}
+          </div>
+          <div className="text-sm font-semibold text-pine money">
+            Total: {fmtBDT(lines.reduce((a, l) => a + Number(l.qty || 0) * Number(l.unit_cost || 0), 0))}
+          </div>
         </div>
       </div>
 
@@ -775,8 +789,7 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
                             <span className="font-medium w-40">{it.item_name}</span>
                             <span>Qty: {it.qty}</span>
                             <span>Rate: {fmtBDT(it.unit_cost)}</span>
-                            <span>VAT: {fmtBDT(it.vat_pct)}</span>
-                            <span className="font-semibold">Total: {fmtBDT(+it.qty * +it.unit_cost)}</span>
+                            <span>Total: {fmtBDT(+it.qty * +it.unit_cost)}</span>
                           </div>
                         ))}
                         {po.approved_by && <div className="text-forest/70 mt-1">Approved by: {po.approved_by}</div>}
@@ -826,7 +839,7 @@ function GRNTab({ flash, userName }) {
     setH((prev) => ({ ...prev, po_id: poId, vendor_id: po.vendor_id }))
     setLines((po.po_items || []).map((it) => ({
       item_id: it.item_id, item_name: it.item_name, qty: it.qty,
-      unit_cost: it.unit_cost, vat_pct: it.vat_pct, unit: '',
+      unit_cost: it.unit_cost, unit: '',
     })))
   }
 
@@ -852,7 +865,7 @@ function GRNTab({ flash, userName }) {
       await supabase.from('grn_items').delete().eq('grn_id', editId)
       await supabase.from('grn_items').insert(lines.map((l) => ({
         grn_id: editId, item_id: l.item_id, item_name: l.item_name,
-        qty: +l.qty, unit_cost: +l.unit_cost, vat_amount: +(l.vat_amount ?? l.vat_pct ?? 0),
+        qty: +l.qty, unit_cost: +l.unit_cost, vat_amount: 0,
       })))
       resetForm()
       load()
@@ -867,11 +880,11 @@ function GRNTab({ flash, userName }) {
     if (error) { flash(error.message, 'error'); return }
     await supabase.from('grn_items').insert(lines.map((l) => ({
       grn_id: grn.id, item_id: l.item_id, item_name: l.item_name,
-      qty: +l.qty, unit_cost: +l.unit_cost, vat_amount: +l.vat_pct,
+      qty: +l.qty, unit_cost: +l.unit_cost, vat_amount: 0,
     })))
     if (h.po_id) await supabase.from('purchase_orders').update({ status: 'RECEIVED' }).eq('id', h.po_id)
     resetForm()
-    load(); flash(`✓ ${grn.grn_no} — stock updated, VAT-6.1 purchase register posted${h.rebateable ? ' (rebateable)' : ''}.`)
+    load(); flash(`✓ ${grn.grn_no} — stock updated.`)
   }
 
   const grnTotal = (g) => (g.grn_items || []).reduce((a, l) => a + +l.qty * +l.unit_cost, 0)
@@ -891,8 +904,6 @@ function GRNTab({ flash, userName }) {
       item_name: it.item_name || '',
       qty: Number(it.qty || 0),
       unit_cost: Number(it.unit_cost || 0),
-      vat_pct: Number(it.vat_amount || 0),
-      vat_amount: Number(it.vat_amount || 0),
       unit: '',
     })))
   }
@@ -918,7 +929,7 @@ function GRNTab({ flash, userName }) {
         { label: 'PO', value: g.purchase_orders?.po_no || '—' },
         { label: 'Invoice', value: g.vendor_invoice_no || '—' },
       ],
-      lines: (g.grn_items || []).map((it) => ({ ...it, vat_pct: it.vat_amount })),
+      lines: g.grn_items || [],
     })
   }
 
@@ -948,19 +959,18 @@ function GRNTab({ flash, userName }) {
             <input type="date" className="input" value={h.vendor_invoice_date} onChange={(e) => setH({ ...h, vendor_invoice_date: e.target.value })} />
           </div>
         </div>
-        <div className="flex gap-4 items-center">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" className="accent-forest" checked={h.rebateable} onChange={(e) => setH({ ...h, rebateable: e.target.checked })} />
-            Input VAT is rebateable (valid Mushak-6.3 received from vendor)
-          </label>
-        </div>
-        <p className="text-xs text-pine/40">VAT column = VAT amount in Tk per line. Auto-posts to Mushak-6.1 purchase register.</p>
+        <p className="text-xs text-pine/40">Unit cost (৳) per line — total auto-calculated.</p>
         <LineEditor items={items} lines={lines} setLines={setLines} withCost={true} />
-        <div className="flex gap-2">
-          <button className="btn-primary" onClick={create}>
-            {editId ? <><Save size={15} /> Update GRN</> : <><PackageCheck size={15} /> Receive goods</>}
-          </button>
-          {editId && <button className="btn-ghost" onClick={resetForm}>Cancel edit</button>}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <button className="btn-primary" onClick={create}>
+              {editId ? <><Save size={15} /> Update GRN</> : <><PackageCheck size={15} /> Receive goods</>}
+            </button>
+            {editId && <button className="btn-ghost" onClick={resetForm}>Cancel edit</button>}
+          </div>
+          <div className="text-sm font-semibold text-pine money">
+            Total: {fmtBDT(lines.reduce((a, l) => a + Number(l.qty || 0) * Number(l.unit_cost || 0), 0))}
+          </div>
         </div>
       </div>
 
@@ -1005,8 +1015,7 @@ function GRNTab({ flash, userName }) {
                             <span className="font-medium w-40">{it.item_name}</span>
                             <span>Qty: {it.qty}</span>
                             <span>Rate: {fmtBDT(it.unit_cost)}</span>
-                            <span>VAT: {fmtBDT(it.vat_amount)}</span>
-                            <span className="font-semibold">Total: {fmtBDT(+it.qty * +it.unit_cost)}</span>
+                            <span>Total: {fmtBDT(+it.qty * +it.unit_cost)}</span>
                           </div>
                         ))}
                       </div>

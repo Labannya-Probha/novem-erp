@@ -10,7 +10,7 @@ export function PosReceipt({ order, items, company, mushakNo }) {
   return (
     <div style={{ maxWidth: 320, width: '100%', margin: '0 auto', color: '#000', fontFamily: 'monospace' }}>
       <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: 6 }}>
-        <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'monospace', color: '#000' }}>{company?.name || 'Novem Eco Resort'}</div>
+        <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'monospace', color: '#000' }}>{company?.name || 'Aura Stay'}</div>
         <div style={{ fontSize: 9 }}>{company?.address}</div>
         <div style={{ fontSize: 9 }}>{company?.phone}{company?.bin ? ` · BIN: ${company.bin}` : ''}</div>
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4, letterSpacing: 1 }}>{(order.outlet || 'Restaurant').toUpperCase()} BILL</div>

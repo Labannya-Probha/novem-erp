@@ -45,7 +45,7 @@ export default function GuestBill({
   buyer_name, buyer_address, buyer_bin,
 }) {
   const co = {
-    name: company?.name || 'Novem Eco Resort',
+    name: company?.name || 'Aura Stay',
     address: company?.address || 'Bishamoni, Radhanagar, Sreemangal, Moulvibazar, Bangladesh',
     phone: company?.phone || '',
     email: company?.email || '',

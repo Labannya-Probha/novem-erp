@@ -760,7 +760,7 @@ function Overview({
     const qr = rateFor(taxConfig, 'ROOM', res.check_in)
     const pn = computeCharge((quote.room_rate || 0) * (quote.room_count || 0), quote.discount_pct || 0, qr)
     const tot = +(pn.total * nights).toFixed(2)
-    return `Dear ${guest?.full_name || 'Guest'},\n\nGreetings from ${company?.name || 'Novem Eco Resort'}!\n\nQuotation for your stay:\n• Check-in: ${fmtDate(res.check_in)}\n• Check-out: ${fmtDate(res.check_out)} (${nights} night${nights !== 1 ? 's' : ''})\n• Rooms: ${quote.room_count} × ${fmtBDT(quote.room_rate)}/night${quote.discount_pct > 0 ? `\n• Discount: ${quote.discount_pct}%` : ''}\n• Total: ${fmtBDT(tot)}\n\nWarm regards,\n${company?.name || 'Novem Eco Resort'}\n${company?.phone || ''}`
+    return `Dear ${guest?.full_name || 'Guest'},\n\nGreetings from ${company?.name || 'Aura Stay'}!\n\nQuotation for your stay:\n• Check-in: ${fmtDate(res.check_in)}\n• Check-out: ${fmtDate(res.check_out)} (${nights} night${nights !== 1 ? 's' : ''})\n• Rooms: ${quote.room_count} × ${fmtBDT(quote.room_rate)}/night${quote.discount_pct > 0 ? `\n• Discount: ${quote.discount_pct}%` : ''}\n• Total: ${fmtBDT(tot)}\n\nWarm regards,\n${company?.name || 'Aura Stay'}\n${company?.phone || ''}`
   }
   const sendQuoteWhatsApp = () => {
     const phone = (guest?.phone || '').replace(/[^0-9]/g, '')
@@ -768,7 +768,7 @@ function Overview({
     window.open(`https://wa.me/${intl}?text=${encodeURIComponent(buildQuoteMsg())}`, '_blank')
   }
   const sendQuoteEmail = () => window.open(
-    `mailto:${guest?.email || ''}?subject=${encodeURIComponent(`Quotation — ${company?.name || 'Novem Eco Resort'} (${res.res_no})`)}&body=${encodeURIComponent(buildQuoteMsg())}`,
+    `mailto:${guest?.email || ''}?subject=${encodeURIComponent(`Quotation — ${company?.name || 'Aura Stay'} (${res.res_no})`)}&body=${encodeURIComponent(buildQuoteMsg())}`,
     '_blank'
   )
   const printQuote = () => {
@@ -1513,8 +1513,6 @@ function AddonTable({ addons, taxConfig, res, userName, reload, flash, isAdmin }
 function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus, userName, openCard, payments, flash, isAdmin, guestIds = [] }) {
   const locked = !isAdmin && ['CHECKED_IN', 'CHECKED_OUT', 'SETTLED'].includes(res.status)
   const [f, setF] = useState({
-    extra_pax: res.extra_pax, extra_pax_rate: res.extra_pax_rate,
-    driver_accommodation: res.driver_accommodation, driver_count: res.driver_count, driver_rate: res.driver_rate,
     special_instructions: res.special_instructions || '',
   })
   const [newGuest, setNewGuest] = useState('')
@@ -1565,8 +1563,8 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
     }
     const wasNoShow = res.status === 'NO_SHOW'
     await setStatus('CHECKED_IN', {
-      extra_pax: +f.extra_pax, extra_pax_rate: +f.extra_pax_rate,
-      driver_accommodation: f.driver_accommodation, driver_count: +f.driver_count, driver_rate: +f.driver_rate,
+      extra_pax: +(res.extra_pax || 0), extra_pax_rate: +(res.extra_pax_rate || 0),
+      driver_accommodation: res.driver_accommodation, driver_count: +(res.driver_count || 0), driver_rate: +(res.driver_rate || 0),
       special_instructions: f.special_instructions,
       checked_in_at: new Date().toISOString(), checkin_by: userName,
     })
@@ -1666,18 +1664,6 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className="label">Extra pax</label><input type="number" min="0" className="input money" value={f.extra_pax} onChange={(e) => set('extra_pax', e.target.value)} /></div>
-            <div><label className="label">Extra pax rate / night</label><input type="number" className="input money" value={f.extra_pax_rate} onChange={(e) => set('extra_pax_rate', e.target.value)} /></div>
-            <div className="col-span-1 sm:col-span-2 flex items-center gap-2 pt-1">
-              <input type="checkbox" id="drv" checked={f.driver_accommodation} onChange={(e) => set('driver_accommodation', e.target.checked)} />
-              <label htmlFor="drv" className="text-sm font-medium">Driver accommodation needed</label>
-            </div>
-            {f.driver_accommodation && (
-              <>
-                <div><label className="label">No. of drivers</label><input type="number" min="0" className="input money" value={f.driver_count} onChange={(e) => set('driver_count', e.target.value)} /></div>
-                <div><label className="label">Driver rate / night</label><input type="number" className="input money" value={f.driver_rate} onChange={(e) => set('driver_rate', e.target.value)} /></div>
-              </>
-            )}
             <div className="col-span-1 sm:col-span-2">
               <label className="label">Notes / special instructions</label>
               <textarea className="input" rows={2} value={f.special_instructions} onChange={(e) => set('special_instructions', e.target.value)} />

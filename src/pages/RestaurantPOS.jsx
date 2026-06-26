@@ -10,7 +10,7 @@ import { Plus, Minus, Trash2, Printer, ChefHat, Banknote, BedDouble, Search, Sav
 
 const TABS = ['Orders', 'Menu', 'Day Close']
 const PAYMENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'CARD', 'BANK', 'OTHER']
-const RESTAURANT_WORKFLOW = ['REQUESTED', 'CONFIRMED', 'ACCEPTED', 'KOT_GENERATED', 'PREPARING', 'READY', 'SERVED']
+const RESTAURANT_WORKFLOW = ['ACCEPTED', 'READY', 'SERVED']
 
 const applyCashRounding = (amount) => {
   const decimal = amount % 1
@@ -323,7 +323,7 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
   const load = async () => {
     let qy = supabase.from('pos_orders').select('*').order('created_at', { ascending: false }).limit(200)
     if (filter === 'TODAY') qy = qy.gte('created_at', `${todayISO()}T00:00:00+06:00`)
-    if (filter === 'OPEN') qy = qy.eq('status', 'OPEN')
+    if (filter === 'OPEN') qy = qy.in('status', ['OPEN', 'ACCEPTED', 'READY', 'SERVED'])
     const { data } = await qy
     setRows(data || [])
   }
@@ -364,29 +364,44 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
       .ilike('description', `%${ref}%`)
       .in('status', ['OPEN', 'IN_PROGRESS'])
       .limit(10)
-    if (!linkedTasks?.length) return
-    for (const row of linkedTasks) {
-      const patch = {
-        description: updateDescriptionStage(row.description || '', nextStage),
-        status: nextStatus,
-        updated_at: new Date().toISOString(),
+    if (linkedTasks?.length) {
+      for (const row of linkedTasks) {
+        const patch = {
+          description: updateDescriptionStage(row.description || '', nextStage),
+          status: nextStatus,
+          updated_at: new Date().toISOString(),
+        }
+        if (nextStatus === 'DONE') {
+          patch.completed_at = new Date().toISOString()
+          patch.completed_by = userName || 'Restaurant'
+        }
+        await supabase.from('tasks').update(patch).eq('id', row.id)
       }
-      if (nextStatus === 'DONE') {
-        patch.completed_at = new Date().toISOString()
-        patch.completed_by = userName || 'Restaurant'
-      }
-      await supabase.from('tasks').update(patch).eq('id', row.id)
     }
   }
 
-  const chip = { OPEN: 'bg-amber/20 text-amber', SETTLED: 'bg-forest/15 text-forest', CHARGED_TO_ROOM: 'bg-pine/15 text-pine', CANCELLED: 'bg-red-100 text-red-600' }
+  const advanceOrderStatus = async (order, orderStatus, taskStage, taskStatus = 'IN_PROGRESS') => {
+    await supabase.from('pos_orders').update({ status: orderStatus }).eq('id', order.id)
+    await syncGuestOrderTask(order, taskStage, taskStatus)
+    load()
+  }
+
+  const chip = {
+    OPEN: 'bg-amber/20 text-amber',
+    ACCEPTED: 'bg-sky-100 text-sky-700',
+    READY: 'bg-pine/15 text-pine',
+    SERVED: 'bg-forest/15 text-forest',
+    SETTLED: 'bg-forest/20 text-forest font-semibold',
+    CHARGED_TO_ROOM: 'bg-pine/15 text-pine',
+    CANCELLED: 'bg-red-100 text-red-600',
+  }
 
   return (
     <div>
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="card p-4"><div className="label">Settled (in view)</div><div className="font-display text-xl font-bold text-forest money">{fmtBDT(sumBy('SETTLED'))}</div></div>
         <div className="card p-4"><div className="label">Charged to rooms</div><div className="font-display text-xl font-bold text-pine money">{fmtBDT(sumBy('CHARGED_TO_ROOM'))}</div></div>
-        <div className="card p-4"><div className="label">Open orders</div><div className="font-display text-xl font-bold text-amber money">{rows.filter((r) => r.status === 'OPEN').length}</div></div>
+        <div className="card p-4"><div className="label">Open orders</div><div className="font-display text-xl font-bold text-amber money">{rows.filter((r) => ['OPEN','ACCEPTED','READY','SERVED'].includes(r.status)).length}</div></div>
       </div>
       <div className="flex gap-2 mb-3">
         {['TODAY', 'OPEN', 'ALL'].map((f) => (<button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${filter === f ? 'bg-pine text-white' : 'bg-white border border-leaf text-pine/70'}`}>{f}</button>))}
@@ -415,9 +430,9 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
                   <div className="flex justify-end gap-2">
                     <button className="btn-ghost !py-1 !px-2 text-forest" onClick={() => printReceipt(o)} title="Print receipt"><Receipt size={14} /></button>
                     {o.status !== 'CANCELLED' && (<button className="btn-ghost !py-1 !px-2 text-amber" onClick={() => printKot(o)} title="Print KOT"><ChefHat size={14} /></button>)}
-                    {o.status !== 'CANCELLED' && (<button className="btn-ghost !py-1 !px-2 text-sky-700" onClick={async () => { await syncGuestOrderTask(o, 'ACCEPTED'); flash(`Workflow updated: ${o.order_no} accepted.`) }} title="Mark accepted">Accept</button>)}
-                    {o.status !== 'CANCELLED' && (<button className="btn-ghost !py-1 !px-2 text-pine" onClick={async () => { await syncGuestOrderTask(o, 'READY'); flash(`Workflow updated: ${o.order_no} ready.`) }} title="Mark ready">Ready</button>)}
-                    {o.status !== 'CANCELLED' && (<button className="btn-ghost !py-1 !px-2 text-forest" onClick={async () => { await syncGuestOrderTask(o, 'SERVED', 'DONE'); flash(`Workflow updated: ${o.order_no} served.`) }} title="Mark served">Served</button>)}
+                    {!['CANCELLED','SETTLED','CHARGED_TO_ROOM'].includes(o.status) && (<button className="btn-ghost !py-1 !px-2 text-sky-700" onClick={async () => { await advanceOrderStatus(o, 'ACCEPTED', 'ACCEPTED'); flash(`${o.order_no} — Accepted.`) }} title="Mark accepted">Accept</button>)}
+                    {!['CANCELLED','SETTLED','CHARGED_TO_ROOM'].includes(o.status) && (<button className="btn-ghost !py-1 !px-2 text-pine" onClick={async () => { await advanceOrderStatus(o, 'READY', 'READY'); flash(`${o.order_no} — Ready.`) }} title="Mark ready">Ready</button>)}
+                    {!['CANCELLED','SETTLED','CHARGED_TO_ROOM'].includes(o.status) && (<button className="btn-ghost !py-1 !px-2 text-forest" onClick={async () => { await advanceOrderStatus(o, 'SERVED', 'SERVED', 'DONE'); flash(`${o.order_no} — Served.`) }} title="Mark served">Served</button>)}
                     {o.invoice_id && (<button className="btn-ghost !py-1 !px-2 text-pine" onClick={() => printMushak(o)} title="Print Mushak-6.3"><FileText size={14} /></button>)}
                     {canEdit(o) && (<button className="btn-ghost !py-1 !px-2 text-forest" onClick={() => resumeOrder(o)} title="Edit order">Edit</button>)}
                     {isAdmin && o.status === 'SETTLED' && (<button className="btn-ghost !py-1 !px-2 text-red-500" onClick={() => voidOrder(o)} title="Void order"><XCircle size={14} /></button>)}

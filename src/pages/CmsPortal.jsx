@@ -8,6 +8,7 @@ import { Combobox } from '../components/ui/combobox'
 import {
   Plus, Pencil, Trash2, Save, ShieldCheck, Search, X,
   Building2, Truck, Package, FolderTree, UtensilsCrossed, Calculator, Handshake, Users, BedDouble, CalendarRange,
+  MapPin, UserSquare2,
 } from 'lucide-react'
 
 /* ------------------------------------------------------------------ */
@@ -95,6 +96,25 @@ const CMS_ENTITIES = [
       { key: 'room_name', label: 'Room name', type: 'text' },
       { key: 'room_type', label: 'Type', type: 'searchable', allowCreate: true, default: 'Standard' },
       { key: 'base_rate', label: 'Base rate', type: 'number', default: 0, format: 'money' },
+    ],
+  },
+  {
+    id: 'store_locations', table: 'store_locations', label: 'Store Locations', icon: MapPin, orderBy: 'sort_order', hasIsActive: true,
+    fields: [
+      { key: 'name', label: 'Location name', type: 'text', required: true },
+      { key: 'code', label: 'Code', type: 'text' },
+      { key: 'notes', label: 'Notes', type: 'text' },
+      { key: 'sort_order', label: 'Sort order', type: 'number', default: 0 },
+    ],
+  },
+  {
+    id: 'guests', table: 'guests', label: 'Guests', icon: UserSquare2, orderBy: 'full_name', hasIsActive: false,
+    fields: [
+      { key: 'full_name', label: 'Full name', type: 'text', required: true },
+      { key: 'phone', label: 'Phone', type: 'text' },
+      { key: 'email', label: 'Email', type: 'text' },
+      { key: 'address', label: 'Address', type: 'text' },
+      { key: 'customer_id', label: 'Customer ID', type: 'text' },
     ],
   },
 ]

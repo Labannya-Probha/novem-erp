@@ -17,6 +17,8 @@ import HousekeepingHub from './pages/HousekeepingHub.jsx'
 import RestaurantPOS, { GuestPosKiosk } from './pages/RestaurantPOS.jsx'
 import Facilities from './pages/ServiceBills.jsx'
 import InventoryHub from './pages/InventoryHub.jsx'
+import ConsumptionEntry from './pages/ConsumptionEntry.jsx'
+import MenuManagement from './pages/MenuManagement.jsx'
 import VatCenter from './pages/VatCenter.jsx'
 import AccountingHub from './pages/AccountingHub.jsx'
 import HrOffice from './pages/HrOffice.jsx'
@@ -110,7 +112,27 @@ const SIDEBAR_CMS_ENTITY_TABS = [
   { id: 'guests',               label: 'Guests' },
 ]
 
-const firstAccessiblePath = (role, privileges) => {
+const SIDEBAR_INVENTORY_TABS = [
+  { id: 'Items & Stock',    label: 'Items & Stock' },
+  { id: 'Vendors',          label: 'Vendors' },
+  { id: 'Requisitions',     label: 'Requisitions' },
+  { id: 'Purchase Orders',  label: 'Purchase Orders' },
+  { id: 'Goods Receipt',    label: 'Goods Receipt' },
+  { id: 'Transfers',        label: 'Transfers' },
+  { id: 'Returns',          label: 'Returns' },
+]
+
+const SIDEBAR_ACCOUNTING_TABS = [
+  { id: 'Journal Vouchers',    label: 'Journal Vouchers' },
+  { id: 'Trial Balance',       label: 'Trial Balance' },
+  { id: 'Chart of Accounts',   label: 'Chart of Accounts' },
+  { id: 'Fixed Assets',        label: 'Fixed Assets' },
+  { id: 'Opening Balance',     label: 'Opening Balance',    adminOnly: true },
+  { id: 'Transaction Mapping', label: 'Transaction Mapping', adminOnly: true },
+  { id: 'Vendor Payments',     label: 'Vendor Payments' },
+]
+
+function firstAccessiblePath(role, privileges) {
   for (const id of ALL_NAV_IDS) {
     if (id === 'dashboard' || can(role, id, privileges)) return `/${id}`
   }
@@ -142,8 +164,13 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
     setOpenGroup(activeGroup?.title || null)
   }, [currentTopId])
   useEffect(() => {
-    if (currentTopId === 'settings' || currentTopId === 'cms') setOpenSystemMenu(currentTopId)
-    else setOpenSystemMenu(null)
+    if (['settings', 'cms', 'inventory', 'consumption', 'accounting', 'vat'].includes(currentTopId)) {
+      setOpenSystemMenu(
+        ['inventory', 'consumption'].includes(currentTopId) ? 'inventory' :
+        ['accounting', 'vat'].includes(currentTopId) ? 'accounting' :
+        currentTopId
+      )
+    } else setOpenSystemMenu(null)
   }, [currentTopId])
 
   const SidebarContent = (
@@ -183,7 +210,11 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
               {isOpenGroup && (
                 <div className="space-y-0.5 mb-1">
                   {items.map((n) => {
-                    if (n.id !== 'settings' && n.id !== 'cms') {
+                    // Items that are folded into a parent's sub-nav are hidden at top level
+                    if (n.id === 'consumption' || n.id === 'vat') return null
+
+                    const isExpandable = ['settings', 'cms', 'inventory', 'accounting'].includes(n.id)
+                    if (!isExpandable) {
                       return (
                         <button key={n.id}
                           className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -197,42 +228,62 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
                       )
                     }
 
-                    const isOpen  = openSystemMenu === n.id
-                    const nested  = n.id === 'settings'
-                      ? SIDEBAR_SETTINGS_SECTIONS.filter((s) => {
-                          if (!s.adminOnly && !s.superuserOnly) return true
-                          if (s.adminOnly) return isAdmin || role === 'SUPERUSER'
-                          return role === 'SUPERUSER'
-                        })
-                      : SIDEBAR_CMS_ENTITY_TABS
+                    const isOpen = openSystemMenu === n.id
+                    // Build the sub-item list for this expandable nav item
+                    let nested = []
+                    let paramKey = 'section'
+                    if (n.id === 'settings') {
+                      paramKey = 'section'
+                      nested = SIDEBAR_SETTINGS_SECTIONS.filter((s) => {
+                        if (!s.adminOnly && !s.superuserOnly) return true
+                        if (s.adminOnly) return isAdmin || role === 'SUPERUSER'
+                        return role === 'SUPERUSER'
+                      }).map((s) => ({ ...s, path: `/settings?section=${s.id}`, active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`) }))
+                    } else if (n.id === 'cms') {
+                      paramKey = 'entity'
+                      nested = SIDEBAR_CMS_ENTITY_TABS.map((s) => ({ ...s, path: `/cms?entity=${s.id}`, active: currentTopId === 'cms' && location.search.includes(`entity=${s.id}`) }))
+                    } else if (n.id === 'inventory') {
+                      nested = [
+                        ...SIDEBAR_INVENTORY_TABS.map((s) => ({ ...s, path: `/inventory?tab=${encodeURIComponent(s.id)}`, active: currentTopId === 'inventory' && location.search.includes(`tab=${encodeURIComponent(s.id)}`) })),
+                        { id: 'consumption', label: 'Consumption Entry', path: '/consumption', active: currentTopId === 'consumption' },
+                      ]
+                    } else if (n.id === 'accounting') {
+                      nested = [
+                        ...SIDEBAR_ACCOUNTING_TABS.filter((s) => !s.adminOnly || isAdmin || role === 'SUPERUSER').map((s) => ({ ...s, path: `/accounting?tab=${encodeURIComponent(s.id)}`, active: currentTopId === 'accounting' && location.search.includes(`tab=${encodeURIComponent(s.id)}`) })),
+                        { id: 'vat', label: 'VAT Centre', path: '/vat', active: currentTopId === 'vat' },
+                      ]
+                    }
+
                     return (
                       <div key={n.id} className="space-y-1">
                         <button
                           className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            currentTopId === n.id
-                              ? 'bg-white/14 text-white ring-1 ring-white/20'
-                              : 'text-white/75 hover:bg-white/10 hover:text-white'
+                            isOpen ? 'bg-white/14 text-white ring-1 ring-white/20' : 'text-white/75 hover:bg-white/10 hover:text-white'
                           }`}
-                          onClick={() => { setOpenSystemMenu(n.id); navigate(`/${n.id}`) }}
+                          onClick={() => {
+                            setOpenSystemMenu(isOpen ? null : n.id)
+                            if (!isOpen && ['inventory', 'accounting'].includes(n.id)) {
+                              // Navigate to the first sub-item when opening
+                              navigate(`/${n.id}`)
+                            } else if (!['inventory', 'accounting'].includes(n.id)) {
+                              navigate(`/${n.id}`)
+                            }
+                          }}
                         >
                           <span className="flex items-center gap-3"><n.icon size={17} /> {n.label}</span>
                           <ChevronDown size={13} className={`transition-transform ${isOpen ? '' : '-rotate-90'}`} />
                         </button>
                         {isOpen && (
                           <div className="ml-6 space-y-0.5">
-                            {nested.map((child) => {
-                              const paramKey      = n.id === 'settings' ? 'section' : 'entity'
-                              const isActiveChild = currentTopId === n.id && location.search.includes(`${paramKey}=${child.id}`)
-                              return (
-                                <button key={child.id}
-                                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                                    isActiveChild ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
-                                  }`}
-                                  onClick={() => navigate(`/${n.id}?${paramKey}=${child.id}`)}>
-                                  {child.label}
-                                </button>
-                              )
-                            })}
+                            {nested.map((child) => (
+                              <button key={child.id}
+                                className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                                  child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
+                                }`}
+                                onClick={() => navigate(child.path)}>
+                                {child.label}
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -360,7 +411,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
           <Route path="/kiosk/pos" element={<GuestPosKiosk />} />
           <Route path="/menu-management" element={
             (isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT')
-              ? <InventoryHub userName={userName} role={role} isAdmin={isAdmin} menuMode />
+              ? <MenuManagement isAdmin={isAdmin} />
               : <Navigate to={firstAccessiblePath(role, privileges)} replace />
           } />
 
@@ -372,7 +423,7 @@ function AppShell({ company, role, isAdmin, userName, loadCompany, privileges })
           } />
           <Route path="/consumption" element={
             <GuardedRoute role={role} navId="inventory" privileges={privileges}>
-              <InventoryHub userName={userName} role={role} isAdmin={isAdmin} consumptionMode />
+              <ConsumptionEntry userName={userName} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
 
