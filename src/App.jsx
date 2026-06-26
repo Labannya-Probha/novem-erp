@@ -57,8 +57,8 @@ const NAV_GROUPS = [
     { id: 'housekeeping', label: 'Housekeeping', icon: BedDouble },
     { id: 'facilities', label: 'Service Bills', icon: ShoppingBasket },
   ]},
-  { title: 'Restaurant POS', items: [
-    { id: 'pos',             label: 'Restaurant POS',  icon: UtensilsCrossed },
+  { title: 'Food & Beverage', items: [
+    { id: 'pos',             label: 'Food & Beverage',  icon: UtensilsCrossed },
     { id: 'menu-management', label: 'Menu Management', icon: ChefHat },
   ]},
   { title: 'Accounting', items: [
