@@ -1084,8 +1084,12 @@ function AdminFeatureAccessCard() {
     } else {
       // Restrict — upsert with can_access = false
       const { error } = await supabase
-        .from('admin_feature_access')
-        .upsert({ user_id: userId, module, can_access: false }, { onConflict: 'user_id,module' })
+        .rpc('upsert_admin_feature_access', {
+          p_user_id: userId,
+          p_module: module,
+          p_can_access: false,
+          p_updated_by: null
+        })
       if (error) { flash(error.message); load() }
     }
   }
