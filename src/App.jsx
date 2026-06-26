@@ -488,8 +488,8 @@ function AppRoot() {
 
   // FIX 1 & 2: loadCompany defined BEFORE the useEffect that calls it,
   // and wrapped in useCallback so it has a stable reference for the dep array.
-  const loadCompany = useCallback(async () => {
-    const tenantId = getTenantId()
+  const loadCompany = useCallback(async (forceTenantId) => {
+    const tenantId = forceTenantId || getTenantId()
     let query = supabase.from('company_settings').select('*')
     if (tenantId) query = query.eq('tenant_id', tenantId)
     const { data } = await query.limit(1).single()
