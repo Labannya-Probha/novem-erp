@@ -256,18 +256,7 @@ function OpeningBalanceTab({ accounts, userName, flash }) {
 
   /* ---------- render ---------- */
   return (
-    <div className="space-y-5">
-      {/* ── Info banner ── */}
-      <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
-        <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
-        <div>
-          <span className="font-semibold">Opening Balance entries are permanent.</span> Once posted, they are
-          locked and cannot be edited or deleted — even by Superuser. The difference between total Debits and
-          Credits is automatically offset to <span className="font-mono font-semibold">{RE_CODE} Retained Earnings</span>.
-          Post only once per accounting commencement date.
-        </div>
-      </div>
-
+    <div className="space-y-5">      
       {/* ── Entry form ── */}
       <div className="card p-5 space-y-4">
         <h3 className="font-display font-semibold text-pine flex items-center gap-2">
@@ -487,13 +476,13 @@ function OpeningBalanceTab({ accounts, userName, flash }) {
 /* ================================================================== */
 /*  JOURNAL VOUCHERS TAB                                                */
 /* ================================================================== */
-const VOUCHER_TYPES = ['JOURNAL', 'DEBIT', 'CREDIT', 'CONTRA']
-const VOUCHER_PREFIX = { JOURNAL: 'JV', DEBIT: 'DV', CREDIT: 'CV', CONTRA: 'CN' }
+const VOUCHER_TYPES = ['JV', 'DEBIT', 'CREDIT', 'CONTRA']
+const VOUCHER_PREFIX = { JV: 'JV', DEBIT: 'DV', CREDIT: 'CV', CONTRA: 'CN' }
 const voucherTypeFromNo = (no = '') => {
   if (no.startsWith('DV-')) return 'DEBIT'
   if (no.startsWith('CV-')) return 'CREDIT'
   if (no.startsWith('CN-')) return 'CONTRA'
-  return 'JOURNAL'
+  return 'JV'
 }
 const voucherNoForType = (no = '', type = 'JOURNAL') => {
   const prefix = VOUCHER_PREFIX[type] || 'JV'
@@ -504,7 +493,7 @@ const voucherNoForType = (no = '', type = 'JOURNAL') => {
 
 function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
   const [rows, setRows]       = useState([])
-  const [head, setHead]       = useState({ jv_date: todayISO(), narration: '', voucher_type: 'JOURNAL' })
+  const [head, setHead] = useState({ jv_date: todayISO(), narration: '', voucher_type: 'JV' })
   const [lines, setLines]     = useState([
     { account_id: '', debit: '', credit: '', line_note: '' },
     { account_id: '', debit: '', credit: '', line_note: '' },
@@ -532,7 +521,7 @@ function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
 
   const resetForm = () => {
     setEditingId(null)
-    setHead({ jv_date: todayISO(), narration: '', voucher_type: 'JOURNAL' })
+    setHead({ jv_date: todayISO(), narration: '', voucher_type: 'JV' })
     setLines([
       { account_id: '', debit: '', credit: '', line_note: '' },
       { account_id: '', debit: '', credit: '', line_note: '' },
@@ -549,7 +538,7 @@ function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
         const updatePayload = {
           jv_date: head.jv_date,
           narration: head.narration,
-          source: head.voucher_type === 'JOURNAL' ? 'MANUAL' : `MANUAL_${head.voucher_type}`,
+          source: head.voucher_type === 'JV' ? 'MANUAL' : `MANUAL_${head.voucher_type}`,
         }
         if (existing?.jv_no) updatePayload.jv_no = voucherNoForType(existing.jv_no, head.voucher_type)
         const { error: ue } = await supabase.from('journal_entries')
