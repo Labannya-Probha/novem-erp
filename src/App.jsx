@@ -58,6 +58,9 @@ import {
   Menu, X, ListChecks, ChevronDown, Bot, ChefHat, ClipboardList,
   BookOpen, Scale, BookMarked, Landmark, Lock, ArrowLeftRight, CreditCard, Wallet,
   UserCog, CalendarCheck, BadgeDollarSign, FileStack, ClipboardCheck,
+  PartyPopper, FileText, FileCheck, LogIn, CheckCircle, TrendingUp, ArrowUpCircle,
+  AlertTriangle, MessageSquareWarning, AlertOctagon, ShieldCheck, Award, Briefcase,
+  Banknote, UsersRound, Siren,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -160,59 +163,34 @@ const SIDEBAR_ACCOUNTING_TABS = [
 ]
 
 const SIDEBAR_HR_TABS = [
-  {
-    id: 'employee-mgmt', label: 'Employee Mgmt', icon: UserCog,
-    children: [
-      { id: 'employee-entry',   label: 'Employee Entry',          path: '/hr/employee-entry' },
-      { id: 'service-book',     label: 'Service Book Entry',      path: '/hr/service-book' },
-      { id: 'nominee',          label: 'Nominee Declaration',     path: '/hr/nominee' },
-    ],
-  },
-  {
-    id: 'leave-mgmt', label: 'Leave Mgmt', icon: CalendarCheck,
-    children: [
-      { id: 'leave-entry',      label: 'Leave Entry',             path: '/hr/leave-entry' },
-      { id: 'comp-leave',       label: 'Comp Leave Mgmt',         path: '/hr/comp-leave' },
-      { id: 'festival-leave',   label: 'Festival Leave Mgmt',     path: '/hr/festival-leave' },
-    ],
-  },
-  {
-    id: 'payroll-mgmt', label: 'Payroll Mgmt', icon: BadgeDollarSign,
-    children: [
-      { id: 'payroll-config',   label: 'Payroll Configuration',   path: '/hr/payroll-config' },
-      { id: 'payroll-gen',      label: 'Payroll Generation',      path: '/hr/payroll-gen' },
-      { id: 'payroll-register', label: 'Payroll Register',        path: '/hr/payroll-register' },
-    ],
-  },
-  {
-    id: 'hr-letters', label: 'HR Letters', icon: FileStack,
-    children: [
-      { id: 'offer-letter',        label: 'Offer Letter',            path: '/hr/offer-letter' },
-      { id: 'appointment-letter',  label: 'Appointment Letter',      path: '/hr/appointment-letter' },
-      { id: 'joining-letter',      label: 'Joining Letter',          path: '/hr/joining-letter' },
-      { id: 'confirmation-letter', label: 'Confirmation Letter',     path: '/hr/confirmation-letter' },
-      { id: 'increment-letter',    label: 'Salary Increment Letter', path: '/hr/increment-letter' },
-      { id: 'promotion-letter',    label: 'Promotion Letter',        path: '/hr/promotion-letter' },
-      { id: 'objection-letter',    label: 'Objection Letter',        path: '/hr/objection-letter' },
-      { id: 'show-cause',          label: 'Show Cause Letter',       path: '/hr/show-cause' },
-      { id: 'warning-letter',      label: 'Warning Letter',          path: '/hr/warning-letter' },
-      { id: 'dismissal-letter',    label: 'Letter of Dismissal',     path: '/hr/dismissal-letter' },
-      { id: 'noc',                 label: 'No Objection Certificate',path: '/hr/noc' },
-      { id: 'experience-cert',     label: 'Experience Certificate',  path: '/hr/experience-cert' },
-      { id: 'employment-cert',     label: 'Employment Certificate',  path: '/hr/employment-cert' },
-      { id: 'final-payment',       label: 'Final Payment Letter',    path: '/hr/final-payment' },
-    ],
-  },
-  {
-    id: 'register', label: 'Register', icon: ClipboardCheck,
-    children: [
-      { id: 'attendance-register', label: 'Attendance Register',    path: '/hr/attendance-register' },
-      { id: 'employee-register',   label: 'Employee Register (Form-8)', path: '/hr/employee-register' },
-      { id: 'service-book-reg',    label: 'Service Book',           path: '/hr/service-book-reg' },
-      { id: 'incidents',           label: 'Incidents',              path: '/hr/incidents' },
-      { id: 'compliance',          label: 'Compliance',             path: '/hr/compliance' },
-    ],
-  },
+  { id: 'employee-entry',       label: 'Employee Entry',          icon: UserCog,        path: '/hr/employee-entry' },
+  { id: 'service-book',         label: 'Service Book Entry',      icon: BookOpen,       path: '/hr/service-book' },
+  { id: 'nominee',              label: 'Nominee Declaration',     icon: Users,          path: '/hr/nominee' },
+  { id: 'leave-entry',          label: 'Leave Entry',             icon: CalendarCheck,  path: '/hr/leave-entry' },
+  { id: 'comp-leave',           label: 'Comp Leave Mgmt',         icon: CalendarDays,   path: '/hr/comp-leave' },
+  { id: 'festival-leave',       label: 'Festival Leave Mgmt',     icon: PartyPopper,    path: '/hr/festival-leave' },
+  { id: 'payroll-config',       label: 'Payroll Configuration',   icon: BadgeDollarSign, path: '/hr/payroll-config' },
+  { id: 'payroll-gen',          label: 'Payroll Generation',      icon: Calculator,     path: '/hr/payroll-gen' },
+  { id: 'payroll-register',     label: 'Payroll Register',        icon: ClipboardList,  path: '/hr/payroll-register' },
+  { id: 'offer-letter',         label: 'Offer Letter',            icon: FileText,       path: '/hr/offer-letter' },
+  { id: 'appointment-letter',   label: 'Appointment Letter',      icon: FileCheck,      path: '/hr/appointment-letter' },
+  { id: 'joining-letter',       label: 'Joining Letter',          icon: LogIn,          path: '/hr/joining-letter' },
+  { id: 'confirmation-letter',  label: 'Confirmation Letter',     icon: CheckCircle,    path: '/hr/confirmation-letter' },
+  { id: 'increment-letter',     label: 'Salary Increment Letter', icon: TrendingUp,     path: '/hr/increment-letter' },
+  { id: 'promotion-letter',     label: 'Promotion Letter',        icon: ArrowUpCircle,  path: '/hr/promotion-letter' },
+  { id: 'objection-letter',     label: 'Objection Letter',        icon: AlertTriangle,  path: '/hr/objection-letter' },
+  { id: 'show-cause',           label: 'Show Cause Letter',       icon: MessageSquareWarning, path: '/hr/show-cause' },
+  { id: 'warning-letter',       label: 'Warning Letter',          icon: AlertOctagon,   path: '/hr/warning-letter' },
+  { id: 'dismissal-letter',     label: 'Letter of Dismissal',     icon: LogOut,         path: '/hr/dismissal-letter' },
+  { id: 'noc',                  label: 'No Objection Certificate',icon: ShieldCheck,    path: '/hr/noc' },
+  { id: 'experience-cert',      label: 'Experience Certificate',  icon: Award,          path: '/hr/experience-cert' },
+  { id: 'employment-cert',      label: 'Employment Certificate',  icon: Briefcase,      path: '/hr/employment-cert' },
+  { id: 'final-payment',        label: 'Final Payment Letter',    icon: Banknote,       path: '/hr/final-payment' },
+  { id: 'attendance-register',  label: 'Attendance Register',     icon: ClipboardCheck, path: '/hr/attendance-register' },
+  { id: 'employee-register',    label: 'Employee Register (Form-8)', icon: UsersRound,  path: '/hr/employee-register' },
+  { id: 'service-book-reg',     label: 'Service Book',            icon: BookMarked,     path: '/hr/service-book-reg' },
+  { id: 'incidents',            label: 'Incidents',               icon: Siren,          path: '/hr/incidents' },
+  { id: 'compliance',           label: 'Compliance',              icon: Scale,          path: '/hr/compliance' },
 ]
 
 function firstAccessiblePath(role, privileges) {
@@ -376,13 +354,9 @@ function firstAccessiblePath(role, privileges) {
                             : location.pathname === s.path,
                         }))
                     } else if (n.id === 'hr') {
-                      nested = SIDEBAR_HR_TABS.map((grp) => ({
-                        ...grp,
-                        active: grp.children.some((c) => location.pathname === c.path),
-                        children: grp.children.map((c) => ({
-                          ...c,
-                          active: location.pathname === c.path,
-                        })),
+                      nested = SIDEBAR_HR_TABS.map((s) => ({
+                        ...s,
+                        active: location.pathname === s.path,
                       }))
                     }
 
@@ -407,14 +381,16 @@ function firstAccessiblePath(role, privileges) {
                         </button>
                         {isOpen && (
                           <div className="ml-6 space-y-0.5">
-                            {nested.map((child) =>
-                              child.children ? (
-                                <HrSubGroup key={child.id} grp={child} navigate={navigate} location={location} />
-                              ) : (
-                                <button key={child.id}
-                                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
-                                    child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
-                                  }`}
+                            {nested.map((child) => (
+                              <button key={child.id}
+                                className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
+                                  child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
+                                }`}
+                                onClick={() => navigate(child.path)}>
+                                {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
+                                {child.label}
+                              </button>
+                            ))}
                                   onClick={() => navigate(child.path)}>
                                   {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
                                   {child.label}
