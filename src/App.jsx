@@ -382,28 +382,19 @@ function firstAccessiblePath(role, privileges) {
                         {isOpen && (
                           <div className="ml-6 space-y-0.5">
                             {nested.map((child) => (
-                              <button key={child.id}
+                              <button
+                                key={child.id}
                                 className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
                                   child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
                                 }`}
-                                onClick={() => navigate(child.path)}>
+                                onClick={() => navigate(child.path)}
+                              >
                                 {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
                                 {child.label}
                               </button>
                             ))}
-                                  onClick={() => navigate(child.path)}>
-                                  {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
-                                  {child.label}
-                                </button>
-                              )
-                            )}
                           </div>
                         )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </div>
           )
         })}
