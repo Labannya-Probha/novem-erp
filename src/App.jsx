@@ -161,6 +161,7 @@ const SIDEBAR_ACCOUNTING_TABS = [
   { id: 'transaction-mapping', label: 'Transaction Mapping', icon: ArrowLeftRight, path: '/accounting/transaction-mapping', adminOnly: true },
   { id: 'vendor-payments',     label: 'Vendor Payments',     icon: CreditCard,     path: '/accounting/vendor-payments' },
   { id: 'vat',                 label: 'VAT Centre',          icon: Wallet,         path: '/vat' },
+  { id: 'vat',                 label: 'VAT Return',          icon: ,         path: '/vat/vat-return' },
 ]
 
 const SIDEBAR_HR_TABS = [
