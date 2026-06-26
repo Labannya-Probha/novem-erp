@@ -696,18 +696,24 @@ function Overview({
     }
 
     // Update / create quotation record
-    const qRate = rateFor(taxConfig, 'ROOM', editForm.check_in)
-    const roomTotal = roomList.reduce((sum, rm) => sum + Number(rm.rate), 0)
-    const nightsCount = nightsBetween(editForm.check_in, editForm.check_out)
+    // Calculate total correctly: each room uses its OWN dates & rate
     const discDescriptor = editForm.discount_type === 'fixed'
       ? { type: 'fixed', value: Number(editForm.discount_val) }
       : Number(editForm.discount_pct)
-    const perNight = computeCharge(roomTotal, discDescriptor, qRate)
-    const grandTotal = +(perNight.total * nightsCount).toFixed(2)
+
+    const grandTotal = +roomList.reduce((sum, rm) => {
+      const ci = rm.from_date || editForm.check_in
+      const co = rm.to_date   || editForm.check_out
+      const roomNights = nightsBetween(ci, co)
+      const qRate = rateFor(taxConfig, 'ROOM', ci)
+      const calc = computeCharge(Number(rm.rate), discDescriptor, qRate)
+      return sum + (calc.total * roomNights)
+    }, 0).toFixed(2)
     const validUntil = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
     const quoteSnapshot = {
       total_amount: grandTotal, valid_until: validUntil,
-      room_rate: roomList.length > 0 ? roomList[0].rate : 0,
+      // room_rate stores first room's rate (used for WhatsApp preview only)
+      room_rate: roomList.length > 0 ? Math.min(...roomList.map(r => Number(r.rate))) : 0,
       room_count: roomList.length,
       discount_pct: editForm.discount_type === 'percentage' ? Number(editForm.discount_pct) : 0,
       updated_at: new Date().toISOString(),
@@ -1071,7 +1077,7 @@ function Overview({
 
             {/* Discount */}
             <fieldset className="border border-leaf rounded-xl p-4 mb-4">
-              <legend className="text-xs font-bold text-pine/60 px-2 uppercase tracking-wide">Discount</legend>
+              <legend className="text-xs font-bold text-pine/60 px-2 uppercase tracking-wide">Discount</legend>              
               <div className="flex flex-wrap gap-2">
                 <button type="button"
                   className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${editForm.discount_type === 'percentage' ? 'bg-forest text-white border-forest' : 'border-leaf text-pine'}`}
