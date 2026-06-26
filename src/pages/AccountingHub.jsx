@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { getTenantId } from '../lib/tenant'
+import { getTenantId, withTenantInsert } from '../lib/tenant'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
 import {
   Calculator, Plus, Trash2, Scale, Building2, Printer, Pencil,
@@ -16,6 +16,21 @@ import VendorPaymentTab from '../components/VendorPaymentTab.jsx'
 /*  Matches chart_of_accounts code = '300100' (Retained Earnings)       */
 /* ------------------------------------------------------------------ */
 const RE_CODE = '300100'
+
+async function fetchActiveAccounts(context = 'loadAccounts') {
+  const tenantId = getTenantId()
+  let q = supabase
+    .from('chart_of_accounts')
+    .select('*')
+    .eq('is_active', true)
+  if (tenantId) q = q.eq('tenant_id', tenantId)
+  const { data, error } = await q.order('code')
+  if (error) {
+    console.error(`${context} error:`, error)
+    return []
+  }
+  return data || []
+}
 
 /* ------------------------------------------------------------------ */
 /*  ROOT                                                                */
@@ -43,15 +58,7 @@ export default function AccountingHub({ userName, isAdmin, role }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   const loadAccounts = async () => {
-    const tenantId = getTenantId()
-    let q = supabase
-      .from('chart_of_accounts')
-      .select('*')
-      .eq('is_active', true)
-    if (tenantId) q = q.eq('tenant_id', tenantId)
-    const { data, error } = await q.order('code')
-    if (error) { console.error('loadAccounts error:', error); setAccounts([]); return }
-    setAccounts(data || [])
+    setAccounts(await fetchActiveAccounts('AccountingHub loadAccounts'))
   }
 
   useEffect(() => {
@@ -808,12 +815,16 @@ function CoaTab({ accounts, reload, flash, isAdmin }) {
 
   const submit = async () => {
     if (!f.code || !f.name) return
+    const tenantId = getTenantId()
+    const payload = withTenantInsert({ code: f.code.trim(), name: f.name.trim(), type: f.type })
 
     if (editId) {
-      const { error } = await supabase
+      let query = supabase
         .from('chart_of_accounts')
-        .update({ code: f.code.trim(), name: f.name.trim(), type: f.type })
+        .update(payload)
         .eq('id', editId)
+      if (tenantId) query = query.eq('tenant_id', tenantId)
+      const { error } = await query
       if (error) {
         flash(error.message)
         return
@@ -826,7 +837,7 @@ function CoaTab({ accounts, reload, flash, isAdmin }) {
 
     const { error } = await supabase
       .from('chart_of_accounts')
-      .insert({ code: f.code.trim(), name: f.name.trim(), type: f.type })
+      .insert(payload)
     if (error) {
       flash(error.message)
       return
@@ -868,7 +879,10 @@ function CoaTab({ accounts, reload, flash, isAdmin }) {
     const ok = window.confirm(`Delete account ${row.code} - ${row.name}?`)
     if (!ok) return
 
-    const { error } = await supabase.from('chart_of_accounts').delete().eq('id', targetId)
+    const tenantId = getTenantId()
+    let query = supabase.from('chart_of_accounts').delete().eq('id', targetId)
+    if (tenantId) query = query.eq('tenant_id', tenantId)
+    const { error } = await query
     if (error) {
       flash('Admin access required, or account is in use.')
       return
@@ -1564,11 +1578,7 @@ export function VoucherEntryPage({ userName, isAdmin, role }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   const loadAccounts = async () => {
-    const tenantId = getTenantId()
-    let q = supabase.from('chart_of_accounts').select('*').eq('is_active', true)
-    if (tenantId) q = q.eq('tenant_id', tenantId)
-    const { data } = await q.order('code')
-    setAccounts(data || [])
+    setAccounts(await fetchActiveAccounts('VoucherEntryPage loadAccounts'))
   }
 
   useEffect(() => {
@@ -1609,15 +1619,7 @@ export function ChartOfAccountsPage({ isAdmin }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   const loadAccounts = async () => {
-    const tenantId = getTenantId()
-    let q = supabase
-      .from('chart_of_accounts')
-      .select('*')
-      .eq('is_active', true)
-    if (tenantId) q = q.eq('tenant_id', tenantId)
-    const { data, error } = await q.order('code')
-    if (error) { console.error('loadAccounts error:', error); setAccounts([]); return }
-    setAccounts(data || [])
+    setAccounts(await fetchActiveAccounts('ChartOfAccountsPage loadAccounts'))
   }
   useEffect(() => { loadAccounts() }, [])
 
@@ -1640,10 +1642,7 @@ export function FixedAssetsPage({ userName }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   useEffect(() => {
-    const tenantId = getTenantId()
-    let q = supabase.from('chart_of_accounts').select('*').eq('is_active', true)
-    if (tenantId) q = q.eq('tenant_id', tenantId)
-    q.order('code').then(({ data }) => setAccounts(data || []))
+    fetchActiveAccounts('FixedAssetsPage loadAccounts').then(setAccounts)
   }, [])
 
   return (
@@ -1665,10 +1664,7 @@ export function OpeningBalancePage({ userName }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   useEffect(() => {
-    const tenantId = getTenantId()
-    let q = supabase.from('chart_of_accounts').select('*').eq('is_active', true)
-    if (tenantId) q = q.eq('tenant_id', tenantId)
-    q.order('code').then(({ data }) => setAccounts(data || []))
+    fetchActiveAccounts('OpeningBalancePage loadAccounts').then(setAccounts)
   }, [])
 
   return (
@@ -1690,10 +1686,7 @@ export function TransactionMappingPage({ userName }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
 
   useEffect(() => {
-    const tenantId = getTenantId()
-    let q = supabase.from('chart_of_accounts').select('*').eq('is_active', true)
-    if (tenantId) q = q.eq('tenant_id', tenantId)
-    q.order('code').then(({ data }) => setAccounts(data || []))
+    fetchActiveAccounts('TransactionMappingPage loadAccounts').then(setAccounts)
   }, [])
 
   return (
