@@ -73,232 +73,327 @@ export default function VATReturn() {
 
   function printMushak91() {
   const win = window.open("", "_blank");
-  const ml = monthLabel();
   const [y, m] = month.split("-");
-  const taxPeriod = `${m}/${y}`;
-  const today = new Date().toLocaleDateString("en-GB");
+  const taxPeriodLabel = new Date(+y, +m - 1, 1)
+    .toLocaleString("en-BD", { month: "long", year: "numeric" });
+  const today = new Date().toLocaleDateString("en-GB").replace(/\//g, "/");
+
+  // Split sales by rate
+  const roomSales = salesRows.filter(r => (+r.vat / +r.taxable_value) > 0.10);
+  const restSales = salesRows.filter(r => (+r.vat / +r.taxable_value) <= 0.10 && +r.vat > 0);
+  const roomTaxable = roomSales.reduce((s, r) => s + +r.taxable_value, 0);
+  const roomVAT     = roomSales.reduce((s, r) => s + +r.vat, 0);
+  const restTaxable = restSales.reduce((s, r) => s + +r.taxable_value, 0);
+  const restVAT     = restSales.reduce((s, r) => s + +r.vat, 0);
+
+  const n = v => Number(v).toLocaleString("en-BD", { minimumFractionDigits: 2 });
+  const blank = `<td></td>`;
 
   win.document.write(`<!DOCTYPE html><html><head>
-    <title>মূসক ৯.১ — ${ml}</title>
+    <title>Mushak-9.1 — ${taxPeriodLabel}</title>
     <meta charset="UTF-8"/>
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:"Arial",sans-serif;font-size:11px;color:#000;padding:15px;background:#fff}
-      .page{max-width:900px;margin:0 auto;border:2px solid #000;padding:10px}
-      .header{text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:8px}
-      .header h1{font-size:14px;font-weight:bold;letter-spacing:1px}
-      .header h2{font-size:12px;font-weight:bold;margin-top:2px}
-      .header h3{font-size:11px;font-weight:normal;margin-top:2px}
-      .section{border:1px solid #000;margin-bottom:6px}
-      .section-title{background:#d0d0d0;font-weight:bold;font-size:11px;padding:3px 6px;border-bottom:1px solid #000}
-      .row{display:flex;border-bottom:1px solid #ccc;min-height:20px}
-      .row:last-child{border-bottom:none}
-      .note-no{width:28px;border-right:1px solid #ccc;text-align:center;padding:2px;font-weight:bold;font-size:10px;color:#333;flex-shrink:0}
-      .label{flex:1;padding:2px 5px;border-right:1px solid #ccc}
-      .val{width:130px;text-align:right;padding:2px 5px;border-right:1px solid #ccc;font-weight:600}
-      .val2{width:100px;text-align:right;padding:2px 5px;border-right:1px solid #ccc}
-      .val3{width:100px;text-align:right;padding:2px 5px}
+      body{font-family:Arial,sans-serif;font-size:11px;color:#000;background:#fff;padding:20px}
+      .page{max-width:820px;margin:0 auto}
+      /* Header */
+      .hdr{text-align:center;margin-bottom:12px}
+      .hdr img{height:60px}
+      .hdr h1{font-size:13px;font-weight:bold}
+      .hdr h2{font-size:12px;font-weight:bold;margin-top:2px}
+      .hdr .form-tag{float:right;border:2px solid #000;padding:4px 10px;font-weight:bold;font-size:12px;margin-top:-36px}
+      /* Tables */
+      table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px}
+      th,td{border:1px solid #000;padding:4px 6px;vertical-align:top}
+      th{background:#f0f0f0;font-weight:bold;text-align:center}
+      .part-title{background:#000;color:#fff;font-weight:bold;text-align:center;font-size:11px;padding:3px;margin:8px 0 4px;letter-spacing:.5px}
+      .label-col{width:65%;font-weight:normal}
+      .note-col{width:8%;text-align:center;font-weight:bold}
+      .val-col{width:27%;text-align:right;font-weight:600}
+      .amt-col{text-align:right}
       .bold{font-weight:bold}
-      .total-row{background:#f0f0f0}
-      .net-row{background:#c8e6c9;font-weight:bold}
-      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
-      .info-cell{padding:3px 6px;border-bottom:1px solid #ccc;border-right:1px solid #ccc;display:flex;gap:5px}
-      .info-cell:nth-child(even){border-right:none}
-      .info-label{font-weight:bold;min-width:120px;color:#333}
-      .sub-table{width:100%;border-collapse:collapse;font-size:10px}
-      .sub-table th{background:#e0e0e0;border:1px solid #999;padding:3px 5px;text-align:center;font-weight:bold}
-      .sub-table td{border:1px solid #ccc;padding:2px 5px}
-      .sub-table .num{text-align:right}
-      .sub-table .total-row td{background:#e8f5e9;font-weight:bold}
-      .col-note{width:35px;text-align:center}
-      .col-val{width:120px;text-align:right}
-      .col-sd{width:100px;text-align:right}
-      .col-vat{width:100px;text-align:right}
-      .decl{margin-top:6px;border:1px solid #000;padding:8px;font-size:10px}
-      .decl p{margin-bottom:4px}
-      .sig-row{display:flex;justify-content:space-between;margin-top:30px}
-      .sig-box{text-align:center;width:200px}
-      .sig-box .line{border-top:1px solid #000;padding-top:4px;margin-top:20px;font-size:10px}
-      @media print{
-        body{padding:5px}
-        .page{border:none;padding:5px}
-        button{display:none}
-        .section{page-break-inside:avoid}
-      }
+      .total{background:#e8e8e8;font-weight:bold}
+      .net{background:#c8e6c9;font-weight:bold}
+      .subform-title{font-weight:bold;text-decoration:underline;margin:8px 0 3px;font-size:11px}
+      /* Declaration */
+      .decl-table td{border:1px solid #000;padding:5px 8px}
+      .sig{margin-top:40px;display:flex;justify-content:space-between}
+      .sig-box{text-align:center;width:220px}
+      .sig-box .line{border-top:1px solid #000;padding-top:5px;margin-top:30px;font-size:10px}
+      @media print{body{padding:5px} button{display:none} .page{page-break-after:always}}
     </style></head><body>
   <div class="page">
 
     <!-- HEADER -->
-    <div class="header">
-      <h1>গণপ্রজাতন্ত্রী বাংলাদেশ সরকার</h1>
-      <h1>GOVERNMENT OF THE PEOPLE'S REPUBLIC OF BANGLADESH</h1>
-      <h2>জাতীয় রাজস্ব বোর্ড / NATIONAL BOARD OF REVENUE</h2>
-      <h2>মূল্য সংযোজন কর রিটার্ন ফরম / VALUE ADDED TAX RETURN FORM</h2>
-      <h3>[বিধি ৪৭(১)] / [Rule 47(1)]</h3>
-      <h2 style="margin-top:4px;background:#333;color:#fff;padding:3px">মূসক-৯.১ / MUSHAK-9.1</h2>
+    <div class="hdr">
+      <h1>Government of the People's Republic of Bangladesh</h1>
+      <h2>National Board of Revenue</h2>
+      <h2 style="margin-top:6px;font-size:13px">VALUE ADDED TAX RETURN FORM</h2>
+      <p style="font-size:10px">[See Rule 47(1)]</p>
+      <p style="font-size:10px">[Please read the instructions before filling up this form]</p>
+      <div class="form-tag">Mushak-9.1</div>
+      <div style="clear:both"></div>
     </div>
 
-    <!-- SECTION 1: TAXPAYER INFO -->
-    <div class="section">
-      <div class="section-title">SECTION - 1: TAXPAYER'S INFORMATION / করদাতার তথ্য</div>
-      <div class="info-grid">
-        <div class="info-cell"><span class="info-label">1. BIN:</span> <span>${"N/A"}</span></div>
-        <div class="info-cell"><span class="info-label">4. Nature of Business:</span> <span>Hotel/Resort Service</span></div>
-        <div class="info-cell" style="grid-column:1/-1"><span class="info-label">2. Name of Taxpayer:</span> <span>${companyName}</span></div>
-        <div class="info-cell" style="grid-column:1/-1"><span class="info-label">3. Address:</span> <span>Sreemangal, Moulvibazar, Sylhet, Bangladesh</span></div>
-        <div class="info-cell"><span class="info-label">5. Economic Activity:</span> <span>Accommodation, Food & Beverage</span></div>
-        <div class="info-cell"><span class="info-label">VAT Circle:</span> <span>Sreemangal</span></div>
-      </div>
-    </div>
+    <!-- PART 1 -->
+    <div class="part-title">PART - 1: TAXPAYER'S INFORMATION</div>
+    <table>
+      <tr><td class="bold" style="width:30%">1. BIN</td><td>${"001892112-0702"}</td></tr>
+      <tr><td class="bold">2. Name of Taxpayer</td><td>${companyName.toUpperCase()}</td></tr>
+      <tr><td class="bold">3. Address of Taxpayer</td><td>Bishamoni, Sreemangal, Moulvibazar, PO: 3210; Sreemangal PS; Moulvibazar - 3210; Bangladesh</td></tr>
+      <tr><td class="bold">4. Type of Ownership</td><td>Private Limited</td></tr>
+      <tr><td class="bold">5. Economic Activity</td><td>Services</td></tr>
+    </table>
 
-    <!-- SECTION 2: RETURN SUBMISSION DATA -->
-    <div class="section">
-      <div class="section-title">SECTION - 2: RETURN SUBMISSION DATA / রিটার্ন দাখিলের তথ্য</div>
-      <div class="info-grid">
-        <div class="info-cell"><span class="info-label">1. Tax Period:</span> <span>${taxPeriod}</span></div>
-        <div class="info-cell"><span class="info-label">4. Date of Submission:</span> <span>${today}</span></div>
-        <div class="info-cell"><span class="info-label">2. Type of Return:</span> <span>✅ A) Main/Original Return (Section 64)</span></div>
-        <div class="info-cell"><span class="info-label">3. Any activities?</span> <span>✅ Yes</span></div>
-      </div>
-    </div>
+    <!-- PART 2 -->
+    <div class="part-title">PART - 2: RETURN SUBMISSION DATA</div>
+    <table>
+      <tr><td class="bold" style="width:60%">1. Tax Period</td><td>${taxPeriodLabel}</td></tr>
+      <tr><td class="bold">2. Type of Return</td><td>A) Main/Original Return (Section 64)</td></tr>
+      <tr><td class="bold">Reason for Amendment</td><td></td></tr>
+      <tr><td class="bold">2a. Economic Activity is Trader or Approved Wholesaler and Want to Pay VAT at 7.5% or 5% or 1.5%?</td><td>☑ No</td></tr>
+      <tr><td class="bold">2b. Any transactions above 2 lakh taka for this tax period?</td><td>☑ ${data?.totalTaxable > 200000 ? "Yes" : "No"}</td></tr>
+      <tr><td class="bold">3. Any activities in this Tax Period?</td><td>☑ Yes</td></tr>
+      <tr><td class="bold">4. Date of Submission</td><td>${today}</td></tr>
+      <tr><td class="bold">5. Last Amendment Date</td><td></td></tr>
+    </table>
 
-    <!-- SECTION 3: SUPPLY - OUTPUT TAX -->
-    <div class="section">
-      <div class="section-title">SECTION - 3: SUPPLY - OUTPUT TAX / সরবরাহ - আউটপুট কর</div>
-      <table class="sub-table">
-        <thead>
-          <tr>
-            <th class="col-note">Note</th>
-            <th>Nature of Supply / সরবরাহের ধরন</th>
-            <th class="col-val">Value (a) / মূল্য (ক)</th>
-            <th class="col-sd">SD (b)</th>
-            <th class="col-vat">VAT (c) / মূসক (গ)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td class="col-note">1</td><td>Zero Rated Goods/Service — Direct Export</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td></tr>
-          <tr><td class="col-note">2</td><td>Deemed Export</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td></tr>
-          <tr><td class="col-note">3</td><td>Exempted Goods/Service</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td></tr>
-          <tr><td class="col-note">4</td><td>Standard Rated Goods/Service (Room @ 15%) / কক্ষ ভাড়া</td>
-            <td class="num">${salesRows.filter(r=>+r.vat/+r.taxable_value > 0.1).reduce((s,r)=>s+ +r.taxable_value,0).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td class="num">0.00</td>
-            <td class="num">${salesRows.filter(r=>+r.vat/+r.taxable_value > 0.1).reduce((s,r)=>s+ +r.vat,0).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-          </tr>
-          <tr><td class="col-note">5</td><td>Goods Based on MRP</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td></tr>
-          <tr><td class="col-note">6</td><td>Goods/Service Based on Specific VAT</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td></tr>
-          <tr><td class="col-note">7</td><td>Goods/Service Other than Standard Rate (Restaurant @ 5%) / রেস্তোরাঁ</td>
-            <td class="num">${salesRows.filter(r=>+r.vat/+r.taxable_value <= 0.1 && +r.vat > 0).reduce((s,r)=>s+ +r.taxable_value,0).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td class="num">0.00</td>
-            <td class="num">${salesRows.filter(r=>+r.vat/+r.taxable_value <= 0.1 && +r.vat > 0).reduce((s,r)=>s+ +r.vat,0).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-          </tr>
-          <tr><td class="col-note">8</td><td>Retail/Wholesale/Trade Based Supply</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td></tr>
-          <tr class="total-row">
-            <td class="col-note bold">9</td>
-            <td class="bold">Total Sales Value & Total Payable Taxes / মোট বিক্রয় ও প্রদেয় কর</td>
-            <td class="num bold">${Number(data?.totalTaxable).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td class="num bold">0.00</td>
-            <td class="num bold">${Number(data?.outputVAT).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <!-- PART 3 -->
+    <div class="part-title">PART - 3: SUPPLY - OUTPUT TAX</div>
+    <table>
+      <tr>
+        <th style="width:38%">Nature of Supply</th>
+        <th style="width:7%">Note</th>
+        <th style="width:20%">Value (a)</th>
+        <th style="width:17%">SD (b)</th>
+        <th style="width:18%">VAT (c)</th>
+      </tr>
+      <tr><td>Zero Rated Goods/Service — Direct Export</td><td style="text-align:center">1</td><td class="amt-col"></td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Deemed Export</td><td style="text-align:center">2</td><td class="amt-col"></td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Exempted Goods/Service</td><td style="text-align:center">3</td><td class="amt-col"></td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Standard Rated Goods/Service</td><td style="text-align:center">4</td><td class="amt-col">${n(roomTaxable)}</td><td class="amt-col"></td><td class="amt-col">${n(roomVAT)}</td></tr>
+      <tr><td>Goods Based on MRP</td><td style="text-align:center">5</td><td class="amt-col"></td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Goods/Service Based on Specific VAT</td><td style="text-align:center">6</td><td class="amt-col"></td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Goods/Service Other than Standard Rate</td><td style="text-align:center">7</td><td class="amt-col">${n(restTaxable)}</td><td class="amt-col"></td><td class="amt-col">${n(restVAT)}</td></tr>
+      <tr><td>Retail/Wholesale/Trade Based Supply</td><td style="text-align:center">8</td><td class="amt-col"></td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr class="total"><td>Total Sales Value &amp; Total Payable Taxes</td><td style="text-align:center">9</td><td class="amt-col">${n(data?.totalTaxable)}</td><td class="amt-col"></td><td class="amt-col">${n(data?.outputVAT)}</td></tr>
+    </table>
 
-    <!-- SECTION 4: PURCHASE - INPUT TAX -->
-    <div class="section">
-      <div class="section-title">SECTION - 4: PURCHASE - INPUT TAX / ক্রয় - ইনপুট কর (রেয়াত)</div>
-      <table class="sub-table">
-        <thead>
-          <tr>
-            <th class="col-note">Note</th>
-            <th>Nature of Purchase / ক্রয়ের ধরন</th>
-            <th class="col-val">Value (a) / মূল্য (ক)</th>
-            <th class="col-vat">VAT (b) / মূসক (খ)</th>
-            <th style="width:80px;text-align:center">Rebate / রেয়াত</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td class="col-note">10</td><td>Zero Rated Goods/Service</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">—</td></tr>
-          <tr><td class="col-note">11</td><td>Exempted Goods/Service</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">—</td></tr>
-          ${purchaseRows.filter(r=>r.rebateable).map((r,i)=>`
-          <tr>
-            <td class="col-note">${12+i}</td>
-            <td>Standard Rated — ${r.vendor_name} (${r.invoice_no})</td>
-            <td class="num">${Number(r.taxable_value).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td class="num">${Number(r.vat_amount).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td class="num" style="color:green">✅ Claimable</td>
-          </tr>`).join("")}
-          ${purchaseRows.filter(r=>!r.rebateable).map(r=>`
-          <tr style="color:#888">
-            <td class="col-note">—</td>
-            <td>Non-Admissible (Capital Asset) — ${r.vendor_name} (${r.invoice_no})</td>
-            <td class="num">${Number(r.taxable_value).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td class="num">${Number(r.vat_amount).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td class="num" style="color:orange">❌ Capital</td>
-          </tr>`).join("")}
-          <tr class="total-row">
-            <td class="col-note bold">23</td>
-            <td class="bold">Total Input Tax Credit / মোট ইনপুট কর রেয়াত</td>
-            <td class="num bold">${Number(data?.totalPurchase).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td class="num bold">${Number(data?.claimableITC).toLocaleString("en-BD",{minimumFractionDigits:2})}</td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <!-- PART 4 -->
+    <div class="part-title">PART - 4: PURCHASE - INPUT TAX</div>
+    <table>
+      <tr>
+        <th style="width:38%">Nature of Purchase</th>
+        <th style="width:7%">Note</th>
+        <th style="width:27%">Value (a)</th>
+        <th style="width:28%">VAT (b)</th>
+      </tr>
+      <tr><td>Zero Rated Goods/Service — Local Purchase / Import</td><td style="text-align:center">10 / 11</td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Exempted Goods/Service — Local Purchase / Import</td><td style="text-align:center">12 / 13</td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Standard Rated Goods/Service — Local Purchase</td><td style="text-align:center">14</td>
+        <td class="amt-col">${n(purchaseRows.filter(r=>r.rebateable).reduce((s,r)=>s+ +r.taxable_value,0))}</td>
+        <td class="amt-col">${n(data?.claimableITC)}</td>
+      </tr>
+      <tr><td>Standard Rated Goods/Service — Import</td><td style="text-align:center">15</td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Goods/Service Other than Standard Rate — Local Purchase / Import</td><td style="text-align:center">16 / 17</td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Goods/Service Based on Specific VAT — Local / Import</td><td style="text-align:center">18 / 18a</td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr><td>Goods/Service Not Admissible for Credit (Capital Assets)</td><td style="text-align:center">19 / 20</td>
+        <td class="amt-col">${n(purchaseRows.filter(r=>!r.rebateable).reduce((s,r)=>s+ +r.taxable_value,0))}</td>
+        <td class="amt-col">${n(data?.nonClaimable)}</td>
+      </tr>
+      <tr><td>Credits not taken / Other Non-admissible</td><td style="text-align:center">21 / 22</td><td class="amt-col"></td><td class="amt-col"></td></tr>
+      <tr class="total"><td>Total Input Tax Credit</td><td style="text-align:center">23</td><td class="amt-col">${n(data?.totalPurchase)}</td><td class="amt-col">${n(data?.claimableITC)}</td></tr>
+    </table>
 
-    <!-- SECTION 5 & 6: ADJUSTMENTS -->
-    <div class="section">
-      <div class="section-title">SECTION - 5 & 6: ADJUSTMENTS / সমন্বয়</div>
-      <div class="row"><div class="note-no">24</div><div class="label">Increasing Adjustment — VAT Deducted at Source (VDS)</div><div class="val">0.00</div></div>
-      <div class="row"><div class="note-no">28</div><div class="label">Total Increasing Adjustment / মোট বর্ধিত সমন্বয়</div><div class="val bold">0.00</div></div>
-      <div class="row"><div class="note-no">29</div><div class="label">Decreasing Adjustment — Credit Note</div><div class="val">0.00</div></div>
-      <div class="row"><div class="note-no">33</div><div class="label">Total Decreasing Adjustment / মোট হ্রাসকৃত সমন্বয়</div><div class="val bold">0.00</div></div>
-    </div>
+    <!-- PART 5 -->
+    <div class="part-title">PART - 5: INCREASING ADJUSTMENTS (VAT)</div>
+    <table>
+      <tr><th style="width:65%">Adjustment Details</th><th style="width:10%">Note</th><th>VAT Amount</th></tr>
+      <tr><td>Due to VAT Deducted at Source by the Supply Receiver</td><td style="text-align:center">24</td><td class="amt-col"></td></tr>
+      <tr><td>Payment Not Made Through Banking Channel</td><td style="text-align:center">25</td><td class="amt-col"></td></tr>
+      <tr><td>Issuance of Debit Note</td><td style="text-align:center">26</td><td class="amt-col"></td></tr>
+      <tr><td>Any Other Adjustments</td><td style="text-align:center">27</td><td class="amt-col"></td></tr>
+      <tr class="total"><td>Total Increasing Adjustment</td><td style="text-align:center">28</td><td class="amt-col">0.00</td></tr>
+    </table>
 
-    <!-- SECTION 7: NET TAX CALCULATION -->
-    <div class="section">
-      <div class="section-title">SECTION - 7: NET TAX CALCULATION / নেট কর গণনা</div>
-      <div class="row"><div class="note-no">9C</div><div class="label">Total Output VAT (from Section 3) / মোট আউটপুট মূসক</div><div class="val">${Number(data?.outputVAT).toLocaleString("en-BD",{minimumFractionDigits:2})}</div></div>
-      <div class="row"><div class="note-no">23B</div><div class="label">Total Input Tax Credit / Rebate (from Section 4) / মোট রেয়াত</div><div class="val">(${Number(data?.claimableITC).toLocaleString("en-BD",{minimumFractionDigits:2})})</div></div>
-      <div class="row"><div class="note-no">28</div><div class="label">Total Increasing Adjustment</div><div class="val">0.00</div></div>
-      <div class="row"><div class="note-no">33</div><div class="label">Total Decreasing Adjustment</div><div class="val">0.00</div></div>
-      <div class="row net-row"><div class="note-no">34</div><div class="label bold">Net Payable VAT for the Tax Period (9C - 23B + 28 - 33) / নেট প্রদেয় মূসক</div><div class="val">${Number(data?.netPayable).toLocaleString("en-BD",{minimumFractionDigits:2})}</div></div>
-      <div class="row"><div class="note-no">41</div><div class="label">Interest on Overdue VAT</div><div class="val">0.00</div></div>
-      <div class="row"><div class="note-no">43</div><div class="label">Fine/Penalty for Non-submission of Return</div><div class="val">0.00</div></div>
-      <div class="row net-row"><div class="note-no">50</div><div class="label bold">Net Payable VAT for Treasury Deposit (35+41+43+44) / কোষাগারে জমাযোগ্য মূসক</div><div class="val">${Number(data?.netPayable).toLocaleString("en-BD",{minimumFractionDigits:2})}</div></div>
-    </div>
+    <!-- PART 6 -->
+    <div class="part-title">PART - 6: DECREASING ADJUSTMENTS (VAT)</div>
+    <table>
+      <tr><th style="width:65%">Adjustment Details</th><th style="width:10%">Note</th><th>VAT Amount</th></tr>
+      <tr><td>Due to VAT Deducted at Source from the Supplies Delivered</td><td style="text-align:center">29</td><td class="amt-col"></td></tr>
+      <tr><td>Advance Tax Paid at Import Stage</td><td style="text-align:center">30</td><td class="amt-col"></td></tr>
+      <tr><td>Issuance of Credit Note</td><td style="text-align:center">31</td><td class="amt-col"></td></tr>
+      <tr><td>Any Other Adjustments</td><td style="text-align:center">32</td><td class="amt-col"></td></tr>
+      <tr class="total"><td>Total Decreasing Adjustment</td><td style="text-align:center">33</td><td class="amt-col">0.00</td></tr>
+    </table>
 
-    <!-- SECTION 9: TREASURY PAYMENT -->
-    <div class="section">
-      <div class="section-title">SECTION - 9: ACCOUNTS CODE WISE PAYMENT SCHEDULE (TREASURY DEPOSIT) / কোষাগার জমার তফসিল</div>
-      <div class="row"><div class="note-no">58</div><div class="label">VAT Deposit for Current Tax Period / চলতি করকালের মূসক জমা</div><div class="val">${Number(data?.netPayable).toLocaleString("en-BD",{minimumFractionDigits:2})}</div><div class="val2">A/C: 1/1133/0030/0311</div></div>
-      <div class="row"><div class="note-no">59</div><div class="label">SD Deposit for Current Tax Period</div><div class="val">0.00</div><div class="val2">A/C: 1/1133/0018/0711</div></div>
-    </div>
+    <!-- PART 7 -->
+    <div class="part-title">PART - 7: NET TAX CALCULATION</div>
+    <table>
+      <tr><th style="width:65%">Items</th><th style="width:10%">Note</th><th>Amount (Tax)</th></tr>
+      <tr><td>Net Payable VAT for the Tax Period (Section-45) (9c - 23b + 28 - 33)</td><td style="text-align:center">34</td><td class="amt-col">${n(data?.netPayable)}</td></tr>
+      <tr class="net"><td>Net Payable VAT after Adjustment with Closing Balance and balance of form 18.6 [34-(52+56)]</td><td style="text-align:center">35</td><td class="amt-col">${n(data?.netPayable)}</td></tr>
+      <tr><td>Net Payable Supplementary Duty (Before adjustment) [9b+38-(39+40)]</td><td style="text-align:center">36</td><td class="amt-col"></td></tr>
+      <tr><td>Net Payable SD after Adjustment [36-(53+57)]</td><td style="text-align:center">37</td><td class="amt-col"></td></tr>
+      <tr><td>Increasing Adjustment of Supplementary Duty</td><td style="text-align:center">38</td><td class="amt-col"></td></tr>
+      <tr><td>Decreasing Adjustment of Supplementary Duty</td><td style="text-align:center">39</td><td class="amt-col"></td></tr>
+      <tr><td>Supplementary Duty Paid on Inputs Against Exports</td><td style="text-align:center">40</td><td class="amt-col"></td></tr>
+      <tr><td>Interest on Overdue VAT (Based on note 35)</td><td style="text-align:center">41</td><td class="amt-col"></td></tr>
+      <tr><td>Interest on Overdue SD (Based on note 37)</td><td style="text-align:center">42</td><td class="amt-col"></td></tr>
+      <tr><td>Fine/Penalty for Non-submission of Return</td><td style="text-align:center">43</td><td class="amt-col"></td></tr>
+      <tr><td>Other Fine/Penalty/Interest</td><td style="text-align:center">44</td><td class="amt-col"></td></tr>
+      <tr><td>Payable Excise Duty</td><td style="text-align:center">45</td><td class="amt-col"></td></tr>
+      <tr><td>Payable Development Surcharge</td><td style="text-align:center">46</td><td class="amt-col"></td></tr>
+      <tr><td>Payable ICT Development Surcharge</td><td style="text-align:center">47</td><td class="amt-col"></td></tr>
+      <tr><td>Payable Health Care Surcharge</td><td style="text-align:center">48</td><td class="amt-col"></td></tr>
+      <tr><td>Payable Environmental Protection Surcharge</td><td style="text-align:center">49</td><td class="amt-col"></td></tr>
+      <tr class="net"><td class="bold">Net Payable VAT for Treasury Deposit (35+41+43+44)</td><td style="text-align:center">50</td><td class="amt-col bold">${n(data?.netPayable)}</td></tr>
+      <tr><td>Net Payable SD for Treasury Deposit (37+42)</td><td style="text-align:center">51</td><td class="amt-col"></td></tr>
+      <tr><td>Closing Balance of Last Tax Period (VAT)</td><td style="text-align:center">52</td><td class="amt-col">0.00</td></tr>
+      <tr><td>Closing Balance of Last Tax Period (SD)</td><td style="text-align:center">53</td><td class="amt-col"></td></tr>
+    </table>
 
-    <!-- SECTION 11: CLOSING BALANCE -->
-    <div class="section">
-      <div class="section-title">SECTION - 11: CLOSING BALANCE / সমাপনী জের</div>
-      <div class="row"><div class="note-no">65</div><div class="label">Closing Balance (VAT) / সমাপনী জের (মূসক)</div><div class="val">0.00</div></div>
-      <div class="row"><div class="note-no">66</div><div class="label">Closing Balance (SD) / সমাপনী জের (এসডি)</div><div class="val">0.00</div></div>
-    </div>
+    <!-- PART 8 -->
+    <div class="part-title">PART - 8: ADJUSTMENT FOR OLD ACCOUNT CURRENT BALANCE</div>
+    <table>
+      <tr><th style="width:75%">Items</th><th style="width:10%">Note</th><th>Amount</th></tr>
+      <tr><td>Remaining Balance (VAT) from Mushak-18.6, [Rule 118(5)]</td><td style="text-align:center">54</td><td class="amt-col"></td></tr>
+      <tr><td>Remaining Balance (SD) from Mushak-18.6, [Rule 118(5)]</td><td style="text-align:center">55</td><td class="amt-col"></td></tr>
+      <tr><td>Decreasing Adjustment for Note 54 (up to 30% of Note 34)</td><td style="text-align:center">56</td><td class="amt-col"></td></tr>
+      <tr><td>Decreasing Adjustment for Note 55 (up to 30% of Note 36)</td><td style="text-align:center">57</td><td class="amt-col"></td></tr>
+    </table>
 
-    <!-- SECTION 12: DECLARATION -->
-    <div class="decl">
-      <div class="section-title" style="margin:-8px -8px 8px;padding:3px 6px">SECTION - 12: DECLARATION / ঘোষণা</div>
-      <p>আমি এতদ্বারা ঘোষণা করছি যে, এই রিটার্ন ফরমে প্রদত্ত সকল তথ্য সম্পূর্ণ, সত্য ও নির্ভুল।</p>
-      <p>I hereby declare that all information provided in this Return Form are complete, true &amp; accurate. In case of any untrue/incomplete statement, I may be subjected to penal action under The Value Added Tax and Supplementary Duty Act, 2012.</p>
-      <div class="sig-row">
-        <div class="sig-box">
-          <div class="line">হিসাব কর্মকর্তা<br/>Accounts Officer</div>
-        </div>
-        <div class="sig-box">
-          <div class="line">ব্যবস্থাপক<br/>Manager</div>
-        </div>
-        <div class="sig-box">
-          <div class="line">অধিকৃত স্বাক্ষর<br/>Authorized Signatory<br/><small>Date: ${today}</small></div>
-        </div>
-      </div>
-    </div>
+    <!-- PART 9 -->
+    <div class="part-title">PART - 9: ACCOUNTS CODE WISE PAYMENT SCHEDULE (TREASURY DEPOSIT)</div>
+    <table>
+      <tr><th style="width:40%">Items</th><th style="width:8%">Note</th><th style="width:25%">Account Code</th><th>Amount</th></tr>
+      <tr><td>VAT Deposit for the Current Tax Period</td><td style="text-align:center">58</td><td>1 / 1133 / 0018 / 0311</td><td class="amt-col">${n(data?.netPayable)}</td></tr>
+      <tr><td>SD Deposit for the Current Tax Period</td><td style="text-align:center">59</td><td>1 / 1133 / 0018 / 0711</td><td class="amt-col"></td></tr>
+      <tr><td>Excise Duty</td><td style="text-align:center">60</td><td>1 / 1133 / 0018 / 0601</td><td class="amt-col"></td></tr>
+      <tr><td>Development Surcharge</td><td style="text-align:center">61</td><td>1 / 1103 / 0000 / 2225</td><td class="amt-col"></td></tr>
+      <tr><td>ICT Development Surcharge</td><td style="text-align:center">62</td><td>1 / 1103 / 0000 / 2214</td><td class="amt-col"></td></tr>
+      <tr><td>Health Care Surcharge</td><td style="text-align:center">63</td><td>1 / 1103 / 0000 / 2212</td><td class="amt-col"></td></tr>
+      <tr><td>Environmental Protection Surcharge</td><td style="text-align:center">64</td><td>1 / 1103 / 0000 / 2213</td><td class="amt-col"></td></tr>
+    </table>
+
+    <!-- PART 10 -->
+    <div class="part-title">PART - 10: CLOSING BALANCE</div>
+    <table>
+      <tr><th style="width:75%">Items</th><th style="width:10%">Note</th><th>Amount</th></tr>
+      <tr><td>Closing Balance (VAT) [58 - (50 + 67) + The Refund Amount Not Approved]</td><td style="text-align:center">65</td><td class="amt-col">0.00</td></tr>
+      <tr><td>Closing Balance (SD) [59 - (51 + 68) + The Refund amount Not Approved]</td><td style="text-align:center">66</td><td class="amt-col"></td></tr>
+    </table>
+
+    <!-- PART 11 -->
+    <div class="part-title">PART - 11: REFUND</div>
+    <table>
+      <tr><td style="width:75%">I am interested to get refund of my Closing Balance</td><td>☑ No</td></tr>
+      <tr><th>Items</th><th>Note</th><th>Amount</th></tr>
+      <tr><td>Requested Amount for Refund (VAT)</td><td style="text-align:center">67</td><td class="amt-col"></td></tr>
+      <tr><td>Requested Amount for Refund (SD)</td><td style="text-align:center">68</td><td class="amt-col"></td></tr>
+    </table>
+    <p style="font-size:10px;margin-bottom:8px">Note: To claim Refund taxpayer must have TIN and Local Bank Account</p>
+
+    <!-- PART 12 -->
+    <div class="part-title">PART - 12: DECLARATION</div>
+    <table class="decl-table">
+      <tr><td style="width:30%" class="bold">Name *</td><td></td></tr>
+      <tr><td class="bold">Designation</td><td></td></tr>
+      <tr><td class="bold">Mobile Number *</td><td></td></tr>
+      <tr><td class="bold">National ID/Passport Number *</td><td></td></tr>
+      <tr><td class="bold">Email *</td><td></td></tr>
+    </table>
+    <p style="font-size:10px;margin:8px 0">
+      ☑ I hereby declare that all information provided in this Return Form are complete, true &amp; accurate.
+      In case of any untrue/incomplete statement, I may be subjected to penal action under The Value Added
+      Tax and Supplementary Duty Act, 2012 or any other applicable Act prevailing at present.
+    </p>
+    <p style="font-size:10px">Signature [Not required for electronic submission]</p>
+
+    <hr style="margin:20px 0 10px"/>
+
+    <!-- SUB-FORMS -->
+    <div class="part-title">Sub-form of Part - 3.4: Standard Rated Goods/Service</div>
+    <table>
+      <tr>
+        <th>Goods/Service Commercial Description</th>
+        <th>Goods/Service Code</th>
+        <th>Goods/Service Name</th>
+        <th>Value (a)</th>
+        <th>SD (b)</th>
+        <th>VAT (c)</th>
+        <th>Notes</th>
+      </tr>
+      ${roomSales.length > 0
+        ? `<tr><td>Service</td><td>S001.10</td><td>Hotel: without bar &amp; floor show</td><td class="amt-col">${n(roomTaxable)}</td><td class="amt-col">0</td><td class="amt-col">${n(roomVAT)}</td><td></td></tr>`
+        : `<tr><td colspan="7" style="text-align:center;color:#999">No standard rated sales this period</td></tr>`
+      }
+      <tr class="total"><td colspan="3">TOTAL</td><td class="amt-col">${n(roomTaxable)}</td><td class="amt-col">0</td><td class="amt-col">${n(roomVAT)}</td><td></td></tr>
+    </table>
+
+    <div class="part-title">Sub-form of Part - 3.7: Goods/Service Based on Minimum Value Addition/Other Rates</div>
+    <table>
+      <tr>
+        <th>Goods/Service Commercial Description</th>
+        <th>Goods/Service Code</th>
+        <th>Goods/Service Name</th>
+        <th>Value (a)</th>
+        <th>SD (b)</th>
+        <th>VAT (c)</th>
+        <th>Notes</th>
+      </tr>
+      ${restSales.length > 0
+        ? `<tr><td>Service</td><td>S001.20</td><td>Restaurant: without bar/floor show</td><td class="amt-col">${n(restTaxable)}</td><td class="amt-col">0</td><td class="amt-col">${n(restVAT)}</td><td>VAT for ${taxPeriodLabel}</td></tr>`
+        : `<tr><td colspan="7" style="text-align:center;color:#999">No restaurant sales this period</td></tr>`
+      }
+      <tr class="total"><td colspan="3">TOTAL</td><td class="amt-col">${n(restTaxable)}</td><td class="amt-col">0</td><td class="amt-col">${n(restVAT)}</td><td></td></tr>
+    </table>
+
+    <div class="part-title">Sub-form of Part - 4.14: Standard Rated Purchase — Input Tax Credit</div>
+    <table>
+      <tr>
+        <th>Treasury Challan / Invoice No.</th>
+        <th>Date</th>
+        <th>Vendor Name</th>
+        <th>Vendor BIN</th>
+        <th>Description</th>
+        <th>Value (a)</th>
+        <th>VAT (b)</th>
+        <th>Rebate</th>
+      </tr>
+      ${purchaseRows.map(r => `
+      <tr>
+        <td>${r.invoice_no}</td>
+        <td>${r.entry_date}</td>
+        <td>${r.vendor_name}</td>
+        <td>${r.vendor_bin || "—"}</td>
+        <td style="font-size:10px">${r.description || "—"}</td>
+        <td class="amt-col">${n(r.taxable_value)}</td>
+        <td class="amt-col">${n(r.vat_amount)}</td>
+        <td style="text-align:center">${r.rebateable ? "✅" : "❌ Capital"}</td>
+      </tr>`).join("")}
+      <tr class="total">
+        <td colspan="5">TOTAL Claimable ITC</td>
+        <td class="amt-col">${n(data?.totalPurchase)}</td>
+        <td class="amt-col">${n(data?.claimableITC)}</td>
+        <td></td>
+      </tr>
+    </table>
+
+    <div class="part-title">Sub-form of Part - 9.58: VAT Deposit for The Tax Period</div>
+    <table>
+      <tr>
+        <th>Treasury Challan Number/Token Number</th>
+        <th>Bank</th>
+        <th>Branch</th>
+        <th>Date</th>
+        <th>Account Code</th>
+        <th>Amount</th>
+        <th>Notes</th>
+      </tr>
+      <tr><td></td><td></td><td></td><td>${today}</td><td>1 / 1133 / 0018 / 0311</td><td class="amt-col">${n(data?.netPayable)}</td><td>VAT for ${taxPeriodLabel}</td></tr>
+      <tr class="total"><td colspan="5">TOTAL</td><td class="amt-col">${n(data?.netPayable)}</td><td></td></tr>
+    </table>
 
   </div>
   <script>window.onload=()=>window.print()</script>
