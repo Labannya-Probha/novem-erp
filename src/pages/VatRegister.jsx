@@ -63,6 +63,7 @@ export default function VatRegister() {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr>
             <th className="th">SL</th><th className="th">Date</th><th className="th">Invoice No.</th>
@@ -96,6 +97,7 @@ export default function VatRegister() {
             </tr></tfoot>
           )}
         </table>
+        </div>
       </div>
 
       <div className="mt-4 px-4 py-3 rounded-lg bg-leaf/40 text-pine text-xs">

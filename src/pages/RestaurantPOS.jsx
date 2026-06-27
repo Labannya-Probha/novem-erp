@@ -413,6 +413,7 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
         <button className="btn-ghost !py-1" onClick={load}><RotateCcw size={13} /> Refresh</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -451,6 +452,7 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

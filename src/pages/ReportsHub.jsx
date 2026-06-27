@@ -118,6 +118,7 @@ const DateRange = ({ from, to, setFrom, setTo, onRun, data, onExport, onPrint })
 
 const Tbl = ({ heads, rows, footRow }) => (
   <div className="card overflow-hidden">
+    <div className="overflow-x-auto">
     <table className="w-full">
       <thead>
         <tr>{heads.map((h, i) => <th key={i} className={`th ${h.right ? 'text-right' : ''}`}>{h.label}</th>)}</tr>
@@ -146,6 +147,7 @@ const Tbl = ({ heads, rows, footRow }) => (
         )}
       </tbody>
     </table>
+    </div>
   </div>
 )
 

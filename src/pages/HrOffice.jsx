@@ -302,6 +302,7 @@ function EmployeesTab({ flash, isAdmin, userName, company }) {
         <button className="btn-primary justify-center" onClick={add}><Plus size={15} /> Add</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Code</th><th className="th">Name</th><th className="th">Designation</th><th className="th">Dept</th><th className="th text-right">Gross</th><th className="th">Status</th></tr></thead>
           <tbody>
@@ -316,6 +317,7 @@ function EmployeesTab({ flash, isAdmin, userName, company }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={6}>No employees yet.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -344,6 +346,7 @@ function AttendanceTab({ flash }) {
     <div className="space-y-4">
       <div className="card p-4 flex items-center gap-3"><CalendarDays size={16} className="text-forest" /><span className="label !mb-0">Date</span><input type="date" className="input !w-44" value={date} onChange={(e) => setDate(e.target.value)} /></div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Code</th><th className="th">Employee</th><th className="th">Mark</th></tr></thead>
           <tbody>
@@ -356,6 +359,7 @@ function AttendanceTab({ flash }) {
             {emps.length === 0 && <tr><td className="td text-pine/40" colSpan={3}>No active employees.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -391,6 +395,7 @@ function LeaveTab({ flash, userName, canApprove }) {
         <button className="btn-primary justify-center" onClick={apply}><Plus size={15} /> Apply</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Employee</th><th className="th">Type</th><th className="th">From → To</th><th className="th text-right">Days</th><th className="th text-right">Balance</th><th className="th">Status</th><th className="th"></th></tr></thead>
           <tbody>
@@ -405,6 +410,7 @@ function LeaveTab({ flash, userName, canApprove }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={7}>No leave applications.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -432,6 +438,7 @@ function CompLeaveTab({ flash }) {
         <button className="btn-primary justify-center" onClick={add}><Plus size={15} /> Earn</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Employee</th><th className="th">Earned</th><th className="th text-right">Days</th><th className="th">Reason</th><th className="th">Used</th></tr></thead>
           <tbody>
@@ -439,6 +446,7 @@ function CompLeaveTab({ flash }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={5}>No compensatory leave recorded.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -560,6 +568,7 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
         </div>
         {locked && <div className="px-4 py-2 rounded-lg bg-amber/10 text-amber text-sm">This run is {active.status.toLowerCase()} — amounts are locked.</div>}
         <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead><tr>
               <th className="th">Employee</th><th className="th text-right">Gross</th>
@@ -592,6 +601,7 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
             </tbody>
             {slips.length > 0 && <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={11}>Total net payable</td><td className="td text-right">{fmtBDT(totalNet)}</td><td className="td"></td></tr></tfoot>}
           </table>
+          </div>
         </div>
         {printSlip && <PrintPortal title={`Payslip — ${printSlip.full_name}`} onClose={() => setPrintSlip(null)}><PayslipDoc slip={printSlip} run={active} company={company} /></PrintPortal>}
       </div>
@@ -606,6 +616,7 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
         {canApprove && <button className="btn-primary" disabled={busy} onClick={generateRun}><Wallet size={15} /> {busy ? 'Generating…' : 'Generate payroll'}</button>}
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Period</th><th className="th">Status</th><th className="th">Generated by</th><th className="th text-right">Open</th></tr></thead>
           <tbody>
@@ -613,6 +624,7 @@ function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
             {runs.length === 0 && <tr><td className="td text-pine/40" colSpan={4}>No payroll runs yet.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -678,6 +690,7 @@ function IncidentsTab({ flash, userName }) {
         <button className="btn-primary justify-center" onClick={add}><Plus size={15} /> Log</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Date</th><th className="th">Category</th><th className="th">Description</th><th className="th">Action</th><th className="th">By</th><th className="th">Status</th></tr></thead>
           <tbody>
@@ -685,6 +698,7 @@ function IncidentsTab({ flash, userName }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={6}>No incidents logged.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

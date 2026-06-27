@@ -202,6 +202,7 @@ function ItemsTab({ flash, isAdmin }) {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -234,6 +235,7 @@ function ItemsTab({ flash, isAdmin }) {
             {filtered.length === 0 && <tr><td className="td text-pine/40 text-center py-6" colSpan={7}>No items found.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -278,6 +280,7 @@ function VendorsTab({ flash, isAdmin }) {
         </div>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Vendor</th><th className="th">BIN</th><th className="th">Phone</th><th className="th">Address</th><th className="th text-right">Actions</th></tr></thead>
           <tbody>
@@ -298,6 +301,7 @@ function VendorsTab({ flash, isAdmin }) {
             {rows.length === 0 && <tr><td className="td text-pine/40 text-center py-6" colSpan={5}>No vendors.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -504,6 +508,7 @@ function RequisitionsTab({ flash, userName, canApprove, onCreatePO, onCreateTRF 
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -582,6 +587,7 @@ function RequisitionsTab({ flash, userName, canApprove, onCreatePO, onCreateTRF 
             {rows.length === 0 && <tr><td className="td text-pine/40 text-center py-6" colSpan={7}>No requisitions yet.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -740,6 +746,7 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -803,6 +810,7 @@ function POTab({ flash, userName, canApprove, navReq, clearNav }) {
             {rows.length === 0 && <tr><td className="td text-pine/40 text-center py-6" colSpan={7}>No purchase orders.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -975,6 +983,7 @@ function GRNTab({ flash, userName }) {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -1027,6 +1036,7 @@ function GRNTab({ flash, userName }) {
             {rows.length === 0 && <tr><td className="td text-pine/40 text-center py-6" colSpan={8}>No goods receipts.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -1177,6 +1187,7 @@ function TransfersTab({ flash, userName, navReq, clearNav }) {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -1227,6 +1238,7 @@ function TransfersTab({ flash, userName, navReq, clearNav }) {
             {rows.length === 0 && <tr><td className="td text-pine/40 text-center py-6" colSpan={7}>No transfers.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -1370,6 +1382,7 @@ function ReturnsTab({ flash, userName }) {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr><th className="th">RET No</th><th className="th">Date</th><th className="th">Type</th><th className="th">Vendor</th><th className="th">From</th><th className="th">Items</th><th className="th text-right">Actions</th></tr>
@@ -1415,6 +1428,7 @@ function ReturnsTab({ flash, userName }) {
             {rows.length === 0 && <tr><td className="td text-pine/40 text-center py-6" colSpan={7}>No returns.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
