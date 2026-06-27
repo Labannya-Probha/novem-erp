@@ -1,120 +1,176 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { fmtBDT, todayISO, exportXLSX, nightsBetween } from '../lib/helpers'
-import ReceiptPaymentModal from './ReceiptPaymentModal'
+import { fmtBDT, todayISO, exportXLSX } from '../lib/helpers'
 import {
   BarChart3, FileDown, AlertCircle, TrendingUp, ShoppingBag, Banknote,
   Scale, BookOpen, PieChart, Activity, Landmark, CreditCard, BookMarked,
   Printer, Users, Building2, FileText, LayoutDashboard,
-  ChevronDown, ChevronRight, Plus, Minus, RefreshCw, ShieldCheck,
-  Search, ArrowLeft, FolderOpen, Filter
+  Search, ArrowLeft, FolderOpen, Filter, RefreshCw
 } from 'lucide-react'
 
 /* ══════════════════════════════════════════════════════════════════════
    ENTERPRISE REPORT DEFINITIONS
 ══════════════════════════════════════════════════════════════════════ */
 const TABS = [
-  // Overview
   { id: 'dashboard',         label: 'Management Dashboard',    desc: 'High-level KPI overview across all modules', icon: LayoutDashboard, group: 'Overview' },
   { id: 'owner_statement',   label: 'Owner Statement',         desc: 'Unified revenue, expenses, and net profit', icon: Users,           group: 'Overview' },
-  
-  // Operations
   { id: 'sales',             label: 'Sales & Revenue',         desc: 'Detailed breakdown of sales and reservations', icon: TrendingUp,      group: 'Operations' },
   { id: 'occupancy',         label: 'Occupancy & RevPAR',      desc: 'Room occupancy rates and revenue per available room', icon: Building2,       group: 'Operations' },
   { id: 'guest_ledger',      label: 'Guest Ledger',            desc: 'In-house guest outstanding balances', icon: FileText,        group: 'Operations' },
   { id: 'city_ledger',       label: 'City Ledger',             desc: 'Corporate and agency receivables', icon: Building2,       group: 'Operations' },
-  { id: 'agency_commission', label: 'Agency Commission',       desc: 'Commission payouts for OTAs and agents', icon: Banknote,        group: 'Operations' },
-  { id: 'shareholder',       label: 'Shareholder Entitlement', desc: 'Dividend and free-stay tracking', icon: Users,           group: 'Operations' },
   { id: 'audit_trail',       label: 'Audit Trail & Logs',      desc: 'System-wide user activity and modification logs', icon: ShieldCheck,     group: 'Operations' },
-  
-  // Restaurant
   { id: 'pos',               label: 'POS Sales Summary',       desc: 'Outlet-wise POS transaction summary', icon: ShoppingBag,     group: 'Restaurant' },
-  { id: 'kot',               label: 'KOT Register',            desc: 'Kitchen Order Ticket logs and status', icon: FileText,        group: 'Restaurant' },
-  { id: 'fnb_revenue',       label: 'F&B Daily Revenue',       desc: 'Daily food & beverage revenue consolidation', icon: PieChart,        group: 'Restaurant' },
-  
-  // Accounting & Financials
-  { id: 'receipt_payment',   label: 'Receipt & Payment',       desc: 'Summary of cash/bank receipts and payments', icon: Activity,        group: 'Accounting' }, // NEW REPORT
+  { id: 'receipt_payment',   label: 'Receipt & Payment',       desc: 'Summary of cash/bank receipts and payments', icon: Activity,        group: 'Accounting' },
   { id: 'pl',                label: 'Profit & Loss',           desc: 'Income statement (IAS 1 compliant)', icon: PieChart,        group: 'Accounting' },
   { id: 'balance_sheet',     label: 'Balance Sheet',           desc: 'Statement of financial position', icon: Landmark,        group: 'Accounting' },
-  { id: 'cashflow',          label: 'Cash Flow Statement',     desc: 'Inflows and outflows by operating/investing/financing', icon: Activity,        group: 'Accounting' },
   { id: 'trial_balance',     label: 'Trial Balance',           desc: 'Debit and credit balances for all accounts', icon: Scale,           group: 'Accounting' },
   { id: 'ledger',            label: 'General Ledger',          desc: 'Detailed transaction logs per account', icon: BookOpen,        group: 'Accounting' },
-  { id: 'bank_book',         label: 'Bank Book',               desc: 'Bank and digital wallet transactions', icon: BookMarked,      group: 'Accounting' },
-  { id: 'cash_book',         label: 'Cash Book',               desc: 'Petty cash and main cash transactions', icon: BookMarked,      group: 'Accounting' },
-  { id: 'bank_recon',        label: 'Bank Reconciliation',     desc: 'Match system books with bank statements', icon: CreditCard,      group: 'Accounting' },
-  { id: 'retained_earnings', label: 'Retained Earnings',       desc: 'Accumulated profits and dividend distributions', icon: Banknote,        group: 'Accounting' },
-  { id: 'nav',               label: 'NAV / Equity Report',     desc: 'Net asset value calculation per share', icon: TrendingUp,      group: 'Accounting' },
-  { id: 'ap_aging',          label: 'AP Aging',                desc: 'Accounts payable duration analysis', icon: AlertCircle,     group: 'Accounting' },
-  { id: 'ar_aging',          label: 'AR Aging',                desc: 'Accounts receivable duration analysis', icon: AlertCircle,     group: 'Accounting' },
-  
-  // Statutory
   { id: 'vat_sales',         label: 'VAT Sales (Mushak 6.1)',  desc: 'Statutory VAT output register', icon: FileText,        group: 'Statutory'  },
-  { id: 'vat_purchase',      label: 'VAT Purchase Register',   desc: 'Statutory VAT input and rebate register', icon: FileText,        group: 'Statutory'  },
-  { id: 'ait',               label: 'AIT Deduction Register',  desc: 'Tax deducted at source (TDS) under Section 52', icon: FileText,        group: 'Statutory'  },
 ]
 
 const GROUPS = ['All', 'Overview', 'Operations', 'Restaurant', 'Accounting', 'Statutory']
 const firstOfMonth = () => todayISO().slice(0, 8) + '01'
-const firstOfYear  = () => todayISO().slice(0, 4) + '-01-01'
 
 /* ══════════════════════════════════════════════════════════════════════
-   SHARED UI COMPONENTS (Kept from previous standard)
+   SHARED UI COMPONENTS
 ══════════════════════════════════════════════════════════════════════ */
 const DateRange = ({ from, to, setFrom, setTo, onRun, data, onExport, onPrint }) => (
   <div className="flex items-end gap-3 flex-wrap bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
-    <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">From Date</label><input type="date" className="input !w-40" value={from} onChange={e => setFrom(e.target.value)} /></div>
-    <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">To Date</label><input type="date" className="input !w-40" value={to} onChange={e => setTo(e.target.value)} /></div>
-    <button className="bg-slate-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-700 transition" onClick={onRun}>Generate Report</button>
+    <div>
+      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">From Date</label>
+      <input type="date" className="input !w-40 bg-slate-50 border-slate-200" value={from} onChange={e => setFrom(e.target.value)} />
+    </div>
+    <div>
+      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">To Date</label>
+      <input type="date" className="input !w-40 bg-slate-50 border-slate-200" value={to} onChange={e => setTo(e.target.value)} />
+    </div>
+    <button className="bg-slate-800 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-slate-700 transition shadow-sm h-10" onClick={onRun}>
+      Generate
+    </button>
     <div className="flex-1"></div>
-    {data && onExport && <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-green-700 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100 transition" onClick={onExport}><FileDown size={16} /> Export Excel</button>}
-    {data && onPrint  && <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition" onClick={onPrint}><Printer size={16} /> Print PDF</button>}
+    {data && onExport && (
+      <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-green-700 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100 transition h-10" onClick={onExport}>
+        <FileDown size={16} /> Export
+      </button>
+    )}
+    {data && onPrint && (
+      <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-700 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition h-10" onClick={onPrint}>
+        <Printer size={16} /> Print
+      </button>
+    )}
   </div>
 )
 
-function Loading() { return <div className="text-slate-400 py-16 flex flex-col items-center justify-center gap-3 font-medium"><RefreshCw size={24} className="animate-spin" /> Processing data...</div> }
-function Err({ msg }) { return <div className="p-4 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 font-medium border border-red-200 mb-4"><AlertCircle size={18} />{msg}</div> }
+function Loading() { return <div className="text-slate-400 py-16 flex flex-col items-center justify-center gap-3 font-medium"><RefreshCw size={24} className="animate-spin" /> Fetching real-time data...</div> }
+function Err({ msg }) { return <div className="p-4 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 font-medium border border-red-200 mb-4 text-sm break-words"><AlertCircle size={18} className="shrink-0" />{msg}</div> }
 
 /* ══════════════════════════════════════════════════════════════════════
-   NEW: RECEIPT & PAYMENT STATEMENT
+   RECEIPT & PAYMENT STATEMENT (MULTI-TENANT REAL DATA PULL)
 ══════════════════════════════════════════════════════════════════════ */
-function ReceiptPaymentStatementTab() {
-  const [from, setFrom] = useState(firstOfMonth()); const [to, setTo] = useState(todayISO())
-  const [data, setData] = useState(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState(null)
+function ReceiptPaymentStatementTab({ tenantId }) {
+  const [from, setFrom] = useState(firstOfMonth()); 
+  const [to, setTo] = useState(todayISO())
+  const [data, setData] = useState(null); 
+  const [loading, setLoading] = useState(false); 
+  const [err, setErr] = useState(null)
 
   const run = useCallback(async () => {
+    if (!tenantId) {
+      setErr("Tenant ID is missing. Cannot fetch data.");
+      return;
+    }
+    
     setLoading(true); setErr(null)
     try {
-      // In a real ERP, opening balance is calculated by summing all previous transactions before 'from' date.
-      // Mocking fetch logic for structural demonstration
-      const openingCash = 150000; const openingBank = 450000;
-      
-      const receipts = [
-        { name: 'Room Sales Collection', val: 520000 },
-        { name: 'Restaurant Sales (Cash/Bank)', val: 180000 },
-        { name: 'Advance Bookings', val: 95000 },
-        { name: 'Sale of Scrap', val: 12000 }
-      ];
-      
-      const payments = [
-        { name: 'Raw Material Purchases', val: 210000 },
-        { name: 'Salary & Wages', val: 185000 },
-        { name: 'Utility Bills', val: 45000 },
-        { name: 'Vendor Payments (AP)', val: 130000 },
-        { name: 'Asset Purchase (AC Units)', val: 80000 }
-      ];
+      // 1. Calculate Opening Balance (All transactions BEFORE 'from' date)
+      // Assuming 'transactions' table has: type ('RECEIPT'/'PAYMENT'), method ('CASH'/'BANK'), amount, date, tenant_id
+      const { data: pastTxns, error: pastErr } = await supabase
+        .from('transactions')
+        .select('type, method, amount')
+        .eq('tenant_id', tenantId)
+        .lt('date', from);
 
-      const totalReceipts = receipts.reduce((a, b) => a + b.val, 0);
-      const totalPayments = payments.reduce((a, b) => a + b.val, 0);
-      
-      const closingCash = 120000;
-      const closingBank = (openingCash + openingBank + totalReceipts) - totalPayments - closingCash;
+      if (pastErr) throw pastErr;
 
-      setData({ openingCash, openingBank, receipts, payments, totalReceipts, totalPayments, closingCash, closingBank })
-    } catch (e) { setErr(e.message) } finally { setLoading(false) }
-  }, [from, to])
+      let openingCash = 0; let openingBank = 0;
+      (pastTxns || []).forEach(txn => {
+        const amt = Number(txn.amount);
+        if (txn.method === 'CASH') {
+          txn.type === 'RECEIPT' ? (openingCash += amt) : (openingCash -= amt);
+        } else {
+          txn.type === 'RECEIPT' ? (openingBank += amt) : (openingBank -= amt);
+        }
+      });
+
+      // 2. Fetch Current Period Transactions
+      const { data: currentTxns, error: currErr } = await supabase
+        .from('transactions')
+        .select('id, type, method, amount, ref, narration, date')
+        .eq('tenant_id', tenantId)
+        .gte('date', from)
+        .lte('date', to);
+
+      if (currErr) throw currErr;
+
+      // Grouping logic for the period
+      let receipts = []; let payments = [];
+      let totalReceipts = 0; let totalPayments = 0;
+
+      (currentTxns || []).forEach(txn => {
+        const amt = Number(txn.amount);
+        const item = { 
+          name: txn.narration || txn.ref || `${txn.method} Transaction`, 
+          val: amt,
+          method: txn.method
+        };
+
+        if (txn.type === 'RECEIPT') {
+          receipts.push(item);
+          totalReceipts += amt;
+        } else {
+          payments.push(item);
+          totalPayments += amt;
+        }
+      });
+
+      // Group identical narrations to prevent massive lists (Optional but recommended for statements)
+      const groupData = (arr) => {
+        const grouped = {};
+        arr.forEach(item => {
+          if(!grouped[item.name]) grouped[item.name] = 0;
+          grouped[item.name] += item.val;
+        });
+        return Object.entries(grouped).map(([name, val]) => ({ name, val }));
+      };
+
+      const groupedReceipts = groupData(receipts);
+      const groupedPayments = groupData(payments);
+
+      // 3. Calculate Closing Balance
+      let closingCash = openingCash; let closingBank = openingBank;
+      (currentTxns || []).forEach(txn => {
+        const amt = Number(txn.amount);
+        if (txn.method === 'CASH') {
+          txn.type === 'RECEIPT' ? (closingCash += amt) : (closingCash -= amt);
+        } else {
+          txn.type === 'RECEIPT' ? (closingBank += amt) : (closingBank -= amt);
+        }
+      });
+
+      setData({ 
+        openingCash, openingBank, 
+        receipts: groupedReceipts, payments: groupedPayments, 
+        totalReceipts, totalPayments, 
+        closingCash, closingBank 
+      })
+    } catch (e) { 
+      setErr(e.message) 
+    } finally { 
+      setLoading(false) 
+    }
+  }, [from, to, tenantId])
   
-  useEffect(() => { run() }, [])
+  useEffect(() => { run() }, [run])
 
   return (
     <div className="animate-in fade-in duration-300">
@@ -122,71 +178,76 @@ function ReceiptPaymentStatementTab() {
       {err && <Err msg={err} />}{loading && <Loading />}
       
       {data && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center py-6 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-xl font-bold text-slate-800 uppercase tracking-widest">Receipt & Payment Statement</h2>
-            <p className="text-sm text-slate-500 mt-1">For the period {from} to {to}</p>
-          </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto w-full">
+          <div className="min-w-[700px]">
+            {/* Header */}
+            <div className="text-center py-5 border-b border-slate-200 bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-widest break-words">Receipt & Payment Statement</h2>
+              <p className="text-sm text-slate-500 mt-1">For the period {from} to {to}</p>
+            </div>
 
-          <div className="grid grid-cols-2 divide-x divide-slate-200">
-            {/* RECEIPTS SIDE (LEFT) */}
-            <div className="p-0">
-              <div className="bg-slate-100/50 py-2 px-4 border-b border-slate-200 flex justify-between font-bold text-slate-700 text-sm">
-                <span>RECEIPTS</span><span>AMOUNT (৳)</span>
+            <div className="grid grid-cols-2 divide-x divide-slate-200">
+              {/* RECEIPTS SIDE */}
+              <div className="p-0">
+                <div className="bg-slate-100/70 py-2 px-4 border-b border-slate-200 flex justify-between font-bold text-slate-700 text-xs uppercase tracking-wider">
+                  <span>Receipts</span><span>Amount (৳)</span>
+                </div>
+                
+                <div className="p-4 space-y-4">
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-800 mb-2 border-b border-slate-100 pb-1 uppercase">Opening Balances</h4>
+                    <div className="flex justify-between text-sm text-slate-600 py-1"><span className="truncate pr-2">Cash in Hand</span><span className="money font-medium whitespace-nowrap">{fmtBDT(data.openingCash)}</span></div>
+                    <div className="flex justify-between text-sm text-slate-600 py-1"><span className="truncate pr-2">Cash at Bank</span><span className="money font-medium whitespace-nowrap">{fmtBDT(data.openingBank)}</span></div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-800 mb-2 border-b border-slate-100 pb-1 uppercase mt-4">Current Receipts</h4>
+                    {data.receipts.length === 0 ? <p className="text-xs text-slate-400 italic">No receipts</p> : 
+                      data.receipts.map((r, i) => (
+                        <div key={i} className="flex justify-between text-sm text-slate-600 py-1">
+                          <span className="truncate pr-2" title={r.name}>{r.name}</span>
+                          <span className="money whitespace-nowrap">{fmtBDT(r.val)}</span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
               </div>
-              
-              <div className="p-4 space-y-4">
-                {/* Opening Balance */}
-                <div>
-                  <h4 className="font-bold text-sm text-slate-800 mb-2 border-b border-slate-100 pb-1">Opening Balances</h4>
-                  <div className="flex justify-between text-sm text-slate-600 py-1"><span>Cash in Hand</span><span className="money">{fmtBDT(data.openingCash)}</span></div>
-                  <div className="flex justify-between text-sm text-slate-600 py-1"><span>Cash at Bank</span><span className="money">{fmtBDT(data.openingBank)}</span></div>
-                  <div className="flex justify-between text-sm font-bold text-slate-800 mt-2"><span>Total Opening Balance</span><span className="money">{fmtBDT(data.openingCash + data.openingBank)}</span></div>
+
+              {/* PAYMENTS SIDE */}
+              <div className="p-0 flex flex-col h-full">
+                <div className="bg-slate-100/70 py-2 px-4 border-b border-slate-200 flex justify-between font-bold text-slate-700 text-xs uppercase tracking-wider">
+                  <span>Payments</span><span>Amount (৳)</span>
+                </div>
+                
+                <div className="p-4 flex-1">
+                  <h4 className="font-bold text-xs text-slate-800 mb-2 border-b border-slate-100 pb-1 uppercase">Current Payments</h4>
+                  {data.payments.length === 0 ? <p className="text-xs text-slate-400 italic">No payments</p> : 
+                    data.payments.map((p, i) => (
+                      <div key={i} className="flex justify-between text-sm text-slate-600 py-1">
+                        <span className="truncate pr-2" title={p.name}>{p.name}</span>
+                        <span className="money whitespace-nowrap">{fmtBDT(p.val)}</span>
+                      </div>
+                    ))
+                  }
                 </div>
 
-                {/* Receipts List */}
-                <div>
-                  <h4 className="font-bold text-sm text-slate-800 mb-2 border-b border-slate-100 pb-1">Revenue & Capital Receipts</h4>
-                  {data.receipts.map((r, i) => (
-                    <div key={i} className="flex justify-between text-sm text-slate-600 py-1"><span>{r.name}</span><span className="money">{fmtBDT(r.val)}</span></div>
-                  ))}
-                  <div className="flex justify-between text-sm font-bold text-slate-800 mt-2"><span>Total Receipts</span><span className="money">{fmtBDT(data.totalReceipts)}</span></div>
+                <div className="p-4 border-t border-slate-100 mt-auto bg-slate-50/50">
+                  <h4 className="font-bold text-xs text-slate-800 mb-2 border-b border-slate-200 pb-1 uppercase">Closing Balances</h4>
+                  <div className="flex justify-between text-sm text-slate-600 py-1"><span className="truncate pr-2">Cash in Hand</span><span className="money font-medium whitespace-nowrap">{fmtBDT(data.closingCash)}</span></div>
+                  <div className="flex justify-between text-sm text-slate-600 py-1"><span className="truncate pr-2">Cash at Bank</span><span className="money font-medium whitespace-nowrap">{fmtBDT(data.closingBank)}</span></div>
                 </div>
               </div>
             </div>
 
-            {/* PAYMENTS SIDE (RIGHT) */}
-            <div className="p-0 flex flex-col h-full">
-              <div className="bg-slate-100/50 py-2 px-4 border-b border-slate-200 flex justify-between font-bold text-slate-700 text-sm">
-                <span>PAYMENTS</span><span>AMOUNT (৳)</span>
+            {/* TOTALS */}
+            <div className="grid grid-cols-2 divide-x divide-slate-300 border-t-2 border-slate-300 bg-slate-100">
+              <div className="py-3 px-4 flex justify-between font-bold text-slate-800 text-base">
+                <span>TOTAL</span><span className="money whitespace-nowrap">{fmtBDT(data.openingCash + data.openingBank + data.totalReceipts)}</span>
               </div>
-              
-              <div className="p-4 flex-1">
-                <h4 className="font-bold text-sm text-slate-800 mb-2 border-b border-slate-100 pb-1">Revenue & Capital Payments</h4>
-                {data.payments.map((p, i) => (
-                  <div key={i} className="flex justify-between text-sm text-slate-600 py-1"><span>{p.name}</span><span className="money">{fmtBDT(p.val)}</span></div>
-                ))}
-                <div className="flex justify-between text-sm font-bold text-slate-800 mt-2"><span>Total Payments</span><span className="money">{fmtBDT(data.totalPayments)}</span></div>
+              <div className="py-3 px-4 flex justify-between font-bold text-slate-800 text-base">
+                <span>TOTAL</span><span className="money whitespace-nowrap">{fmtBDT(data.totalPayments + data.closingCash + data.closingBank)}</span>
               </div>
-
-              {/* Closing Balances placed at the bottom to balance */}
-              <div className="p-4 border-t border-slate-100 mt-auto">
-                <h4 className="font-bold text-sm text-slate-800 mb-2 border-b border-slate-100 pb-1">Closing Balances</h4>
-                <div className="flex justify-between text-sm text-slate-600 py-1"><span>Cash in Hand</span><span className="money">{fmtBDT(data.closingCash)}</span></div>
-                <div className="flex justify-between text-sm text-slate-600 py-1"><span>Cash at Bank</span><span className="money">{fmtBDT(data.closingBank)}</span></div>
-                <div className="flex justify-between text-sm font-bold text-slate-800 mt-2"><span>Total Closing Balance</span><span className="money">{fmtBDT(data.closingCash + data.closingBank)}</span></div>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Totals (Must match) */}
-          <div className="grid grid-cols-2 divide-x divide-slate-300 border-t-2 border-slate-300 bg-slate-100">
-            <div className="py-3 px-4 flex justify-between font-bold text-slate-800 text-lg">
-              <span>TOTAL</span><span className="money">{fmtBDT(data.openingCash + data.openingBank + data.totalReceipts)}</span>
-            </div>
-            <div className="py-3 px-4 flex justify-between font-bold text-slate-800 text-lg">
-              <span>TOTAL</span><span className="money">{fmtBDT(data.totalPayments + data.closingCash + data.closingBank)}</span>
             </div>
           </div>
         </div>
@@ -195,18 +256,18 @@ function ReceiptPaymentStatementTab() {
   )
 }
 
-/* Mock placeholders for other tabs to prevent errors */
-function PlaceholderTab({ name }) { return <div className="p-16 text-center text-slate-400 border border-slate-200 border-dashed rounded-xl bg-slate-50">Module <b>{name}</b> is active. Ready for data integration.</div> }
+function PlaceholderTab({ name }) { 
+  return <div className="p-10 text-center text-slate-400 border border-slate-200 border-dashed rounded-xl bg-white shadow-sm break-words">Module <b className="text-slate-600">{name}</b> is active. Ready for multi-tenant data integration.</div> 
+}
 
 /* ══════════════════════════════════════════════════════════════════════
-   ENTERPRISE REPORT HUB WRAPPER (Redesigned)
+   ENTERPRISE REPORT HUB WRAPPER (No External Sidebar, Full Width)
 ══════════════════════════════════════════════════════════════════════ */
-export default function ReportsHub() {
+export default function ReportsHub({ tenantId }) {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeReportId, setActiveReportId] = useState(null) // null = show dashboard, string = show specific report
+  const [activeReportId, setActiveReportId] = useState(null)
 
-  // Filter logic for the dashboard grid
   const filteredReports = useMemo(() => {
     return TABS.filter(tab => {
       const matchCat = activeCategory === 'All' || tab.group === activeCategory;
@@ -216,127 +277,137 @@ export default function ReportsHub() {
     })
   }, [activeCategory, searchQuery])
 
-  // Get active report object
   const activeReport = TABS.find(t => t.id === activeReportId)
 
-  // Render proper component based on ID
   const renderActiveReport = () => {
     switch(activeReportId) {
-      case 'receipt_payment': return <ReceiptPaymentStatementTab />
-      // add specific cases like: case 'pl': return <PLTab /> 
+      case 'receipt_payment': return <ReceiptPaymentStatementTab tenantId={tenantId} />
       default: return <PlaceholderTab name={activeReport?.label} />
     }
   }
 
+  // If tenantId is missing, warn the user at the top level
+  if (!tenantId) {
+    return (
+      <div className="p-8 w-full">
+        <Err msg="Configuration Error: Tenant ID is missing. Multi-tenant features disabled." />
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
+    <div className="w-full bg-slate-50/50 min-h-screen font-sans text-slate-900 flex flex-col">
       
-      {/* LEFT SIDEBAR NAVIGATION */}
-      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-10 hidden md:flex">
-        <div className="p-6 border-b border-slate-800">
-          <h1 className="text-xl font-display font-bold text-white flex items-center gap-2"><BarChart3 className="text-blue-500" /> ERP Reports</h1>
+      {/* INTERNAL TOP NAVIGATION / FILTER BAR */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-slate-800 flex items-center gap-2">
+            <BarChart3 className="text-blue-600" /> Reporting Hub
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">Multi-tenant ERP Standards</p>
         </div>
-        
-        <div className="p-4 flex-1 overflow-y-auto">
-          <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4 px-2">Report Modules</div>
-          <nav className="space-y-1">
+
+        {!activeReportId && (
+          <div className="relative w-full sm:w-80 lg:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search reports..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition w-full"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* CATEGORY CHIPS (Replaces Sidebar) */}
+      {!activeReportId && (
+        <div className="px-6 pt-4 pb-2 w-full overflow-x-auto whitespace-nowrap no-scrollbar border-b border-slate-200 bg-white">
+          <div className="flex items-center gap-2">
             {GROUPS.map(group => (
               <button
                 key={group}
-                onClick={() => { setActiveCategory(group); setActiveReportId(null); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${activeCategory === group && !activeReportId ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800 hover:text-white'}`}
+                onClick={() => setActiveCategory(group)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all shrink-0 border ${
+                  activeCategory === group 
+                    ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                }`}
               >
-                {group === 'All' ? <FolderOpen size={18} /> : <Filter size={18} />}
+                {group === 'All' ? <FolderOpen size={16} /> : <Filter size={16} />}
                 {group}
               </button>
             ))}
-          </nav>
+          </div>
         </div>
-      </aside>
+      )}
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+      {/* WORKSPACE CONTENT */}
+      <div className="p-4 sm:p-6 lg:p-8 flex-1 w-full overflow-x-hidden">
         
-        {/* TOP NAVBAR */}
-        <header className="bg-white h-16 border-b border-slate-200 flex items-center px-8 shadow-sm shrink-0">
-          {activeReportId ? (
-            <div className="flex items-center gap-4">
+        {activeReportId ? (
+          // ACTIVE REPORT VIEW
+          <div className="w-full max-w-full">
+            <div className="flex items-center gap-4 mb-6">
               <button 
                 onClick={() => setActiveReportId(null)}
-                className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition font-semibold text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md"
+                className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition font-semibold text-sm bg-white border border-slate-200 shadow-sm hover:bg-slate-50 px-4 py-2 rounded-lg shrink-0"
               >
-                <ArrowLeft size={16} /> Back to Repository
+                <ArrowLeft size={16} /> Back
               </button>
-              <div className="h-6 w-px bg-slate-300"></div>
-              <div className="flex items-center gap-2 text-slate-800">
-                {activeReport?.icon && <activeReport.icon size={18} className="text-blue-600" />}
-                <h2 className="font-bold text-lg">{activeReport?.label}</h2>
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">{activeReport?.group}</span>
+              <div className="h-6 w-px bg-slate-300 hidden sm:block"></div>
+              <div className="flex flex-wrap items-center gap-2 text-slate-800 min-w-0">
+                {activeReport?.icon && <activeReport.icon size={20} className="text-blue-600 shrink-0 hidden sm:block" />}
+                <h2 className="font-bold text-lg sm:text-xl truncate">{activeReport?.label}</h2>
+                <span className="ml-2 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100 shrink-0">
+                  {activeReport?.group}
+                </span>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-between w-full">
-              <h2 className="text-lg font-bold text-slate-800">Report Repository</h2>
-              <div className="relative w-96">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Search reports (e.g. VAT, Ledger, Aging)..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
-                />
-              </div>
+            
+            <div className="w-full">
+              {renderActiveReport()}
             </div>
-          )}
-        </header>
-
-        {/* WORKSPACE CONTENT */}
-        <div className="flex-1 overflow-y-auto p-8">
-          
-          {activeReportId ? (
-            // RENDER SPECIFIC REPORT
-            renderActiveReport()
-          ) : (
-            // RENDER DASHBOARD GRID
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-slate-500 font-semibold">{activeCategory === 'All' ? 'All Available Reports' : `${activeCategory} Reports`}</h3>
-                <span className="text-sm text-slate-400">{filteredReports.length} reports found</span>
+          </div>
+        ) : (
+          // DASHBOARD GRID VIEW
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
+            {filteredReports.length === 0 ? (
+              <div className="text-center py-20 text-slate-400">
+                <FolderOpen size={48} className="mx-auto mb-4 opacity-30" />
+                <p className="text-lg font-medium">No reports matched your criteria.</p>
               </div>
-
-              {filteredReports.length === 0 ? (
-                <div className="text-center py-20 text-slate-400">
-                  <FolderOpen size={48} className="mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium">No reports matched your search criteria.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredReports.map(tab => {
-                    const Icon = tab.icon;
-                    return (
-                      <div 
-                        key={tab.id}
-                        onClick={() => setActiveReportId(tab.id)}
-                        className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 cursor-pointer transition-all group flex flex-col h-full"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="p-2.5 bg-blue-50 rounded-lg group-hover:bg-blue-600 transition-colors">
-                            <Icon size={22} className="text-blue-600 group-hover:text-white transition-colors" />
-                          </div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded">{tab.group}</span>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 w-full">
+                {filteredReports.map(tab => {
+                  const Icon = tab.icon;
+                  return (
+                    <div 
+                      key={tab.id}
+                      onClick={() => setActiveReportId(tab.id)}
+                      className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 cursor-pointer transition-all group flex flex-col h-full overflow-hidden"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="p-3 bg-slate-50 rounded-lg group-hover:bg-blue-50 transition-colors border border-slate-100 group-hover:border-blue-100">
+                          <Icon size={24} className="text-slate-500 group-hover:text-blue-600 transition-colors" />
                         </div>
-                        <h4 className="font-bold text-slate-800 text-base mb-1 group-hover:text-blue-600 transition-colors">{tab.label}</h4>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed mt-auto">{tab.desc}</p>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-md shrink-0">
+                          {tab.group}
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </main>
+                      <h4 className="font-bold text-slate-800 text-base mb-1.5 group-hover:text-blue-600 transition-colors truncate">{tab.label}</h4>
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed mt-auto break-words line-clamp-2" title={tab.desc}>
+                        {tab.desc}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
