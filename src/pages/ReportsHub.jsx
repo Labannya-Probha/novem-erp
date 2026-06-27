@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Download,
   Building2,
+  Plug,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -118,6 +120,9 @@ export default function ReportsHub() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [snapshot, setSnapshot] = useState(emptySnapshot)
+  const [exportProvider, setExportProvider] = useState('quickbooks')
+  const [exporting, setExporting] = useState(false)
+  const [exportMsg, setExportMsg] = useState('')
   const activeSectionMeta = REPORT_SECTIONS.find((section) => section.id === activeSection)
   const activePanelItems = REPORT_PANEL_ITEMS[activeSection] || []
 
@@ -300,6 +305,31 @@ export default function ReportsHub() {
     ])
   }, [fromDate, toDate, snapshot])
 
+  const exportToAccounting = useCallback(async () => {
+    setExporting(true)
+    setExportMsg('')
+    try {
+      const fnName = exportProvider === 'quickbooks' ? 'sync-quickbooks'
+                   : exportProvider === 'xero'        ? 'sync-xero'
+                   : 'sync-tally'
+      const { data, error: fnErr } = await supabase.functions.invoke(fnName, {
+        body: {
+          action:    'push-journals',
+          tenant_id: tenantId,
+          from_date: fromDate,
+          to_date:   toDate,
+        },
+      })
+      if (fnErr) throw fnErr
+      const pushed = data?.pushed ?? 0
+      setExportMsg(`✓ ${pushed} journal entries pushed to ${exportProvider}.`)
+    } catch (err) {
+      setExportMsg(`✗ Export failed: ${err.message}`)
+    } finally {
+      setExporting(false)
+    }
+  }, [exportProvider, fromDate, toDate, tenantId])
+
   return (
     <div className="space-y-5">
       <Card className="border-0 shadow-sm">
@@ -340,6 +370,27 @@ export default function ReportsHub() {
                 <Download size={15} /> Export XLSX
               </Button>
             </div>
+          </div>
+          {/* Export to Accounting Software */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              className="input !w-auto text-sm"
+              value={exportProvider}
+              onChange={(e) => setExportProvider(e.target.value)}
+            >
+              <option value="quickbooks">QuickBooks</option>
+              <option value="xero">Xero</option>
+              <option value="tally">Tally</option>
+            </select>
+            <Button variant="outline" size="sm" onClick={exportToAccounting} disabled={exporting}>
+              {exporting ? <Loader2 size={14} className="animate-spin" /> : <Plug size={14} />}
+              Export to Accounting
+            </Button>
+            {exportMsg && (
+              <span className={`text-sm ${exportMsg.startsWith('✓') ? 'text-forest' : 'text-red-600'}`}>
+                {exportMsg}
+              </span>
+            )}
           </div>
           {error && (
             <div className="mt-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2 flex items-center gap-2">
