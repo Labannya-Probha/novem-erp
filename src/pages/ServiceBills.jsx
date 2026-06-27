@@ -432,6 +432,7 @@ function SalesList({ setPrintDoc, isAdmin, flash }) {
 
   return (
     <div className="card overflow-hidden">
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr>
@@ -480,6 +481,7 @@ function SalesList({ setPrintDoc, isAdmin, flash }) {
           )}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

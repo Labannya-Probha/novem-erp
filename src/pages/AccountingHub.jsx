@@ -440,6 +440,7 @@ function OpeningBalanceTab({ accounts, userName, flash }) {
               Posted Opening Balances ({postedList.length})
             </span>
           </div>
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
@@ -476,6 +477,7 @@ function OpeningBalanceTab({ accounts, userName, flash }) {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -683,6 +685,7 @@ function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -730,6 +733,7 @@ function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -767,6 +771,7 @@ function TrialBalance() {
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Trial Balance</div>
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr>
@@ -794,6 +799,7 @@ function TrialBalance() {
           </tr>
         </tfoot>
       </table>
+      </div>
     </div>
   )
 }
@@ -955,6 +961,7 @@ function CoaTab({ accounts, reload, flash, isAdmin }) {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -989,6 +996,7 @@ function CoaTab({ accounts, reload, flash, isAdmin }) {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -1089,6 +1097,7 @@ function AssetsTab({ accounts, userName, flash }) {
         </button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -1119,6 +1128,7 @@ function AssetsTab({ accounts, userName, flash }) {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

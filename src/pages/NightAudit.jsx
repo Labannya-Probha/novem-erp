@@ -354,7 +354,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
           </div>
           <div>
             <div className="label">Invoice-wise audit snapshot (in-house guests)</div>
-            <div className="card overflow-auto">
+            <div className="card overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr>
@@ -406,6 +406,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
 
       <div className="card overflow-hidden">
         <div className="px-5 pt-4 pb-2 font-display font-semibold text-pine">Recent audits</div>
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Date</th><th className="th">By</th><th className="th text-right">Revenue total</th><th className="th text-right">Receipts</th><th className="th">JV</th><th className="th text-right">Report</th></tr></thead>
           <tbody>
@@ -422,6 +423,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
             {audits.length === 0 && <tr><td className="td text-pine/40" colSpan={6}>No audits yet.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

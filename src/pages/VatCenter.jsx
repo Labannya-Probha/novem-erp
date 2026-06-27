@@ -53,6 +53,7 @@ function SalesReg({ ym, company }) {
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-leaf flex items-center justify-between"><span className="font-display font-semibold text-pine">Sales Register (Mushak-6.2)</span><button className="btn-ghost !py-1" onClick={xls}><FileDown size={14} /> Excel</button></div>
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead><tr><th className="th">Date</th><th className="th">Invoice</th><th className="th">Buyer</th><th className="th text-right">Taxable</th><th className="th text-right">SD</th><th className="th text-right">VAT</th><th className="th text-right">Total</th></tr></thead>
         <tbody>
@@ -61,6 +62,7 @@ function SalesReg({ ym, company }) {
         </tbody>
         <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={3}>TOTAL</td><td className="td text-right">{tot.tv.toFixed(2)}</td><td className="td text-right">{tot.sd.toFixed(2)}</td><td className="td text-right">{tot.vat.toFixed(2)}</td><td className="td text-right">{tot.total.toFixed(2)}</td></tr></tfoot>
       </table>
+      </div>
     </div>
   )
 }
@@ -73,6 +75,7 @@ function PurchaseReg({ ym, company }) {
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-leaf flex items-center justify-between"><span className="font-display font-semibold text-pine">Purchase Register (Mushak-6.1)</span><button className="btn-ghost !py-1" onClick={xls}><FileDown size={14} /> Excel</button></div>
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead><tr><th className="th">Date</th><th className="th">Vendor</th><th className="th">Invoice</th><th className="th text-right">Taxable</th><th className="th text-right">VAT</th><th className="th">Rebate</th><th className="th text-right">Total</th></tr></thead>
         <tbody>
@@ -81,6 +84,7 @@ function PurchaseReg({ ym, company }) {
         </tbody>
         <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={3}>TOTAL · Rebateable VAT {tot.reb.toFixed(2)}</td><td className="td text-right">{tot.tv.toFixed(2)}</td><td className="td text-right">{tot.vat.toFixed(2)}</td><td className="td"></td><td className="td text-right">{tot.total.toFixed(2)}</td></tr></tfoot>
       </table>
+      </div>
     </div>
   )
 }
@@ -130,6 +134,7 @@ function VdsTab({ ym, userName, flash, onPrint }) {
         {editId && <button className="btn-ghost justify-center" onClick={() => { setF(blank); setEditId(null) }}>Cancel edit</button>}
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Date</th><th className="th">Dir</th><th className="th">Cert</th><th className="th">Party</th><th className="th text-right">Base</th><th className="th text-right">Rate</th><th className="th text-right">VDS</th><th className="th">Challan</th><th className="th text-right">Actions</th></tr></thead>
           <tbody>
@@ -155,6 +160,7 @@ function VdsTab({ ym, userName, flash, onPrint }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={9}>No VDS certificates this month.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -197,6 +203,7 @@ function Mushak610({ company }) {
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Over-threshold tax invoices (Mushak-6.10 trigger) — ≥ {fmtBDT(threshold)}</div>
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead><tr><th className="th">Date</th><th className="th">Invoice</th><th className="th">Buyer</th><th className="th">Buyer BIN</th><th className="th text-right">Grand total</th></tr></thead>
         <tbody>
@@ -204,6 +211,7 @@ function Mushak610({ company }) {
           {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={5}>No invoices over the threshold.</td></tr>}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

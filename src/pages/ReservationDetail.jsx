@@ -2988,6 +2988,13 @@ function ChargeTypeSelect({ value, onChange, items = [] }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
+  useEffect(() => {
+    if (!open) return
+    const closeOnScroll = () => { setOpen(false); setQuery('') }
+    window.addEventListener('scroll', closeOnScroll, true)
+    return () => window.removeEventListener('scroll', closeOnScroll, true)
+  }, [open])
+
   return (
     <>
       <button

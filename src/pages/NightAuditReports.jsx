@@ -54,6 +54,7 @@ export default function NightAuditReports() {
       </div>
 
       <div className="card overflow-hidden bg-white">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
@@ -100,9 +101,8 @@ export default function NightAuditReports() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
-
-      {selectedReport && (
         <PrintPortal title={`Daily Revenue Statement — ${selectedReport.date}`} onClose={() => setSelectedReport(null)}>
           <DailyStatementReport report={selectedReport} />
         </PrintPortal>
