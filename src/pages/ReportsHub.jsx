@@ -27,6 +27,29 @@ const REPORT_SECTIONS = [
   { id: 'receivables', label: 'Receivables Desk', desc: 'Outstanding invoice priorities', icon: HandCoins },
 ]
 
+const REPORT_PANEL_ITEMS = {
+  executive: [
+    { code: 'RPT-EX-01', name: 'KPI Summary', purpose: 'Management snapshot for core business health', status: 'Live' },
+    { code: 'RPT-EX-02', name: 'Collection Efficiency', purpose: 'Revenue realization against collections', status: 'Live' },
+    { code: 'RPT-EX-03', name: 'Night Close Compliance', purpose: 'Day-close completeness for selected period', status: 'Live' },
+  ],
+  finance: [
+    { code: 'RPT-FN-01', name: 'Revenue Stream Analysis', purpose: 'Department contribution breakdown', status: 'Live' },
+    { code: 'RPT-FN-02', name: 'Payment Method Split', purpose: 'Collection distribution by channel', status: 'Live' },
+    { code: 'RPT-FN-03', name: 'Period Export Workbook', purpose: 'Excel-ready financial package', status: 'Live' },
+  ],
+  operations: [
+    { code: 'RPT-OP-01', name: 'Reservation Status Mix', purpose: 'Booking mix by lifecycle state', status: 'Live' },
+    { code: 'RPT-OP-02', name: 'Occupancy Governance', purpose: 'In-house ratio against active rooms', status: 'Live' },
+    { code: 'RPT-OP-03', name: 'Day-Close Governance', purpose: 'Operational closure control checks', status: 'Live' },
+  ],
+  receivables: [
+    { code: 'RPT-AR-01', name: 'Receivables Action Queue', purpose: 'Top outstanding invoices for follow-up', status: 'Live' },
+    { code: 'RPT-AR-02', name: 'A/R Exposure', purpose: 'Total due position monitoring', status: 'Live' },
+    { code: 'RPT-AR-03', name: 'Overdue Prioritization', purpose: 'Largest balances sorted for collection desk', status: 'Live' },
+  ],
+}
+
 const money = (v) => Number(v || 0)
 const dayStart = (d) => `${d}T00:00:00`
 const dayEnd = (d) => `${d}T23:59:59`
@@ -95,6 +118,8 @@ export default function ReportsHub() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [snapshot, setSnapshot] = useState(emptySnapshot)
+  const activeSectionMeta = REPORT_SECTIONS.find((section) => section.id === activeSection)
+  const activePanelItems = REPORT_PANEL_ITEMS[activeSection] || []
 
   const loadSnapshot = useCallback(async () => {
     if (!fromDate || !toDate || toDate < fromDate) {
@@ -324,26 +349,73 @@ export default function ReportsHub() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-        {REPORT_SECTIONS.map((s) => {
-          const Icon = s.icon
-          const active = activeSection === s.id
-          return (
-            <button
-              key={s.id}
-              onClick={() => setActiveSection(s.id)}
-              className={`text-left rounded-xl border p-4 transition ${active ? 'border-primary bg-primary/5 shadow-sm' : 'border-[--border-color] bg-white hover:border-primary/40'}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <Icon size={18} className={active ? 'text-primary' : 'text-pine'} />
-                {active && <Badge variant="success">Active</Badge>}
+      <Card className="border-0 shadow-sm overflow-hidden">
+        <CardContent className="p-0">
+          <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr]">
+            <div className="border-b lg:border-b-0 lg:border-r border-[--border-color] bg-leaf/[0.22]">
+              <div className="px-4 pt-4 pb-2">
+                <p className="text-[11px] uppercase tracking-wider text-pine/60">Report Groups</p>
+                <p className="text-sm font-semibold text-pine">eZee-style panel navigation</p>
               </div>
-              <div className="mt-3 font-semibold text-pine">{s.label}</div>
-              <div className="text-xs text-pine/60 mt-1">{s.desc}</div>
-            </button>
-          )
-        })}
-      </div>
+              <div className="px-2 pb-3 space-y-1">
+                {REPORT_SECTIONS.map((s) => {
+                  const Icon = s.icon
+                  const active = activeSection === s.id
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setActiveSection(s.id)}
+                      className={`w-full text-left rounded-lg border px-3 py-2.5 transition ${active ? 'border-primary bg-primary/10' : 'border-transparent hover:border-primary/35 hover:bg-white/70'}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Icon size={16} className={active ? 'text-primary' : 'text-pine'} />
+                          <span className="text-sm font-medium text-pine">{s.label}</span>
+                        </div>
+                        {active && <Badge variant="success">Open</Badge>}
+                      </div>
+                      <p className="mt-1 text-[11px] text-pine/60">{s.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-pine/60">Report Catalogue</p>
+                  <h2 className="text-lg font-semibold text-pine">{activeSectionMeta?.label || 'Reports'}</h2>
+                  <p className="text-sm text-pine/60">{activeSectionMeta?.desc}</p>
+                </div>
+                <Badge variant="outline">{activePanelItems.length} reports</Badge>
+              </div>
+
+              <div className="mt-3 rounded-lg border border-[--border-color] overflow-hidden">
+                <div className="grid grid-cols-[110px_1fr_130px] bg-leaf/30 px-3 py-2 text-[11px] uppercase tracking-wide text-pine/70">
+                  <span>Code</span>
+                  <span>Report Name & Purpose</span>
+                  <span className="text-right">Status</span>
+                </div>
+                <div className="divide-y divide-[--border-color] bg-white">
+                  {activePanelItems.map((item) => (
+                    <div key={item.code} className="grid grid-cols-[110px_1fr_130px] px-3 py-2.5 gap-2">
+                      <span className="text-xs font-semibold text-pine/80">{item.code}</span>
+                      <div>
+                        <p className="text-sm font-medium text-pine">{item.name}</p>
+                        <p className="text-xs text-pine/60">{item.purpose}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="success">{item.status}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {activeSection === 'executive' && (
         <Card className="border-0 shadow-sm">
