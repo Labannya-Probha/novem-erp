@@ -8,12 +8,34 @@ import { getTenantId, withTenantInsert, withTenantInsertMany } from '../lib/tena
 import { PosReceipt } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
 import { useToast } from '../components/Toast.jsx'
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
 import { Plus, Minus, Trash2, Banknote, BedDouble, Leaf, Printer } from 'lucide-react'
 
 const TABS = ['New Sale', 'Sales', 'Items']
 const withTenant = (q) => {
   const tenantId = getTenantId()
   return tenantId ? q.eq('tenant_id', tenantId) : q
+}
+
+function ActionPopoverButton({ message, className, children, disabled = false, ...props }) {
+  const [open, setOpen] = useState(false)
+  const show = () => { if (!disabled) setOpen(true) }
+  const hide = () => setOpen(false)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <span className="inline-flex" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+          <button className={className} disabled={disabled} {...props}>
+            {children}
+          </button>
+        </span>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="center" className="w-auto max-w-[220px] px-2.5 py-1.5 text-xs text-pine">
+        {message}
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 export default function Facilities({ userName, isAdmin }) {
@@ -436,10 +458,18 @@ function SalesList({ setPrintDoc, isAdmin, flash }) {
               <td className="td"><span className={`status-chip ${chip[o.status]}`}>{o.status.replace(/_/g, ' ')}</span></td>
               <td className="td">
                 <div className="flex justify-end gap-1.5">
-                  <button className="btn-ghost !py-1 !px-2" title="Bill" onClick={() => printReceipt(o)}><Printer size={13} /></button>
-                  {o.invoice_id && <button className="btn-ghost !py-1 !px-2 text-xs" onClick={() => printMushak(o)}>6.3</button>}
+                  <ActionPopoverButton className="btn-ghost !py-1 !px-2" message="Print bill receipt" onClick={() => printReceipt(o)}>
+                    <Printer size={13} />
+                  </ActionPopoverButton>
+                  {o.invoice_id && (
+                    <ActionPopoverButton className="btn-ghost !py-1 !px-2 text-xs" message="Print Mushak 6.3" onClick={() => printMushak(o)}>
+                      6.3
+                    </ActionPopoverButton>
+                  )}
                   {isAdmin && ['SETTLED', 'CHARGED_TO_ROOM'].includes(o.status) && (
-                    <button className="btn-ghost !py-1 !px-2 text-red-500 text-xs" onClick={() => voidSale(o)}>Void</button>
+                    <ActionPopoverButton className="btn-ghost !py-1 !px-2 text-red-500 text-xs" message="Void this sale and reverse postings" onClick={() => voidSale(o)}>
+                      Void
+                    </ActionPopoverButton>
                   )}
                 </div>
               </td>
@@ -539,19 +569,20 @@ function ItemsManager({ items, reload, isAdmin, flash }) {
                 )}
               </td>
               <td className="td">
-                <button
+                <ActionPopoverButton
                   onClick={() => isAdmin && toggle(it)}
                   disabled={!isAdmin}
+                  message={it.is_active ? 'Deactivate item' : 'Activate item'}
                   className={`status-chip ${it.is_active ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-600'} ${!isAdmin ? 'cursor-default' : ''}`}
                 >
                   {it.is_active ? 'ACTIVE' : 'OFF'}
-                </button>
+                </ActionPopoverButton>
               </td>
               <td className="td text-right">
                 {isAdmin && (
-                  <button onClick={() => del(it)} className="text-red-300 hover:text-red-600">
+                  <ActionPopoverButton onClick={() => del(it)} className="text-red-300 hover:text-red-600" message="Delete this item">
                     <Trash2 size={14} />
-                  </button>
+                  </ActionPopoverButton>
                 )}
               </td>
             </tr>
