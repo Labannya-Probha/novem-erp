@@ -1823,21 +1823,37 @@ function ReservationPaymentsTab({ res, guest, payments, reload, userName, isAdmi
     showPopover('Print পাঠানো হয়েছে.')
   }
 
+  const buildProfessionalPaymentMessage = (pm, paymentNo) => {
+    const guestName = guest?.full_name || res?.reservation_name || 'Guest'
+    return [
+      `Dear ${guestName},`,
+      '',
+      `Greetings from ${company?.name || 'Aura Stay'}.`,
+      '',
+      'Please find your payment details below:',
+      `• Reservation No: ${res.res_no || '—'}`,
+      `• Payment Slip No: ${paymentNo || 'N/A'}`,
+      `• Amount: ${fmtBDT(Number(pm.amount || 0))}`,
+      `• Method: ${pm.method || 'N/A'}`,
+      `• Date: ${pm.received_date || ''}`,
+      '',
+      'A PDF copy of the payment slip/quotation is attached for your reference.',
+      '',
+      `Warm regards,`,
+      `${company?.name || 'Aura Stay'}`,
+      `${company?.phone || ''}`,
+    ].join('\n')
+  }
+
   const openSend = (channel, pm) => {
     const parsed = parsePaymentReference(pm.reference)
     const guestPhone = (guest?.phone || '').replace(/[^\d]/g, '')
-    const msg = [
-      `Reservation: ${res.res_no || ''}`,
-      `Payment ID: ${parsed.paymentNo || 'N/A'}`,
-      `Amount: ${fmtBDT(Number(pm.amount || 0))}`,
-      `Method: ${pm.method || 'N/A'}`,
-      `Date: ${pm.received_date || ''}`,
-    ].join('\n')
+    const msg = buildProfessionalPaymentMessage(pm, parsed.paymentNo)
     setSendBox({
       open: true,
       channel,
       to: channel === 'EMAIL' ? (guest?.email || '') : guestPhone,
-      subject: `Payment Receipt ${parsed.paymentNo || res.res_no}`,
+      subject: `Payment Slip — ${parsed.paymentNo || res.res_no}`,
       body: msg,
       file: null,
       payment: pm,
@@ -1860,9 +1876,18 @@ function ReservationPaymentsTab({ res, guest, payments, reload, userName, isAdmi
     if (!sendBox.to?.trim()) { showPopover('Recipient is required.', 'error'); return }
 
     let attachmentPayload = null
+    if (sendBox.channel === 'WHATSAPP' && !sendBox.file) {
+      showPopover('WhatsApp এর জন্য payment slip/quotation PDF attachment দিন.', 'error')
+      return
+    }
+
     if (sendBox.file) {
       if (sendBox.file.size > 10 * 1024 * 1024) {
         showPopover('Attachment বেশি বড়। সর্বোচ্চ 10MB allowed.', 'error')
+        return
+      }
+      if (sendBox.channel === 'WHATSAPP' && sendBox.file.type !== 'application/pdf') {
+        showPopover('WhatsApp attachment অবশ্যই PDF হতে হবে.', 'error')
         return
       }
       const base64 = await fileToBase64(sendBox.file)
@@ -2107,8 +2132,17 @@ function ReservationPaymentsTab({ res, guest, payments, reload, userName, isAdmi
               </div>
               <div className="sm:col-span-2">
                 <label className="label !text-xs">Attachment</label>
-                <input type="file" className="input" onChange={(e) => setSendBox({ ...sendBox, file: e.target.files?.[0] || null })} />
-                <p className="text-[11px] text-pine/50 mt-1">Edge function দিয়ে direct dispatch হবে। সর্বোচ্চ 10MB attachment পাঠানো যাবে।</p>
+                <input
+                  type="file"
+                  accept={sendBox.channel === 'WHATSAPP' ? 'application/pdf' : undefined}
+                  className="input"
+                  onChange={(e) => setSendBox({ ...sendBox, file: e.target.files?.[0] || null })}
+                />
+                <p className="text-[11px] text-pine/50 mt-1">
+                  {sendBox.channel === 'WHATSAPP'
+                    ? 'WhatsApp এ professional document পাঠাতে PDF attachment বাধ্যতামূলক (max 10MB)।'
+                    : 'Email এর জন্য attachment optional। সর্বোচ্চ 10MB।'}
+                </p>
               </div>
             </div>
             <div className="flex justify-end gap-2">

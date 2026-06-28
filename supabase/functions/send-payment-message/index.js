@@ -35,6 +35,9 @@ Deno.serve(async (req) => {
   if (attachment?.size && Number(attachment.size) > MAX_ATTACHMENT_BYTES) {
     return json({ error: 'Attachment too large (max 10MB)' }, 400)
   }
+  if (channel === 'WHATSAPP' && attachment && attachment.type !== 'application/pdf') {
+    return json({ error: 'WhatsApp attachment must be a PDF file' }, 400)
+  }
 
   try {
     const supabase = createClient(
