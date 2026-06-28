@@ -31,7 +31,7 @@ export default function ReservationPayments({ userName, isAdmin }) {
 
   // ── send dialog ──────────────────────────────────────────────────
   const [sendBox, setSendBox] = useState({
-    open: false, channel: 'WHATSAPP', to: '', subject: '', body: '', payment: null,
+    open: false, channel: 'WHATSAPP', to: '', subject: '', body: '', file: null, payment: null,
   })
   const [sendBusy, setSendBusy] = useState(false)
 
@@ -173,43 +173,86 @@ export default function ReservationPayments({ userName, isAdmin }) {
       to: channel === 'EMAIL' ? (guest?.email || '') : phone,
       subject: `Payment Receipt — ${parsed.paymentNo || pm.reservations?.res_no || ''}`,
       body: msg,
+      file: null,
       payment: pm,
     })
   }
+
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      const base64 = result.includes(',') ? result.split(',')[1] : ''
+      resolve(base64)
+    }
+    reader.onerror = () => reject(new Error('Could not read attachment'))
+    reader.readAsDataURL(file)
+  })
 
   const sendNow = async () => {
     const pm = sendBox.payment
     if (!pm) return
     if (!sendBox.to?.trim()) { flash('Recipient is required.', 'err'); return }
-    setSendBusy(true)
-
-    const parsed = parsePaymentReference(pm.reference)
-
-    if (sendBox.channel === 'WHATSAPP') {
-      const phone = sendBox.to.replace(/[^\d]/g, '')
-      const intl  = phone.startsWith('880') ? phone : phone.startsWith('0') ? '88' + phone : '880' + phone
-      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(sendBox.body)}`, '_blank')
-      await logAudit({
-        actor: userName, action: 'SEND_WHATSAPP', entity: 'payment',
-        entity_id: parsed.paymentNo || pm.id,
-        details: { channel: 'WHATSAPP', to: sendBox.to, reservation_id: pm.reservation_id, payment_id: pm.id },
-      })
-      flash('WhatsApp window opened.')
-    } else {
-      window.open(
-        `mailto:${sendBox.to}?subject=${encodeURIComponent(sendBox.subject)}&body=${encodeURIComponent(sendBox.body)}`,
-        '_blank'
-      )
-      await logAudit({
-        actor: userName, action: 'SEND_EMAIL', entity: 'payment',
-        entity_id: parsed.paymentNo || pm.id,
-        details: { channel: 'EMAIL', to: sendBox.to, reservation_id: pm.reservation_id, payment_id: pm.id },
-      })
-      flash('Email client opened.')
+    if (sendBox.channel === 'WHATSAPP' && !sendBox.file) {
+      flash('Attach a PDF file for WhatsApp.', 'err')
+      return
+    }
+    if (sendBox.file && sendBox.file.size > 10 * 1024 * 1024) {
+      flash('Attachment too large. Max 10MB.', 'err')
+      return
+    }
+    if (sendBox.channel === 'WHATSAPP' && sendBox.file && sendBox.file.type !== 'application/pdf') {
+      flash('WhatsApp attachment must be a PDF file.', 'err')
+      return
     }
 
-    setSendBusy(false)
-    setSendBox({ ...sendBox, open: false })
+    setSendBusy(true)
+    try {
+      let attachmentPayload = null
+      if (sendBox.file) {
+        const base64 = await fileToBase64(sendBox.file)
+        attachmentPayload = {
+          name: sendBox.file.name,
+          type: sendBox.file.type || 'application/octet-stream',
+          size: sendBox.file.size,
+          base64,
+        }
+      }
+
+      const parsed = parsePaymentReference(pm.reference)
+      const { data, error } = await supabase.functions.invoke('send-payment-message', {
+        body: {
+          channel: sendBox.channel,
+          to: sendBox.to.trim(),
+          subject: sendBox.subject || 'Payment Receipt',
+          message: sendBox.body || '',
+          attachment: attachmentPayload,
+          reservation_id: pm.reservation_id,
+          payment_id: pm.id,
+        },
+      })
+
+      if (error) {
+        flash(error.message || 'Message dispatch failed.', 'err')
+        return
+      }
+      if (data?.error) {
+        flash(data.error, 'err')
+        return
+      }
+
+      await logAudit({
+        actor: userName, action: `SEND_${sendBox.channel}`, entity: 'payment',
+        entity_id: parsed.paymentNo || pm.id,
+        details: { channel: sendBox.channel, to: sendBox.to, reservation_id: pm.reservation_id, payment_id: pm.id },
+      })
+      flash(`${sendBox.channel === 'WHATSAPP' ? 'WhatsApp' : 'Email'} sent successfully.`)
+      setSendBox({ ...sendBox, open: false })
+    } catch (err) {
+      flash(err?.message || 'Message dispatch failed.', 'err')
+    } finally {
+      setSendBusy(false)
+    }
   }
 
   const advanceTotal = useMemo(
@@ -445,12 +488,26 @@ export default function ReservationPayments({ userName, isAdmin }) {
                 <label className="label !text-xs">Message</label>
                 <textarea className="input h-32 resize-none" value={sendBox.body} onChange={(e) => setSendBox({ ...sendBox, body: e.target.value })} />
               </div>
+              <div>
+                <label className="label !text-xs">Attachment</label>
+                <input
+                  type="file"
+                  accept={sendBox.channel === 'WHATSAPP' ? 'application/pdf' : undefined}
+                  className="input"
+                  onChange={(e) => setSendBox({ ...sendBox, file: e.target.files?.[0] || null })}
+                />
+                <p className="text-[11px] text-pine/50 mt-1">
+                  {sendBox.channel === 'WHATSAPP'
+                    ? 'PDF attachment required for WhatsApp (max 10MB).'
+                    : 'Optional attachment (max 10MB).'}
+                </p>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button className="btn-ghost" onClick={() => setSendBox({ ...sendBox, open: false })}>Cancel</button>
               <button className="btn-primary" onClick={sendNow} disabled={sendBusy}>
                 {sendBox.channel === 'WHATSAPP' ? <MessageCircle size={14} /> : <Mail size={14} />}
-                {sendBusy ? 'Sending…' : sendBox.channel === 'WHATSAPP' ? 'Open WhatsApp' : 'Open Email'}
+                {sendBusy ? 'Sending…' : 'Send'}
               </button>
             </div>
           </div>
