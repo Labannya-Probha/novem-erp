@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, rateFor, computeCharge, exportXLSX } from '../lib/helpers'
+import { logAudit } from '../lib/pms.api.js'
 import KPICards from '../components/KPICards.jsx'
 import PrintPortal from '../components/PrintPortal.jsx'
 import { MoonStar, BedDouble, UserX, CheckCircle2, FileDown, BookOpenCheck, Printer, XCircle } from 'lucide-react'
@@ -156,7 +157,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
   const markNoShow = async (res) => {
     if (!window.confirm(`Mark ${res.res_no} (${res.reservation_name || res.guests?.full_name || ''}) as NO-SHOW?`)) return
     await supabase.from('reservations').update({ status: 'NO_SHOW' }).eq('id', res.id)
-    await supabase.from('audit_log').insert({ actor: userName, action: 'NO_SHOW', entity: 'reservation', entity_id: res.res_no, details: { audit_date: auditDate, source: 'MANUAL' } })
+    await logAudit({ actor: userName, action: 'NO_SHOW', entity: 'reservation', entity_id: res.res_no, details: { audit_date: auditDate, source: 'MANUAL' } })
     await loadAll()
   }
 

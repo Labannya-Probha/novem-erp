@@ -6,6 +6,7 @@ import {
   rateFor, computeCharge, sumCharges, applyRounding, STATUS_COLORS,
 } from '../lib/helpers'
 import { canManualCheckIn, getCheckInActionCopy } from '../lib/noShowAutomation'
+import { logAudit } from '../lib/pms.api.js'
 import PrintPortal from '../components/PrintPortal.jsx'
 import RegistrationCard from '../components/print/RegistrationCard.jsx'
 import GuestBill from '../components/print/GuestBill.jsx'
@@ -774,11 +775,15 @@ function Overview({
     const phone = (guest?.phone || '').replace(/[^0-9]/g, '')
     const intl = phone.startsWith('880') ? phone : phone.startsWith('0') ? '88' + phone : '880' + phone
     window.open(`https://wa.me/${intl}?text=${encodeURIComponent(buildQuoteMsg())}`, '_blank')
+    logAudit({ actor: '', action: 'SEND_QUOTE_WHATSAPP', entity: 'reservation', entity_id: res?.res_no, details: { to: phone } })
   }
-  const sendQuoteEmail = () => window.open(
-    `mailto:${guest?.email || ''}?subject=${encodeURIComponent(`Quotation — ${company?.name || 'Aura Stay'} (${res.res_no})`)}&body=${encodeURIComponent(buildQuoteMsg())}`,
-    '_blank'
-  )
+  const sendQuoteEmail = () => {
+    window.open(
+      `mailto:${guest?.email || ''}?subject=${encodeURIComponent(`Quotation — ${company?.name || 'Aura Stay'} (${res.res_no})`)}&body=${encodeURIComponent(buildQuoteMsg())}`,
+      '_blank'
+    )
+    logAudit({ actor: '', action: 'SEND_QUOTE_EMAIL', entity: 'reservation', entity_id: res?.res_no, details: { to: guest?.email } })
+  }
   const printQuote = () => {
     if (!quote) return
     setPrintDoc?.({
@@ -1577,7 +1582,7 @@ function CheckInTab({ res, guest, resGuests, resRooms, rooms, reload, setStatus,
       checked_in_at: new Date().toISOString(), checkin_by: userName,
     })
     if (wasNoShow) {
-      await supabase.from('audit_log').insert({
+      await logAudit({
         actor: userName,
         action: 'NO_SHOW_OVERRIDE_CHECKIN',
         entity: 'reservation',
@@ -1978,7 +1983,7 @@ function BillingsAndCheckOutTab({
       .update({ is_void: true, void_reason: reason || 'Re-check-in', voided_by: userName, voided_at: new Date().toISOString() })
       .eq('reservation_id', res.id)
       .not('is_void', 'is', true)
-    await supabase.from('audit_log').insert({
+    await logAudit({
       actor: userName, action: 'RE_CHECKIN', entity: 'reservation',
       entity_id: res.res_no, details: { reason },
     })
@@ -2796,7 +2801,7 @@ function GuestRefundCard({ res, payments, charges, totals, paid, resRooms = [], 
       })
 
       // 4. Audit log
-      await supabase.from('audit_log').insert({
+      await logAudit({
         actor: userName, action: 'GUEST_REFUND', entity: 'reservation',
         entity_id: res.res_no,
         details: { total_paid: paid, cancellation_charge: effectiveCharge, refund_amount: refundAmount, method: refundMethod, policy: selectedPolicy?.name || 'Manual' },

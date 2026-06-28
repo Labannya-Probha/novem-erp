@@ -6,7 +6,7 @@ import { ROLES, ROLE_LABELS } from '../lib/roles'
 import {
   Save, Plus, Percent, Trash2, Users, ShieldCheck,
   Image, KeyRound, AlertTriangle, FileText, Lock,
-  Eye, EyeOff, ChevronDown, ChevronUp, Pencil, Calendar, Plug,
+  Eye, EyeOff, ChevronDown, ChevronUp, Pencil, Calendar,
 } from 'lucide-react'
 import BrandingCard from '../components/settings/BrandingCard'
 // TaxCard is a standalone registry component — see src/components/settings/TaxCard.jsx
@@ -19,7 +19,6 @@ export const SETTINGS_SECTIONS = [
   { id: 'role-permissions', label: 'Role Permissions', superuserOnly: true },
   { id: 'admin-feature-access', label: 'Admin Feature Access', superuserOnly: true },
   { id: 'staff', label: 'Staff Management' },
-  { id: 'accounting-integrations', label: 'Accounting Integrations', adminOnly: true },
   { id: 'data-system', label: 'Data & System', superuserOnly: true },
 ]
 
@@ -85,7 +84,6 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
     { id: 'admin-feature-access', title: 'Admin Feature Access', icon: Lock, visible: isSuperuser, content: <AdminFeatureAccessCard /> },
     { id: 'staff', title: 'Staff Management', icon: Users, visible: true, content: <StaffCard isAdminPlus={isAdminPlus} isSuperuser={isSuperuser} currentUserName={userName} /> },
     { id: 'reservation-policy', title: 'Reservation Policy', icon: Calendar, visible: isAdminPlus, content: <ReservationPolicyCard /> },
-    { id: 'accounting-integrations', title: 'Accounting Integrations', icon: Plug, visible: isAdminPlus, content: <AccountingIntegrationsCard /> },
     { id: 'data-system', title: 'Data & System', icon: AlertTriangle, visible: isSuperuser, content: <DataWipeCard /> },
   ].filter((s) => s.visible)
 
@@ -1825,178 +1823,4 @@ function ReservationPolicyCard() {
   )
 }
 
-/* ------------------------------------------------------------------ */
-/*  ACCOUNTING INTEGRATIONS CARD — Admin + Superuser                   */
-/*  Stores QuickBooks / Xero OAuth client credentials and the default  */
-/*  sync schedule. Actual OAuth flows happen at /accounting/integrations. */
-/* ------------------------------------------------------------------ */
-const SYNC_SCHEDULES = [
-  { value: 'manual', label: 'Manual only' },
-  { value: 'daily',  label: 'Daily (midnight)' },
-  { value: 'weekly', label: 'Weekly (Sunday midnight)' },
-]
-
-function AccountingIntegrationsCard() {
-  const [fields, setFields] = useState({
-    qb_client_id:     '',
-    qb_client_secret: '',
-    xero_client_id:   '',
-    xero_client_secret: '',
-    sync_schedule:    'manual',
-  })
-  const [showSecrets, setShowSecrets] = useState({})
-  const [msg, setMsg]   = useState('')
-  const [busy, setBusy] = useState(false)
-  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
-
-  // Load persisted config from company_settings extended JSON (or a dedicated table)
-  useEffect(() => {
-    supabase.from('company_settings').select('accounting_integration_config').limit(1).maybeSingle()
-      .then(({ data }) => {
-        if (data?.accounting_integration_config) {
-          setFields((f) => ({ ...f, ...data.accounting_integration_config }))
-        }
-      })
-  }, [])
-
-  const save = async () => {
-    setBusy(true)
-    try {
-      // Store non-secret fields in company_settings. Actual secrets (client_secret)
-      // should be placed directly in Supabase Edge Function secrets via the dashboard,
-      // not stored in the database. We store only client IDs here for the OAuth flow URL.
-      const config = {
-        qb_client_id:    fields.qb_client_id.trim(),
-        xero_client_id:  fields.xero_client_id.trim(),
-        sync_schedule:   fields.sync_schedule,
-      }
-      const { error } = await supabase.from('company_settings').update({
-        accounting_integration_config: config,
-      }).not('id', 'is', null)
-      if (error) throw error
-      flash('Accounting integration settings saved.')
-    } catch (err) {
-      flash(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const toggleSecret = (key) => setShowSecrets((s) => ({ ...s, [key]: !s[key] }))
-
-  return (
-    <div className="card p-5 space-y-5">
-      <div>
-        <h2 className="font-display font-semibold text-pine flex items-center gap-2 mb-1">
-          <Plug size={18} className="text-forest" /> Accounting Integrations
-        </h2>
-        <p className="text-xs text-pine/50">
-          Configure OAuth client credentials for QuickBooks and Xero. Client secrets must also be added
-          as <span className="font-mono">QB_CLIENT_SECRET</span> / <span className="font-mono">XERO_CLIENT_SECRET</span>{' '}
-          in the Supabase Edge Function secrets dashboard — they are never stored in this database.
-        </p>
-      </div>
-
-      {msg && <div className="px-3 py-2 rounded-lg bg-forest/10 text-forest text-sm">{msg}</div>}
-
-      {/* QuickBooks */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-pine/60 uppercase tracking-widest">QuickBooks Online</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="label">Client ID</label>
-            <input
-              className="input"
-              placeholder="QB OAuth 2.0 Client ID"
-              value={fields.qb_client_id}
-              onChange={(e) => setFields({ ...fields, qb_client_id: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="label">Client Secret <span className="text-pine/40 font-normal normal-case">(set in Supabase secrets)</span></label>
-            <div className="relative">
-              <input
-                className="input pr-9"
-                type={showSecrets.qb ? 'text' : 'password'}
-                placeholder="Store QB_CLIENT_SECRET in Supabase → not here"
-                value={fields.qb_client_secret}
-                onChange={(e) => setFields({ ...fields, qb_client_secret: e.target.value })}
-                autoComplete="off"
-              />
-              <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-pine/40 hover:text-pine" onClick={() => toggleSecret('qb')}>
-                {showSecrets.qb ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-            <p className="text-[11px] text-pine/40 mt-1">This field is for reference only — never committed to the database.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Xero */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-pine/60 uppercase tracking-widest">Xero</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="label">Client ID</label>
-            <input
-              className="input"
-              placeholder="Xero OAuth 2.0 Client ID"
-              value={fields.xero_client_id}
-              onChange={(e) => setFields({ ...fields, xero_client_id: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="label">Client Secret <span className="text-pine/40 font-normal normal-case">(set in Supabase secrets)</span></label>
-            <div className="relative">
-              <input
-                className="input pr-9"
-                type={showSecrets.xero ? 'text' : 'password'}
-                placeholder="Store XERO_CLIENT_SECRET in Supabase → not here"
-                value={fields.xero_client_secret}
-                onChange={(e) => setFields({ ...fields, xero_client_secret: e.target.value })}
-                autoComplete="off"
-              />
-              <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-pine/40 hover:text-pine" onClick={() => toggleSecret('xero')}>
-                {showSecrets.xero ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-            <p className="text-[11px] text-pine/40 mt-1">This field is for reference only — never committed to the database.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Sync schedule */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-pine/60 uppercase tracking-widest">Sync Schedule</p>
-        <div className="flex flex-wrap gap-3">
-          {SYNC_SCHEDULES.map((s) => (
-            <label key={s.value} className="flex items-center gap-2 cursor-pointer text-sm text-pine">
-              <input
-                type="radio"
-                name="sync_schedule"
-                value={s.value}
-                checked={fields.sync_schedule === s.value}
-                onChange={() => setFields({ ...fields, sync_schedule: s.value })}
-                className="accent-forest"
-              />
-              {s.label}
-            </label>
-          ))}
-        </div>
-        <p className="text-xs text-pine/40">Scheduled syncs run via Supabase pg_cron (requires pg_cron to be enabled and edge functions deployed).</p>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button className="btn-primary gap-2" onClick={save} disabled={busy}>
-          <Save size={14} /> {busy ? 'Saving…' : 'Save Settings'}
-        </button>
-        <a
-          href="/accounting/integrations"
-          className="text-sm text-forest hover:underline"
-        >
-          Go to Integrations →
-        </a>
-      </div>
-    </div>
-  )
-}
+/* end of Settings module */
