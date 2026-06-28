@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate } from '../lib/helpers'
-import { withTenantInsert } from '../lib/tenant'
 import { logAudit } from '../lib/pms.api.js'
 import {
   Pencil, Trash2, Printer, MessageCircle, Mail, X, Save, Search,
