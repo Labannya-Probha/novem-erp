@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { X, Banknote, CreditCard, Smartphone, Building2, Plus, Minus } from 'lucide-react'
 import { supabase } from '../supabase'
 import { fmtBDT, todayISO } from '../lib/helpers'
+import { generateReservationPaymentNo, toPaymentReference } from '../lib/paymentNumber'
+import SearchableSelect from '../components/SearchableSelect.jsx'
 
 const METHODS = [
   { id: 'CASH',  label: 'Cash',   icon: Banknote   },
@@ -41,12 +43,13 @@ export default function ReceiptPaymentModal({ type = 'RECEIPT', onClose, onSaved
 
     try {
       if (isReceipt) {
+        const paymentNo = await generateReservationPaymentNo()
         // Insert into payments table
         const payload = {
           received_date: date,
           method,
           amount: +amount,
-          reference_no: cheque || ref || null,
+          reference_no: toPaymentReference(paymentNo, cheque || ref),
           narration: narration || null,
         }
         if (reservationId) payload.reservation_id = reservationId
@@ -126,24 +129,12 @@ export default function ReceiptPaymentModal({ type = 'RECEIPT', onClose, onSaved
           {/* Payment method */}
           <div>
             <label className="label">Method</label>
-            <div className="flex gap-2 flex-wrap">
-              {METHODS.map(m => {
-                const Icon = m.icon
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => setMethod(m.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                      method === m.id
-                        ? 'bg-forest text-white border-forest'
-                        : 'border-leaf text-pine/70 hover:border-forest'
-                    }`}
-                  >
-                    <Icon size={12} />{m.label}
-                  </button>
-                )
-              })}
-            </div>
+            <SearchableSelect
+              value={method}
+              onChange={setMethod}
+              options={METHODS.map((m) => ({ value: m.id, label: m.label }))}
+              placeholder="Select method..."
+            />
           </div>
 
           {/* Ref / Party */}

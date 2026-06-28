@@ -11,7 +11,8 @@ import { getTenantId, setTenantId } from './lib/tenant'
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
-import ReservationDetail from './pages/ReservationDetail.jsx'
+import Reservationmodule from './pages/Reservationmodule.jsx'
+import Frontofficemodule from './pages/Frontofficemodule.jsx'
 import ReservationPayments from './pages/ReservationPayments.jsx'
 import BookingCalendar from './pages/BookingCalendar.jsx'
 import HousekeepingHub from './pages/HousekeepingHub.jsx'
@@ -76,16 +77,16 @@ function BrandLogo({ url }) {
 /* ------------------------------------------------------------------ */
 const NAV_GROUPS = [
   { title: 'Sales & Reservation', items: [
-    { id: 'calendar',             label: 'Booking Calendar',    icon: CalendarDays },
-    { id: 'reservations',         label: 'Reservations',        icon: BedDouble },
-    { id: 'reservation-payments', label: 'Payment History',     icon: CreditCard },
+    { id: 'calendar',     label: 'Booking Calendar', icon: CalendarDays },
+    { id: 'reservations', label: 'Reservations',     icon: BedDouble },
+    { id: 'reservation-payments', label: 'Reservation Payments', icon: Wallet },
   ]},
   { title: 'Tasks', items: [
     { id: 'tasks',     label: 'Task Management', icon: ListChecks },
     { id: 'ai-tasker', label: 'AI Tasker',        icon: Bot },
   ]},
   { title: 'Front Office', items: [
-    { id: 'dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
+    { id: 'dashboard',    label: 'Frontoffice Module',    icon: LayoutDashboard },
     { id: 'nightaudit',   label: 'Night Audit',  icon: MoonStar },
     { id: 'housekeeping', label: 'Housekeeping', icon: BedDouble },
     { id: 'facilities', label: 'Service Bills', icon: ShoppingBasket },
@@ -249,7 +250,14 @@ function firstAccessiblePath(role, privileges) {
 
   const currentTopId = location.pathname.split('/').filter(Boolean)[0] || 'dashboard'
 
-  const openReservation  = (id)          => navigate(`/reservations/${id}`)
+  const openReservation  = (id, tab) => {
+    const q = tab ? `?tab=${encodeURIComponent(tab)}` : ''
+    navigate(`/reservations/${id}${q}`)
+  }
+  const openFrontOfficeReservation = (id, tab) => {
+    const q = tab ? `?tab=${encodeURIComponent(tab)}` : ''
+    navigate(`/frontoffice/reservations/${id}${q}`)
+  }
   const startReservation = (prefill = {}) => navigate('/reservations', { state: { prefill } })
 
   const softwareName    = company?.software_name || 'Aura Stay'
@@ -294,6 +302,7 @@ function firstAccessiblePath(role, privileges) {
             if (n.id === 'cms')             return role === 'SUPERUSER'
             if (n.id === 'menu-management') return isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT'
             if (n.id === 'consumption')     return can(role, 'inventory', privileges)
+            if (n.id === 'reservation-payments') return can(role, 'reservations', privileges)
             return can(role, n.id, privileges)
           })
           if (items.length === 0) return null
@@ -464,11 +473,14 @@ function firstAccessiblePath(role, privileges) {
         )}
 
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/frontoffice" replace />} />
 
           {/* Dashboard */}
           <Route path="/dashboard" element={
-            <Dashboard openReservation={openReservation} userName={userName} role={role} isAdmin={isAdmin} />
+            <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} />
+          } />
+          <Route path="/frontoffice" element={
+            <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} />
           } />
 
           {/* Reservations */}
@@ -479,7 +491,12 @@ function firstAccessiblePath(role, privileges) {
           } />
           <Route path="/reservations/:id" element={
             <GuardedRoute role={role} navId="reservations" privileges={privileges}>
-              <ReservationDetailRoute userName={userName} role={role} isAdmin={isAdmin} />
+              <ReservationModuleRoute userName={userName} role={role} isAdmin={isAdmin} />
+            </GuardedRoute>
+          } />
+          <Route path="/frontoffice/reservations/:id" element={
+            <GuardedRoute role={role} navId="dashboard" privileges={privileges}>
+              <FrontOfficeReservationRoute userName={userName} role={role} isAdmin={isAdmin} />
             </GuardedRoute>
           } />
           <Route path="/reservation-payments" element={
@@ -588,6 +605,7 @@ function firstAccessiblePath(role, privileges) {
              <VendorPaymentPage role={role} />
             </GuardedRoute>
           } />
+
           {/* HR & Payroll */}
           <Route path="/hr" element={<Navigate to="/hr/employee-entry" replace />} />
           <Route path="/hr/employee-entry"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrEmployeeEntryPage      userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
@@ -685,10 +703,16 @@ function ReservationsRoute({ openReservation, userName }) {
   return <Reservations openReservation={openReservation} userName={userName} prefill={prefill} clearPrefill={clearPrefill} />
 }
 
-function ReservationDetailRoute({ userName, role, isAdmin }) {
+function ReservationModuleRoute({ userName, role, isAdmin }) {
   const { id }   = useParams()
   const navigate = useNavigate()
-  return <ReservationDetail id={id} back={() => navigate('/reservations')} userName={userName} role={role} isAdmin={isAdmin} />
+  return <Reservationmodule id={id} back={() => navigate('/reservations')} userName={userName} role={role} isAdmin={isAdmin} />
+}
+
+function FrontOfficeReservationRoute({ userName, role, isAdmin }) {
+  const { id }   = useParams()
+  const navigate = useNavigate()
+  return <Frontofficemodule id={id} back={() => navigate('/frontoffice')} userName={userName} role={role} isAdmin={isAdmin} />
 }
 
 /* ------------------------------------------------------------------ */
@@ -852,7 +876,7 @@ function AppRoot() {
     const pathParts = location.pathname.split('/').filter(Boolean)
     const slug = pathParts.length > 1 ? pathParts[0] : undefined
     if (!session) return <Login slug={slug} />
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/frontoffice" replace />
   }
 
   if (!session && location.pathname.startsWith('/kiosk/pos')) return <GuestPosKiosk />

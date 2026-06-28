@@ -1,12 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { LogIn, Eye, EyeOff } from 'lucide-react'
-import { Button } from './ui/button'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
-import { Card, CardContent, CardHeader } from './ui/card'
-import { Alert, AlertDescription } from './ui/alert'
-import { Separator } from './ui/separator'
 import { cn } from '../lib/utils'
 
 // Hardcoded fallback — used if the slug lookup fails or no slug is given
@@ -110,8 +104,8 @@ export default function Login({ slug }) {
       )}
 
       {/* Login Card */}
-      <Card className="relative w-full max-w-sm shadow-2xl border-leaf/80">
-        <CardHeader className="items-center text-center pt-8 pb-5">
+      <div className="card relative w-full max-w-sm border border-leaf/80 bg-white/95 p-8 shadow-2xl backdrop-blur-sm">
+        <div className="flex flex-col items-center text-center pb-5">
           {/* Logo / Avatar */}
           <div className={cn(
             'w-24 h-24 rounded-2xl mb-4 overflow-hidden shadow-sm bg-white flex items-center justify-center ring-1 ring-leaf/70',
@@ -134,10 +128,9 @@ export default function Login({ slug }) {
 
           <h1 className="font-display text-2xl font-bold text-pine leading-tight">{softwareName}</h1>
           <p className="text-sm text-pine/60 mt-1">Welcome to {propertyName}</p>
-        </CardHeader>
+        </div>
 
-        <CardContent className="px-8 pb-8">
-          <Separator className="mb-6" />
+        <div className="h-px w-full bg-pine/10 mb-6" />
 
           <form
             className="space-y-4"
@@ -145,8 +138,8 @@ export default function Login({ slug }) {
           >
             {/* Username */}
             <div className="space-y-1.5">
-              <Label htmlFor="username">Username</Label>
-              <Input
+              <label htmlFor="username" className="label mb-0 min-h-0">Username</label>
+              <input
                 id="username"
                 type="text"
                 autoCapitalize="none"
@@ -155,20 +148,21 @@ export default function Login({ slug }) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="your username"
+                className="input"
               />
             </div>
 
             {/* Password */}
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+              <label htmlFor="password" className="label mb-0 min-h-0">Password</label>
               <div className="relative">
-                <Input
+                <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
+                  className="input pr-10"
                 />
                 <button
                   type="button"
@@ -184,20 +178,20 @@ export default function Login({ slug }) {
 
             {/* Error */}
             {err && (
-              <Alert variant="destructive">
-                <AlertDescription>{err}</AlertDescription>
-              </Alert>
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {err}
+              </div>
             )}
 
             {/* Submit */}
-            <Button
+            <button
               type="submit"
-              className="w-full mt-2"
+              className="btn-primary w-full mt-2"
               disabled={busy || !username || !password}
             >
               <LogIn size={16} />
               {busy ? 'Signing in…' : 'Sign in'}
-            </Button>
+            </button>
 
             {/* Footer */}
             <div className="pt-1 flex items-center justify-between text-xs text-pine/40">
@@ -207,8 +201,7 @@ export default function Login({ slug }) {
               </span>
             </div>
           </form>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   )
 }
