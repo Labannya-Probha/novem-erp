@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge'
 import { Separator } from '../components/ui/separator'
 import { useToast } from '../components/Toast'
 import { cn } from '../lib/utils'
-
+const TABS = ['Check-In', 'Billings & Check-Out']
 const HK_STYLE = {
   'Clean':        'bg-forest/15 text-forest border-forest/30',
   'Inspected':    'bg-sky-100 text-sky-700 border-sky-300',

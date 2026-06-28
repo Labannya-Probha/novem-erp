@@ -1,23 +1,22 @@
-import * as React from 'react'
-import { cn } from '../../lib/utils'
+import * as React from "react"
 
-const Input = React.forwardRef(({ className, type, ...props }, ref) => {
+import { cn } from "src/lib/utils"
+
+function Input({
+  className,
+  type,
+  ...props
+}) {
   return (
     <input
       type={type}
+      data-slot="input"
       className={cn(
-        'flex h-[38px] w-full rounded-[10px] border border-[--border-color] bg-white px-3 py-2 text-[14px] text-ink transition-all duration-150',
-        'placeholder:text-[rgba(95,90,85,0.55)]',
-        'focus:outline-none focus:border-[--brand-color] focus:shadow-[0_0_0_3px_var(--interactive-glow)] focus:bg-white focus:-translate-y-px',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-        className,
+        "h-8 w-full min-w-0 rounded-2xl border border-transparent bg-input/50 px-2.5 py-1 text-base transition-[color,box-shadow] duration-200 outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
       )}
-      ref={ref}
-      {...props}
-    />
-  )
-})
-Input.displayName = 'Input'
+      {...props} />
+  );
+}
 
 export { Input }

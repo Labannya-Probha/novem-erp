@@ -19,6 +19,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'role-permissions', label: 'Role Permissions', superuserOnly: true },
   { id: 'admin-feature-access', label: 'Admin Feature Access', superuserOnly: true },
   { id: 'staff', label: 'Staff Management' },
+  { id: 'accounting-integrations', label: 'Accounting Integrations', adminOnly: true },
   { id: 'data-system', label: 'Data & System', superuserOnly: true },
 ]
 
@@ -1822,5 +1823,3 @@ function ReservationPolicyCard() {
     </div>
   )
 }
-
-/* end of Settings module */

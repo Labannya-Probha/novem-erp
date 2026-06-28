@@ -6,6 +6,7 @@ import { Search, Trash2, UserSearch, X, CheckCircle2 } from 'lucide-react'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import KPICards from '../components/KPICards.jsx'
 import { Combobox } from '../components/ui/combobox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUSES = ['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'NO_SHOW', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED', 'CANCELLED'];
 const STATUS_TO_TAB = {
@@ -33,15 +34,18 @@ export function StatusFilter({ q, setQ, filter, setFilter }) {
       </div>
 
       <div className="w-full sm:w-[220px] sm:shrink-0 relative z-30">
-        <select
-          className="input w-full bg-white border-leaf text-pine shadow-sm"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          {STATUSES.map((status) => (
-            <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
-          ))}
-        </select>
+        <Select value={filter} onValueChange={setFilter}>
+          <SelectTrigger className="w-full bg-white border-leaf text-pine shadow-sm">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent className="z-[200] bg-white border-leaf shadow-xl">
+            {STATUSES.map((status) => (
+              <SelectItem key={status} value={status}>
+                {status.replace(/_/g, ' ')}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   )
