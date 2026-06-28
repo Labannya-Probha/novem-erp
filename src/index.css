@@ -1,14 +1,10 @@
 /* ============================================================
    FONTS — Inter
    ============================================================ */
-<<<<<<< HEAD
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-=======
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
->>>>>>> 9f6c59c2c6931b44b9fe168543f5f4a93b5fe229
 
 @tailwind base;
 @tailwind components;
