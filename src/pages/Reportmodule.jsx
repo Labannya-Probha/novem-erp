@@ -843,3 +843,5 @@ export default function Reports() {
     </div>
   )
 }
+
+export { default } from './Reportmodule.jsx'
