@@ -23,7 +23,7 @@ export function WelcomePopover({ isOpen, userName = 'User', onClose }) {
       <div
         role="status"
         aria-live="polite"
-        className={`pointer-events-auto rounded-lg border bg-white px-4 py-3 text-center text-sm font-semibold text-pine shadow-lg transition-all duration-300 ${
+        className={`pointer-events-auto w-auto max-w-sm rounded-lg border bg-white px-4 py-3 text-center text-sm font-semibold text-pine shadow-lg ring-0 transition-all duration-300 ${
           animate ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
         }`}
         style={{
