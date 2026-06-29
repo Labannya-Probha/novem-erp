@@ -1,7 +1,6 @@
 import { fmtBDT, fmtDate } from '../../lib/helpers'
 import { normalizeInvoiceItems, normalizeInvoiceTotals, resolveBuyerInfo } from '../../lib/invoiceFormat'
 
-/* ---------- Amount-in-words (kept local — do not assume helpers.js has it) ---------- */
 const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
   'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
 const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
@@ -31,7 +30,11 @@ function takaInWords(amount) {
   return s + ' Only'
 }
 
-// NBR-prescribed Mushak-6.3 (কর চালানপত্র) layout — strict black on white
+const issueTimeOf = (issued) =>
+  issued.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Dhaka' })
+
+const supplyUnit = (line) => line.charge_type === 'ROOM' ? 'Night' : 'Service'
+
 export default function Mushak63({
   charges = [], line_snapshot = [], totals = {}, paid = 0, due = 0,
   res, guest, company, guestCompany, refNo, invoice_no, issued_at,
@@ -47,142 +50,211 @@ export default function Mushak63({
   const t = normalizeInvoiceTotals(totals)
   const buyer = resolveBuyerInfo({ res, guest, guestCompany, buyer_name, buyer_address, buyer_bin })
   const issued = new Date(issued_at || new Date())
-  const issueTime = issued.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Dhaka' })
-
   const invNo = invoice_no || '—'
   const creator = created_by || '________________'
-
-  const b = { border: 'none', borderBottom: '1px solid #000', padding: '4px 6px', fontSize: 10.5, verticalAlign: 'top', fontFamily: 'Inter, sans-serif' };
-  const bc = { ...b, textAlign: 'center' };
-  const br = { ...b, textAlign: 'right', fontFamily: 'Inter, sans-serif' };
-
-  // Pre-VAT, pre-discount "value" column per NBR format — for legacy items
-  // (no per-line discount/SC available) this is simply the recorded amount.
   const lineValue = (l) => l._legacy
     ? Number(l.base_amount || 0)
     : +(Number(l.base_amount) - Number(l.discount) + Number(l.service_charge)).toFixed(2)
   const totalValue = lines.reduce((a, l) => a + lineValue(l), 0)
 
+  const copies = ['Guest Copy', 'Resort Copy']
+
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', color: '#000', position: 'relative' }}>
-      {is_void && <div style={{ position: 'absolute', top: '40%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 96, fontWeight: 800, color: 'rgba(220,0,0,0.16)', letterSpacing: 8, pointerEvents: 'none' }}>VOID / বাতিল</div>}
-      <table style={{ width: '100%' }}>
-        <tbody>
-          <tr>
-            <td style={{ width: '20%' }}></td>
-            <td style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>গণপ্রজাতন্ত্রী বাংলাদেশ সরকার</div>
-              <div style={{ fontSize: 12 }}>জাতীয় রাজস্ব বোর্ড</div>
-              <div style={{ fontSize: 9 }}>Government of the People's Republic of Bangladesh · National Board of Revenue</div>
-            </td>
-            <td style={{ width: '20%', textAlign: 'right', verticalAlign: 'top' }}>
-              <div style={{ display: 'inline-block', border: '2px solid #000', padding: '4px 10px', fontWeight: 700, fontSize: 13 }}>মূসক-৬.৩</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div style={{ textAlign: 'center', fontSize: 9, marginTop: 2 }}>[বিধি ৪০ এর উপ-বিধি (১) এর দফা (গ) দ্রষ্টব্য]</div>
-      <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, margin: '6px 0 10px', textDecoration: 'underline' }}>কর চালানপত্র (Tax Invoice)</div>
+    <div className="mushak-copy-stack">
+      {copies.map((copyLabel, copyIndex) => (
+        <MushakCopy
+          key={copyLabel}
+          copyLabel={copyLabel}
+          copyIndex={copyIndex}
+          lines={lines}
+          totals={t}
+          totalValue={totalValue}
+          lineValue={lineValue}
+          buyer={buyer}
+          company={company}
+          res={res}
+          refNo={refNo}
+          invNo={invNo}
+          issued={issued}
+          creator={creator}
+          isLegacy={isLegacy}
+          isVoid={is_void}
+        />
+      ))}
+    </div>
+  )
+}
+
+function MushakCopy({
+  copyLabel, copyIndex, lines, totals, totalValue, lineValue, buyer, company,
+  res, refNo, invNo, issued, creator, isLegacy, isVoid,
+}) {
+  const cell = {
+    border: '1px solid #111',
+    padding: '4px 5px',
+    fontSize: 9.5,
+    lineHeight: 1.25,
+    verticalAlign: 'top',
+    color: '#000',
+    background: '#fff',
+  }
+  const center = { ...cell, textAlign: 'center' }
+  const right = { ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+  const label = { fontSize: 11, padding: '2px 0' }
+  const value = { fontSize: 11, padding: '2px 0 2px 8px', fontWeight: 600 }
+
+  return (
+    <section
+      className={`print-copy mushak-63-doc print-a4-doc ${copyIndex > 0 ? 'print-copy-break' : ''}`}
+      style={{ maxWidth: '190mm', margin: '0 auto', color: '#000', background: '#fff', fontFamily: "'Noto Sans Bengali', 'SolaimanLipi', 'Inter', sans-serif", position: 'relative' }}
+    >
+      {isVoid && <div style={{ position: 'absolute', top: '41%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 88, fontWeight: 800, color: 'rgba(220,0,0,0.14)', letterSpacing: 8, pointerEvents: 'none' }}>VOID / বাতিল</div>}
+
+      <div style={{ textAlign: 'right', marginBottom: 2 }}>
+        <span className="copy-badge" style={{ display: 'inline-block', border: '1px solid #111', padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>{copyLabel}</span>
+      </div>
+
+      <header style={{ position: 'relative', textAlign: 'center', marginBottom: 8 }}>
+        <div style={{ position: 'absolute', right: 0, top: 8, border: '2px solid #111', padding: '5px 13px', fontSize: 14, fontWeight: 800 }}>মূসক-৬.৩</div>
+        <div style={{ fontSize: 15, fontWeight: 700 }}>গণপ্রজাতন্ত্রী বাংলাদেশ সরকার</div>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>জাতীয় রাজস্ব বোর্ড</div>
+        <div style={{ fontSize: 20, fontWeight: 800, marginTop: 12, textDecoration: 'underline' }}>কর চালানপত্র</div>
+        <div style={{ fontSize: 11, marginTop: 3 }}>বিধি ৪০ এর উপ-বিধি (১) এর দফা (গ) ও দফা (চ) দ্রষ্টব্য</div>
+      </header>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
         <tbody>
           <tr>
-            <td style={b}><b>নিবন্ধিত ব্যক্তির নাম</b> (Name of registered person):<br />{company?.legal_name || company?.name}</td>
-            <td style={b}><b>নিবন্ধিত ব্যক্তির বিআইএন</b> (BIN):<br /><span style={{ fontFamily: '"IBM Plex Mono", monospace' }}>{company?.bin || '____________________'}</span></td>
+            <td style={{ ...label, width: '34%' }}>নিবন্ধিত ব্যক্তির নাম</td>
+            <td style={{ ...label, width: 14 }}>:</td>
+            <td style={value}>{company?.legal_name || company?.name || 'Aura Stay'}</td>
           </tr>
           <tr>
-            <td style={b} colSpan={2}><b>চালানপত্র ইস্যুর ঠিকানা</b> (Address of issue):<br />{company?.name} — {company?.address}</td>
+            <td style={label}>নিবন্ধিত ব্যক্তির বিআইএন</td>
+            <td style={label}>:</td>
+            <td style={value}>{company?.bin || company?.bin_no || company?.vat_reg || company?.vat_bin || '____________________'}</td>
           </tr>
           <tr>
-            <td style={b}>
-              <b>ক্রেতার নাম</b> (Buyer's name): {buyer.name}<br />
-              <b>ক্রেতার ঠিকানা</b> (Buyer's address): {buyer.address}<br />
-              <b>ক্রেতার বিআইএন</b> (Buyer's BIN, if any): {buyer.bin || '—'}
-            </td>
-            <td style={b}>
-              <b>চালানপত্র নম্বর</b> (Invoice No.): <span style={{ fontFamily: '"IBM Plex Mono", monospace', fontWeight: 700 }}>{invNo}</span><br />
-              <b>ইস্যুর তারিখ</b> (Date of issue): {fmtDate(issued)}<br />
-              <b>ইস্যুর সময়</b> (Time of issue): {issueTime}
-            </td>
-          </tr>
-          <tr>
-            <td style={b}><b>সরবরাহের গন্তব্যস্থল</b> (Destination of supply): {company?.name}, {company?.address}</td>
-            <td style={b}><b>যানবাহনের প্রকৃতি ও নম্বর</b> (Vehicle type & no.): প্রযোজ্য নয় (N/A) · Ref: {refNo || res?.res_no || '—'}</td>
+            <td style={label}>চালানপত্র ইস্যুর ঠিকানা</td>
+            <td style={label}>:</td>
+            <td style={value}>{company?.address || '—'}</td>
           </tr>
         </tbody>
       </table>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+        <tbody>
+          <tr>
+            <td style={{ ...label, width: '18%' }}>ক্রেতার নাম</td>
+            <td style={{ ...label, width: 14 }}>:</td>
+            <td style={value}>{buyer.name}</td>
+            <td style={{ ...label, width: '18%' }}>চালানপত্র নম্বর</td>
+            <td style={{ ...label, width: 14 }}>:</td>
+            <td style={value}>{invNo}</td>
+          </tr>
+          <tr>
+            <td style={label}>ক্রেতার বিআইএন</td>
+            <td style={label}>:</td>
+            <td style={value}>{buyer.bin || '—'}</td>
+            <td style={label}>ইস্যুর তারিখ</td>
+            <td style={label}>:</td>
+            <td style={value}>{fmtDate(issued)}</td>
+          </tr>
+          <tr>
+            <td style={label}>সরবরাহের গন্তব্যস্থল</td>
+            <td style={label}>:</td>
+            <td style={value}>{buyer.address !== '—' ? buyer.address : company?.address || '—'}</td>
+            <td style={label}>ইস্যুর সময়</td>
+            <td style={label}>:</td>
+            <td style={value}>{issueTimeOf(issued)}</td>
+          </tr>
+          <tr>
+            <td style={label}>যানবাহনের প্রকৃতি ও নাম্বার</td>
+            <td style={label}>:</td>
+            <td style={value}>প্রযোজ্য নয়</td>
+            <td style={label}>রেফারেন্স</td>
+            <td style={label}>:</td>
+            <td style={value}>{refNo || res?.res_no || '—'}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
         <thead>
           <tr>
-            <th style={bc}>ক্রমিক<br />নং</th>
-            <th style={bc}>পণ্য বা সেবার বর্ণনা<br />(Description of goods/services)</th>
-            <th style={bc}>সরবরাহের<br />একক</th>
-            <th style={bc}>পরিমাণ</th>
-            <th style={bc}>মূল্য (টাকায়)<br />(Value)</th>
-            <th style={bc}>মূসক হার<br />(VAT rate)</th>
-            <th style={bc}>মূসকের পরিমাণ<br />(টাকায়)</th>
-            <th style={bc}>সকল প্রকার শুল্ক ও<br />করসহ মূল্য</th>
+            <th style={{ ...center, width: '5%' }}>ক্রমিক<br />নং</th>
+            <th style={{ ...center, width: '22%' }}>পণ্য বা সেবার বর্ণনা<br />(প্রযোজ্য ক্ষেত্রে ব্র্যান্ড নামসহ)</th>
+            <th style={{ ...center, width: '7%' }}>সরবরাহের<br />একক</th>
+            <th style={{ ...center, width: '6%' }}>পরিমাণ</th>
+            <th style={{ ...center, width: '9%' }}>একক মূল্য *<br />(টাকায়)</th>
+            <th style={{ ...center, width: '9%' }}>মোট মূল্য<br />(টাকায়)</th>
+            <th style={{ ...center, width: '7%' }}>সম্পূরক<br />শুল্কের হার</th>
+            <th style={{ ...center, width: '8%' }}>সম্পূরক শুল্কের<br />পরিমাণ</th>
+            <th style={{ ...center, width: '8%' }}>মূসক / সুনির্দিষ্ট<br />করের হার</th>
+            <th style={{ ...center, width: '9%' }}>মূসক / সুনির্দিষ্ট<br />করের পরিমাণ</th>
+            <th style={{ ...center, width: '10%' }}>সকল প্রকার শুল্ক ও<br />করসহ মূল্য</th>
+          </tr>
+          <tr>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => <th key={n} style={center}>{n}</th>)}
           </tr>
         </thead>
         <tbody>
-          {lines.map((l, i) => {
-            const val = lineValue(l)
-            const vatPct = l._legacy ? null : (val > 0 ? ((Number(l.vat) / val) * 100).toFixed(1).replace(/\.0$/, '') : '0')
+          {lines.map((line, i) => {
+            const valueAmount = lineValue(line)
+            const vatRate = line._legacy ? null : (valueAmount > 0 ? ((Number(line.vat) / valueAmount) * 100).toFixed(1).replace(/\.0$/, '') : '0')
             return (
-              <tr key={l.id || i}>
-                <td style={bc}>{i + 1}</td>
-                <td style={b}>{l.description}</td>
-                <td style={bc}>{l.charge_type === 'ROOM' ? 'Night' : 'Service'}</td>
-                <td style={bc}>1</td>
-                <td style={br}>{val.toFixed(2)}</td>
-                <td style={bc}>{vatPct === null ? '—' : `${vatPct}%`}</td>
-                <td style={br}>{l._legacy ? '—' : Number(l.vat).toFixed(2)}</td>
-                <td style={br}>{Number(l.total).toFixed(2)}</td>
+              <tr key={line.id || i}>
+                <td style={center}>{i + 1}</td>
+                <td style={cell}>{line.description}</td>
+                <td style={center}>{supplyUnit(line)}</td>
+                <td style={center}>1</td>
+                <td style={right}>{valueAmount.toFixed(2)}</td>
+                <td style={right}>{valueAmount.toFixed(2)}</td>
+                <td style={center}>—</td>
+                <td style={right}>—</td>
+                <td style={center}>{vatRate === null ? '—' : `${vatRate}%`}</td>
+                <td style={right}>{line._legacy ? '—' : Number(line.vat).toFixed(2)}</td>
+                <td style={right}>{Number(line.total).toFixed(2)}</td>
               </tr>
             )
           })}
           <tr>
-            <td style={{ ...b, fontWeight: 700 }} colSpan={4}>সর্বমোট (Total)</td>
-            <td style={{ ...br, fontWeight: 700 }}>{totalValue.toFixed(2)}</td>
-            <td style={bc}>—</td>
-            <td style={{ ...br, fontWeight: 700 }}>{t.vat.toFixed(2)}</td>
-            <td style={{ ...br, fontWeight: 700 }}>{t.grand_total_raw.toFixed(2)}</td>
+            <td style={{ ...cell, fontWeight: 800 }} colSpan={5}>মোট:</td>
+            <td style={{ ...right, fontWeight: 800 }}>{totalValue.toFixed(2)}</td>
+            <td style={center}>—</td>
+            <td style={right}>—</td>
+            <td style={center}>—</td>
+            <td style={{ ...right, fontWeight: 800 }}>{totals.vat.toFixed(2)}</td>
+            <td style={{ ...right, fontWeight: 800 }}>{totals.grand_total_raw.toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
 
       {isLegacy && (
-        <div style={{ fontSize: 9, marginTop: 4, color: '#444' }}>
-          দ্রষ্টব্য: এই চালানটি লাইন-পর্যায়ের বিস্তারিত হিসাব সংরক্ষণের আগে ইস্যু করা হয়েছিল — প্রতি লাইনে মূসক হার দেখানো সম্ভব হয়নি। মোট মূসক ও সর্বমোট মূল্য সঠিক রয়েছে। (Note: this invoice predates per-line tax breakdown — totals below remain accurate.)
+        <div style={{ fontSize: 9.5, marginTop: 5 }}>
+          দ্রষ্টব্য: এই চালানটি লাইন-পর্যায়ের বিস্তারিত হিসাব সংরক্ষণের আগে ইস্যু করা হয়েছিল, তাই প্রতি লাইনে মূসক হার দেখানো সম্ভব হয়নি। মোট মূসক ও সর্বমোট মূল্য সঠিক রয়েছে।
         </div>
       )}
 
-      {!!t.rounding && (
+      {!!totals.rounding && (
         <div style={{ fontSize: 10.5, marginTop: 6, textAlign: 'right' }}>
-          রাউন্ডিং (Rounding): {t.rounding > 0 ? '+' : '−'}{fmtBDT(Math.abs(t.rounding))} &nbsp;·&nbsp; <b>প্রদেয় (Net payable): {fmtBDT(t.grand_total)}</b>
+          রাউন্ডিং: {totals.rounding > 0 ? '+' : '−'}{fmtBDT(Math.abs(totals.rounding))} &nbsp; <b>প্রদেয়: {fmtBDT(totals.grand_total)}</b>
         </div>
       )}
 
-      <div style={{ fontSize: 10.5, marginTop: 6 }}>
-        <b>কথায় (In words):</b> {takaInWords(t.grand_total || 0)}
+      <div style={{ border: '1px solid #111', borderTop: 'none', padding: '6px 8px', fontSize: 11, fontWeight: 700 }}>
+        মোট (কথায়): {takaInWords(totals.grand_total || 0)}
       </div>
 
-      <table style={{ width: '100%', marginTop: 40, fontSize: 10.5 }}>
-        <tbody>
-          <tr>
-            <td style={{ width: '55%' }}>
-              <b>প্রতিষ্ঠান কর্তৃপক্ষের দায়িত্বপ্রাপ্ত ব্যক্তির নাম</b> (Name of responsible person): {creator}<br />
-              <b>পদবি</b> (Designation): ________________
-            </td>
-            <td style={{ width: '45%', textAlign: 'right', verticalAlign: 'bottom' }}>
-              <div style={{ borderTop: '1px solid #000', display: 'inline-block', paddingTop: 4, minWidth: 180, textAlign: 'center' }}>
-                <b>স্বাক্ষর</b> (Signature) ও সিল (Seal)
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <footer style={{ marginTop: 22, fontSize: 11 }}>
+        <div style={{ marginBottom: 12 }}>প্রতিষ্ঠান কর্তৃপক্ষের দায়িত্বপ্রাপ্ত ব্যক্তির নামঃ {creator}</div>
+        <div style={{ marginBottom: 22 }}>পদবীঃ __________________________</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div>সীলঃ</div>
+          <div style={{ minWidth: 210, textAlign: 'center', borderTop: '1px solid #111', paddingTop: 5 }}>স্বাক্ষরঃ</div>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 9.5 }}>* সকল প্রকার কর ব্যতীত মূল্য</div>
+      </footer>
+    </section>
   )
 }

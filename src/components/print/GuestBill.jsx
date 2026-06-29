@@ -43,6 +43,7 @@ export default function GuestBill({
   charges = [], line_snapshot = [], totals = {}, paid = 0, due = 0,
   res, guest, company, guestCompany, invoice_no, issued_at,
   buyer_name, buyer_address, buyer_bin,
+  copyLabel, singleCopy = false,
 }) {
   const co = {
     name: company?.name || 'Aura Stay',
@@ -62,6 +63,7 @@ export default function GuestBill({
   const isDraft = !invoice_no
   const invoiceNumber = invoice_no || `INV-${res?.res_no || 'DRAFT'}`
   const issueDate = fmtDate(issued_at || new Date().toISOString())
+  const issueTime = new Date(issued_at || new Date()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Dhaka' })
   const nights = res?.check_in && res?.check_out ? nightsBetween(res.check_in, res.check_out) : 0
   const pax = (Number(res?.pax_adults) || 0) + (Number(res?.pax_children) || 0)
 
@@ -87,8 +89,36 @@ export default function GuestBill({
     return Number(item[field] || 0).toFixed(2)
   }
 
+  if (!singleCopy) {
+    return (
+      <div className="guest-bill-copy-stack">
+        {['Guest Copy', 'Resort Copy'].map((label) => (
+          <GuestBill
+            key={label}
+            charges={charges}
+            line_snapshot={line_snapshot}
+            totals={totals}
+            paid={paid}
+            due={due}
+            res={res}
+            guest={guest}
+            company={company}
+            guestCompany={guestCompany}
+            invoice_no={invoice_no}
+            issued_at={issued_at}
+            buyer_name={buyer_name}
+            buyer_address={buyer_address}
+            buyer_bin={buyer_bin}
+            copyLabel={label}
+            singleCopy
+          />
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div className="gb-wrap print-a4-doc" style={{
+    <div className={`gb-wrap print-copy print-a4-doc ${copyLabel === 'Resort Copy' ? 'print-copy-break' : ''}`} style={{
       fontFamily: "'Inter', sans-serif", color: INK, background: '#fff',
       maxWidth: '186mm', margin: '0 auto', padding: '3mm 4mm 5mm', lineHeight: 1.35,
     }}>
@@ -102,6 +132,9 @@ export default function GuestBill({
       `}</style>
 
       {/* ═══ 1. COMPANY HEADER ═══ */}
+      <div style={{ textAlign: 'right', marginBottom: 4 }}>
+        <span className="copy-badge" style={{ display: 'inline-block', border: `1px solid ${LINE}`, borderRadius: 4, padding: '2px 8px', fontSize: 9, fontWeight: 800, color: PINE, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{copyLabel}</span>
+      </div>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, paddingBottom: 9, borderBottom: `3px solid ${FOREST}` }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           {co.logo
@@ -132,6 +165,11 @@ export default function GuestBill({
           </div>
           <div><span style={{ color: MUTE }}>Date: </span><span style={{ fontWeight: 600 }}>{issueDate}</span></div>
           <div><span style={{ color: MUTE }}>Status: </span><span style={{ fontWeight: 700, color: statusColor }}>{statusLabel}</span></div>
+        </div>
+        <div style={{ display: 'inline-grid', gridTemplateColumns: 'auto auto auto', gap: '6px 14px', marginTop: 8, padding: '6px 12px', border: `1px solid ${LINE}`, borderRadius: 6, background: 'rgba(46,125,50,0.03)', fontSize: 10.5, textAlign: 'left' }}>
+          <div><span style={{ color: MUTE }}>চালানপত্র নম্বর: </span><b>{invoiceNumber}</b></div>
+          <div><span style={{ color: MUTE }}>ইস্যুর তারিখ: </span><b>{issueDate}</b></div>
+          <div><span style={{ color: MUTE }}>ইস্যুর সময়: </span><b>{issueTime}</b></div>
         </div>
       </section>
 
