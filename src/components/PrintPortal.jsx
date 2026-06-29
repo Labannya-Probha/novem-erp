@@ -49,6 +49,34 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         --print-ink: #111827;
         --print-muted: #4b5563;
       }
+      #print-root .print-doc,
+      #print-root .print-a4-doc {
+        color: var(--print-ink);
+      }
+      #print-root h1,
+      #print-root h2,
+      #print-root h3,
+      #print-root .print-title {
+        color: var(--print-primary) !important;
+      }
+      #print-root table th,
+      #print-root .print-heading {
+        background: var(--print-soft) !important;
+        color: var(--print-primary) !important;
+        border-color: var(--print-line) !important;
+      }
+      #print-root table td,
+      #print-root table th,
+      #print-root .print-box,
+      #print-root .print-card {
+        border-color: var(--print-line) !important;
+      }
+      #print-root .print-accent {
+        color: var(--print-accent) !important;
+      }
+      #print-root .print-accent-bg {
+        background: var(--print-soft) !important;
+      }
       @media print {
         body > div:not(#print-portal-container) { display: none !important; }
         html, body { width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow-y: visible !important; }
@@ -115,19 +143,25 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
   if (!portalNode) return null
   return createPortal(
     <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto overscroll-contain p-3 sm:p-6">
-      <div className="bg-white max-w-3xl w-full my-0 sm:my-4 relative overflow-hidden rounded-xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col">
+      <div
+        className="bg-white max-w-3xl w-full my-0 sm:my-4 relative overflow-hidden rounded-xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col"
+        style={{ border: `1px solid rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.22)` }}
+      >
         
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-gray-300 sticky top-0 bg-white z-10 no-print">
-          <h3 className="font-semibold text-gray-800 font-sans min-w-0 flex-1 truncate">{title}</h3>
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b sticky top-0 bg-white z-10 no-print"
+          style={{ borderColor: `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.22)` }}
+        >
+          <h3 className="font-semibold font-sans min-w-0 flex-1 truncate" style={{ color: brandPrimary }}>{title}</h3>
           <div className="flex flex-wrap gap-2 justify-end">
             <button className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandPrimary }} onClick={handleExportPDF}>
               <Download size={14} /> Export PDF
             </button>
-            <button className="flex items-center gap-1 bg-gray-800 text-white px-3 py-1.5 rounded text-sm hover:bg-black" onClick={() => window.print()}>
+            <button className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandAccent }} onClick={() => window.print()}>
               <Printer size={14} /> Print
             </button>
-            <button className="px-3 py-1.5 rounded text-sm border border-gray-300 hover:bg-gray-100" onClick={onClose}>
+            <button className="px-3 py-1.5 rounded text-sm border hover:bg-gray-100" style={{ borderColor: `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.24)`, color: brandPrimary }} onClick={onClose}>
               <X size={14} /> Close
             </button>
           </div>
