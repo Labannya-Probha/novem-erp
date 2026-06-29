@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
-import { fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
+import { fmtDate, todayISO } from '../lib/helpers'
 import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle } from 'lucide-react'
 import KPICards from '../components/KPICards.jsx'
 import { Button } from '../components/ui/button'
