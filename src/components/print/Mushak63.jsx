@@ -50,6 +50,7 @@ export default function Mushak63({
   const t = normalizeInvoiceTotals(totals)
   const buyer = resolveBuyerInfo({ res, guest, guestCompany, buyer_name, buyer_address, buyer_bin })
   const issued = new Date(issued_at || new Date())
+  const printedAt = new Date()
   const invNo = invoice_no || '—'
   const creator = created_by || '________________'
   const lineValue = (l) => l._legacy
@@ -76,6 +77,7 @@ export default function Mushak63({
           refNo={refNo}
           invNo={invNo}
           issued={issued}
+          printedAt={printedAt}
           creator={creator}
           isLegacy={isLegacy}
           isVoid={is_void}
@@ -87,7 +89,7 @@ export default function Mushak63({
 
 function MushakCopy({
   copyLabel, copyIndex, lines, totals, totalValue, lineValue, buyer, company,
-  res, refNo, invNo, issued, creator, isLegacy, isVoid,
+  res, refNo, invNo, issued, printedAt, creator, isLegacy, isVoid,
 }) {
   const cell = {
     border: '1px solid #111',
@@ -106,7 +108,7 @@ function MushakCopy({
   return (
     <section
       className={`print-copy mushak-63-doc print-a4-doc ${copyIndex > 0 ? 'print-copy-break' : ''}`}
-      style={{ width: '100%', maxWidth: '194mm', minHeight: '281mm', margin: '0 auto', color: '#000', background: '#fff', fontFamily: "'Noto Sans Bengali', 'SolaimanLipi', 'Inter', sans-serif", position: 'relative' }}
+      style={{ width: '100%', maxWidth: '194mm', minHeight: '281mm', margin: '0 auto', padding: '0 4mm', color: '#000', background: '#fff', fontFamily: "'Noto Sans Bengali', 'SolaimanLipi', 'Inter', sans-serif", position: 'relative', pageBreakAfter: copyIndex === 0 ? 'always' : 'auto' }}
     >
       {isVoid && <div style={{ position: 'absolute', top: '41%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 88, fontWeight: 800, color: 'rgba(220,0,0,0.14)', letterSpacing: 8, pointerEvents: 'none' }}>VOID / বাতিল</div>}
 
@@ -166,7 +168,7 @@ function MushakCopy({
             <td style={value}>{buyer.address !== '—' ? buyer.address : company?.address || '—'}</td>
             <td style={label}>ইস্যুর সময়</td>
             <td style={label}>:</td>
-            <td style={value}>{issueTimeOf(issued)}</td>
+            <td style={value}>{issueTimeOf(printedAt)}</td>
           </tr>
           <tr>
             <td style={label}>যানবাহনের প্রকৃতি ও নাম্বার</td>

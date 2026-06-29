@@ -11,6 +11,12 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
   const brandPrimary = primaryColor || '#1B4D2E'
   const brandAccent = accentColor || '#2E7D32'
 
+  // Supports: A4, thermal, thermal-58, thermal-80
+  const normalizedType = String(type || 'A4').toLowerCase()
+  const isThermal = normalizedType === 'thermal' || normalizedType === 'thermal-58' || normalizedType === 'thermal-80'
+  const thermalPaperWidth = normalizedType === 'thermal-80' ? '80mm' : '58mm'
+  const thermalContentMaxWidth = normalizedType === 'thermal-80' ? '72mm' : '52mm'
+
   const hexToRgb = (hex, fallback) => {
     const safe = (hex || '').replace('#', '').trim()
     if (/^[0-9a-fA-F]{6}$/.test(safe)) {
@@ -36,8 +42,8 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
     style.innerHTML = `
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&display=swap');
       @page {
-        size: ${type === 'thermal' ? '80mm auto' : 'A4'};
-        margin: ${type === 'thermal' ? '0' : '8mm'};
+        size: ${isThermal ? `${thermalPaperWidth} auto` : 'A4'};
+        margin: ${isThermal ? '0' : '8mm'};
       }
       #print-root {
         --print-primary: ${brandPrimary};
@@ -107,18 +113,16 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         body > div:not(#print-portal-container) { display: none !important; }
         html, body { width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow-y: visible !important; }
         .no-print { display: none !important; }
-        
+
         #print-root {
           font-family: 'Inter', sans-serif !important;
           display: block !important;
-          width: 100% !important;
-          max-width: ${type === 'thermal' ? '72mm' : '194mm'} !important;
-          margin: 0 auto !important;
-          padding: ${type === 'thermal' ? '0' : '0 0 8mm'} !important;
-          font-size: 11px !important;
-          line-height: 1.4 !important;
           color: var(--print-ink) !important;
-          box-shadow: none !important;
+          width: 100% !important;
+          max-width: ${isThermal ? thermalContentMaxWidth : '194mm'} !important;
+          margin: 0 auto !important;
+          padding: ${isThermal ? '0' : '0 0 8mm'} !important;
+          overflow: visible !important;
         }
         #print-root .print-a4-doc {
           width: 100% !important;
@@ -159,6 +163,58 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           page-break-inside: avoid !important;
           break-inside: avoid !important;
         }
+
+        /* Thermal specific tuning for 58mm / 80mm receipts */
+        #print-root.epos-receipt,
+        #print-root.print-pos-58 {
+          width: 52mm !important;
+          max-width: 52mm !important;
+          min-width: 52mm !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          font-size: 10px !important;
+          line-height: 1.2 !important;
+        }
+
+        #print-root.print-pos-80 {
+          width: 72mm !important;
+          max-width: 72mm !important;
+          min-width: 72mm !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          font-size: 10px !important;
+          line-height: 1.2 !important;
+        }
+
+        #print-root.print-pos-58 table,
+        #print-root.print-pos-80 table {
+          width: 100% !important;
+          table-layout: fixed !important;
+          border-collapse: collapse !important;
+        }
+
+        #print-root.print-pos-58 th,
+        #print-root.print-pos-58 td,
+        #print-root.print-pos-80 th,
+        #print-root.print-pos-80 td {
+          padding: 2px 3px !important;
+          word-break: break-word !important;
+          overflow-wrap: anywhere !important;
+          white-space: normal !important;
+          vertical-align: top !important;
+        }
+
+        #print-root.print-pos-58 .no-pos-print,
+        #print-root.print-pos-80 .no-pos-print {
+          display: none !important;
+        }
+
+        #print-root.print-pos-58 .print-copy-break,
+        #print-root.print-pos-80 .print-copy-break {
+          page-break-before: auto !important;
+          break-before: auto !important;
+        }
+
         #print-root .print-footer,
         #print-footer {
           display: block !important;
@@ -179,7 +235,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
       document.getElementById('__print-portal-page-style__')?.remove()
       if (node.parentNode) node.parentNode.removeChild(node)
     }
-  }, [type, brandPrimary, brandAccent])
+  }, [type, brandPrimary, brandAccent, isThermal, thermalPaperWidth, thermalContentMaxWidth])
 
   const handleExportPDF = () => {
     window.print();
@@ -189,10 +245,13 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
   return createPortal(
     <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto overscroll-contain p-3 sm:p-6">
       <div
-        className="bg-white max-w-3xl w-full my-0 sm:my-4 relative overflow-hidden rounded-xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col"
-        style={{ border: `1px solid rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.22)` }}
+        className="bg-white w-full my-0 sm:my-4 relative overflow-visible rounded-xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col"
+        style={{
+          border: `1px solid rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.22)`,
+          maxWidth: isThermal ? '420px' : '900px',
+        }}
       >
-        
+
         {/* Toolbar */}
         <div
           className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b sticky top-0 bg-white z-10 no-print"
@@ -212,7 +271,16 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           </div>
         </div>
         {/* Print Content Wrapper */}
-        <div id="print-root" className={`p-4 sm:p-8 overflow-auto ${type === 'thermal' ? 'epos-receipt' : 'print-doc'}`}>
+        <div
+          id="print-root"
+          className={`p-4 sm:p-8 overflow-auto ${
+            isThermal
+              ? normalizedType === 'thermal-80'
+                ? 'epos-receipt print-pos-80'
+                : 'epos-receipt print-pos-58'
+              : 'print-doc print-a4'
+          }`}
+        >
           {children}
         </div>
       </div>
