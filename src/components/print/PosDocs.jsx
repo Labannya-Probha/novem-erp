@@ -42,7 +42,7 @@ export function PosReceipt({ order, items, company, mushakNo, copyLabel, singleC
         <tbody>
           <tr>
             <td><b>{order.order_no}</b></td>
-            <td style={{ textAlign: 'right' }}>{fmtDate(order.created_at)} · {timeOf(issuedAt)}</td>
+            <td style={{ textAlign: 'right' }}>{fmtDate(issuedAt)} · {timeOf(issuedAt)}</td>
           </tr>
           <tr>
             <td>{order.order_type.replace('_', ' ')}{order.table_no ? ` · Table ${order.table_no}` : ''}</td>
