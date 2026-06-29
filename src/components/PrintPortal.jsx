@@ -92,6 +92,23 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         color: var(--print-primary) !important;
         border-color: var(--print-line) !important;
       }
+      #print-root .print-copy {
+        overflow: visible;
+      }
+      #print-root .mushak-63-doc {
+        color: #000 !important;
+      }
+      #print-root .mushak-63-doc table th,
+      #print-root .mushak-63-doc table td {
+        background: #fff !important;
+        color: #000 !important;
+        border-color: #111 !important;
+        overflow-wrap: anywhere;
+        word-break: normal;
+      }
+      #print-root .mushak-grid-table {
+        table-layout: fixed !important;
+      }
       @media print {
         body > div:not(#print-portal-container) { display: none !important; }
         html, body { width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow-y: visible !important; }
@@ -112,6 +129,12 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           max-width: 186mm !important;
           margin: 0 auto !important;
         }
+        #print-root .mushak-63-doc {
+          width: 194mm !important;
+          max-width: 194mm !important;
+          min-height: 281mm !important;
+          font-family: 'Noto Sans Bengali', 'Inter', sans-serif !important;
+        }
         #print-root .print-copy + .print-copy {
           margin-top: 0 !important;
           padding-top: 0 !important;
@@ -121,13 +144,13 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           page-break-before: always !important;
           break-before: page !important;
         }
-        #print-root .mushak-63-doc {
-          font-family: 'Noto Sans Bengali', 'Inter', sans-serif !important;
-        }
         #print-root table {
           width: 100% !important;
           border-collapse: collapse !important;
-          table-layout: fixed;
+          table-layout: auto !important;
+        }
+        #print-root .mushak-grid-table {
+          table-layout: fixed !important;
         }
         #print-root thead { display: table-header-group; }
         #print-root tfoot { display: table-row-group; }
@@ -192,6 +215,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           break-before: auto !important;
         }
 
+        #print-root .print-footer,
         #print-footer {
           display: block !important;
           position: relative !important;

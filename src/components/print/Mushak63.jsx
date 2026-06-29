@@ -93,22 +93,22 @@ function MushakCopy({
 }) {
   const cell = {
     border: '1px solid #111',
-    padding: '4px 5px',
-    fontSize: 9.5,
-    lineHeight: 1.25,
+    padding: '3px 4px',
+    fontSize: 8.7,
+    lineHeight: 1.18,
     verticalAlign: 'top',
     color: '#000',
     background: '#fff',
   }
   const center = { ...cell, textAlign: 'center' }
   const right = { ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
-  const label = { fontSize: 11, padding: '2px 0' }
-  const value = { fontSize: 11, padding: '2px 0 2px 8px', fontWeight: 600 }
+  const label = { fontSize: 10.2, padding: '1px 0', lineHeight: 1.25 }
+  const value = { fontSize: 10.2, padding: '1px 0 1px 8px', fontWeight: 600, lineHeight: 1.25, overflowWrap: 'anywhere' }
 
   return (
     <section
       className={`print-copy mushak-63-doc print-a4-doc ${copyIndex > 0 ? 'print-copy-break' : ''}`}
-      style={{ maxWidth: '210mm', margin: '0 auto', padding: '0 4mm', color: '#000', background: '#fff', fontFamily: "'Noto Sans Bengali', 'SolaimanLipi', 'Inter', sans-serif", position: 'relative', pageBreakAfter: copyIndex === 0 ? 'always' : 'auto' }}
+      style={{ width: '100%', maxWidth: '194mm', minHeight: '281mm', margin: '0 auto', padding: '0 4mm', color: '#000', background: '#fff', fontFamily: "'Noto Sans Bengali', 'SolaimanLipi', 'Inter', sans-serif", position: 'relative', pageBreakAfter: copyIndex === 0 ? 'always' : 'auto' }}
     >
       {isVoid && <div style={{ position: 'absolute', top: '41%', left: 0, right: 0, textAlign: 'center', transform: 'rotate(-24deg)', fontSize: 88, fontWeight: 800, color: 'rgba(220,0,0,0.14)', letterSpacing: 8, pointerEvents: 'none' }}>VOID / বাতিল</div>}
 
@@ -116,15 +116,15 @@ function MushakCopy({
         <span className="copy-badge" style={{ display: 'inline-block', border: '1px solid #111', padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>{copyLabel}</span>
       </div>
 
-      <header style={{ position: 'relative', textAlign: 'center', marginBottom: 8 }}>
-        <div style={{ position: 'absolute', right: 0, top: 8, border: '2px solid #111', padding: '5px 13px', fontSize: 14, fontWeight: 800 }}>মূসক-৬.৩</div>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>গণপ্রজাতন্ত্রী বাংলাদেশ সরকার</div>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>জাতীয় রাজস্ব বোর্ড</div>
-        <div style={{ fontSize: 20, fontWeight: 800, marginTop: 12, textDecoration: 'underline' }}>কর চালানপত্র</div>
-        <div style={{ fontSize: 11, marginTop: 3 }}>বিধি ৪০ এর উপ-বিধি (১) এর দফা (গ) ও দফা (চ) দ্রষ্টব্য</div>
+      <header style={{ position: 'relative', textAlign: 'center', marginBottom: 7 }}>
+        <div style={{ position: 'absolute', right: 0, top: 5, border: '2px solid #111', padding: '4px 11px', fontSize: 13, fontWeight: 800 }}>মূসক-৬.৩</div>
+        <div style={{ fontSize: 14, fontWeight: 700 }}>গণপ্রজাতন্ত্রী বাংলাদেশ সরকার</div>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>জাতীয় রাজস্ব বোর্ড</div>
+        <div style={{ fontSize: 18, fontWeight: 800, marginTop: 8, textDecoration: 'underline' }}>কর চালানপত্র</div>
+        <div style={{ fontSize: 10, marginTop: 2 }}>বিধি ৪০ এর উপ-বিধি (১) এর দফা (গ) ও দফা (চ) দ্রষ্টব্য</div>
       </header>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 6, tableLayout: 'fixed' }}>
         <tbody>
           <tr>
             <td style={{ ...label, width: '34%' }}>নিবন্ধিত ব্যক্তির নাম</td>
@@ -144,7 +144,7 @@ function MushakCopy({
         </tbody>
       </table>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 7, tableLayout: 'fixed' }}>
         <tbody>
           <tr>
             <td style={{ ...label, width: '18%' }}>ক্রেতার নাম</td>
@@ -181,20 +181,20 @@ function MushakCopy({
         </tbody>
       </table>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+      <table className="mushak-grid-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
         <thead>
           <tr>
-            <th style={{ ...center, width: '5%' }}>ক্রমিক<br />নং</th>
-            <th style={{ ...center, width: '22%' }}>পণ্য বা সেবার বর্ণনা<br />(প্রযোজ্য ক্ষেত্রে ব্র্যান্ড নামসহ)</th>
-            <th style={{ ...center, width: '7%' }}>সরবরাহের<br />একক</th>
-            <th style={{ ...center, width: '6%' }}>পরিমাণ</th>
-            <th style={{ ...center, width: '9%' }}>একক মূল্য *<br />(টাকায়)</th>
-            <th style={{ ...center, width: '9%' }}>মোট মূল্য<br />(টাকায়)</th>
+            <th style={{ ...center, width: '4.5%' }}>ক্রমিক<br />নং</th>
+            <th style={{ ...center, width: '23%' }}>পণ্য বা সেবার বর্ণনা<br />(প্রযোজ্য ক্ষেত্রে ব্র্যান্ড নামসহ)</th>
+            <th style={{ ...center, width: '6.5%' }}>সরবরাহের<br />একক</th>
+            <th style={{ ...center, width: '5.5%' }}>পরিমাণ</th>
+            <th style={{ ...center, width: '8.5%' }}>একক মূল্য *<br />(টাকায়)</th>
+            <th style={{ ...center, width: '8.5%' }}>মোট মূল্য<br />(টাকায়)</th>
             <th style={{ ...center, width: '7%' }}>সম্পূরক<br />শুল্কের হার</th>
             <th style={{ ...center, width: '8%' }}>সম্পূরক শুল্কের<br />পরিমাণ</th>
             <th style={{ ...center, width: '8%' }}>মূসক / সুনির্দিষ্ট<br />করের হার</th>
             <th style={{ ...center, width: '9%' }}>মূসক / সুনির্দিষ্ট<br />করের পরিমাণ</th>
-            <th style={{ ...center, width: '10%' }}>সকল প্রকার শুল্ক ও<br />করসহ মূল্য</th>
+            <th style={{ ...center, width: '11.5%' }}>সকল প্রকার শুল্ক ও<br />করসহ মূল্য</th>
           </tr>
           <tr>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => <th key={n} style={center}>{n}</th>)}
@@ -233,29 +233,29 @@ function MushakCopy({
       </table>
 
       {isLegacy && (
-        <div style={{ fontSize: 9.5, marginTop: 5 }}>
+        <div style={{ fontSize: 8.8, marginTop: 4 }}>
           দ্রষ্টব্য: এই চালানটি লাইন-পর্যায়ের বিস্তারিত হিসাব সংরক্ষণের আগে ইস্যু করা হয়েছিল, তাই প্রতি লাইনে মূসক হার দেখানো সম্ভব হয়নি। মোট মূসক ও সর্বমোট মূল্য সঠিক রয়েছে।
         </div>
       )}
 
       {!!totals.rounding && (
-        <div style={{ fontSize: 10.5, marginTop: 6, textAlign: 'right' }}>
+        <div style={{ fontSize: 9.5, marginTop: 5, textAlign: 'right' }}>
           রাউন্ডিং: {totals.rounding > 0 ? '+' : '−'}{fmtBDT(Math.abs(totals.rounding))} &nbsp; <b>প্রদেয়: {fmtBDT(totals.grand_total)}</b>
         </div>
       )}
 
-      <div style={{ border: '1px solid #111', borderTop: 'none', padding: '6px 8px', fontSize: 11, fontWeight: 700 }}>
+      <div style={{ border: '1px solid #111', borderTop: 'none', padding: '5px 7px', fontSize: 10.2, fontWeight: 700 }}>
         মোট (কথায়): {takaInWords(totals.grand_total || 0)}
       </div>
 
-      <footer style={{ marginTop: 22, fontSize: 11 }}>
-        <div style={{ marginBottom: 12 }}>প্রতিষ্ঠান কর্তৃপক্ষের দায়িত্বপ্রাপ্ত ব্যক্তির নামঃ {creator}</div>
-        <div style={{ marginBottom: 22 }}>পদবীঃ __________________________</div>
+      <footer style={{ marginTop: 18, fontSize: 10.2 }}>
+        <div style={{ marginBottom: 9 }}>প্রতিষ্ঠান কর্তৃপক্ষের দায়িত্বপ্রাপ্ত ব্যক্তির নামঃ {creator}</div>
+        <div style={{ marginBottom: 18 }}>পদবীঃ __________________________</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div>সীলঃ</div>
           <div style={{ minWidth: 210, textAlign: 'center', borderTop: '1px solid #111', paddingTop: 5 }}>স্বাক্ষরঃ</div>
         </div>
-        <div style={{ marginTop: 10, fontSize: 9.5 }}>* সকল প্রকার কর ব্যতীত মূল্য</div>
+        <div style={{ marginTop: 8, fontSize: 8.8 }}>* সকল প্রকার কর ব্যতীত মূল্য</div>
       </footer>
     </section>
   )
