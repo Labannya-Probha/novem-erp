@@ -642,6 +642,12 @@ function firstAccessiblePath(role, privileges) {
 
           {/* Reports */}
           <Route path="/Reports" element={<Navigate to="/reports" replace />} />
+          <Route path="/:slug/Reports" element={<Navigate to="/reports" replace />} />
+          <Route path="/:slug/reports" element={
+            <GuardedRoute role={role} navId="reports" privileges={privileges}>
+              <Reportmodule userName={userName} role={role} />
+            </GuardedRoute>
+          } />
           <Route path="/reports" element={
             <GuardedRoute role={role} navId="reports" privileges={privileges}>
               <Reportmodule userName={userName} role={role} />

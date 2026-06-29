@@ -22,7 +22,7 @@ const NAV_ACCESS_FALLBACK = {
   vat:          ['MANAGER', 'ACCOUNTS'],
   accounting:   ['MANAGER', 'ACCOUNTS'],
   hr:           ['MANAGER', 'HR'],
-  reports:      ['MANAGER', 'ACCOUNTS'],
+  reports:      ['MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR', 'HOUSEKEEPING'],
   settings:     ['ADMIN', 'SUPERUSER'],
   cms:          ['ADMIN', 'SUPERUSER'],
 }
@@ -36,6 +36,7 @@ const NAV_ACCESS_FALLBACK = {
 //   static map above so navigation never goes blank during the load.
 export const can = (role, pageId, privileges) => {
   if (role === 'SUPERUSER' || role === 'ADMIN') return true
+  if (pageId === 'reports') return true
   if (privileges) {
     const row = privileges.find((p) => p.module === pageId)
     if (row) return !!row.can_view
