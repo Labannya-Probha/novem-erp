@@ -34,7 +34,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
     const style = document.createElement('style')
     style.id = '__print-portal-page-style__'
     style.innerHTML = `
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&display=swap');
       @page {
         size: ${type === 'thermal' ? '80mm auto' : 'A4'};
         margin: ${type === 'thermal' ? '0' : '8mm'};
@@ -77,6 +77,15 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
       #print-root .print-accent-bg {
         background: var(--print-soft) !important;
       }
+      #print-root .print-copy + .print-copy {
+        margin-top: 16mm !important;
+        padding-top: 8mm !important;
+        border-top: 1px dashed var(--print-line);
+      }
+      #print-root .copy-badge {
+        color: var(--print-primary) !important;
+        border-color: var(--print-line) !important;
+      }
       @media print {
         body > div:not(#print-portal-container) { display: none !important; }
         html, body { width: 100% !important; height: auto !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow-y: visible !important; }
@@ -98,6 +107,18 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           width: 100% !important;
           max-width: 186mm !important;
           margin: 0 auto !important;
+        }
+        #print-root .print-copy + .print-copy {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+          border-top: 0 !important;
+        }
+        #print-root .print-copy-break {
+          page-break-before: always !important;
+          break-before: page !important;
+        }
+        #print-root .mushak-63-doc {
+          font-family: 'Noto Sans Bengali', 'Inter', sans-serif !important;
         }
         #print-root table {
           width: 100% !important;

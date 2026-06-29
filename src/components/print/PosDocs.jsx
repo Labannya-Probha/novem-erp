@@ -4,11 +4,33 @@ const timeOf = (ts) =>
   new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Dhaka' })
 
 /* ---------- Restaurant Bill (guest copy) ---------- */
-export function PosReceipt({ order, items, company, mushakNo }) {
+export function PosReceipt({ order, items, company, mushakNo, copyLabel, singleCopy = false }) {
   const row = { padding: '2px 0', fontSize: 11, fontFamily: 'monospace' }
   const num = { textAlign: 'right', fontFamily: 'monospace' }
+  const issuedAt = order.settled_at || order.created_at || new Date().toISOString()
+  const invoiceNo = mushakNo || order.invoice_no || order.order_no
+
+  if (!singleCopy) {
+    return (
+      <div className="pos-receipt-copy-stack">
+        {['Guest Copy', 'Resort Copy'].map((label) => (
+          <PosReceipt
+            key={label}
+            order={order}
+            items={items}
+            company={company}
+            mushakNo={mushakNo}
+            copyLabel={label}
+            singleCopy
+          />
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div style={{ maxWidth: 320, width: '100%', margin: '0 auto', color: '#000', fontFamily: 'monospace' }}>
+    <div className={`print-copy ${copyLabel === 'Resort Copy' ? 'print-copy-break' : ''}`} style={{ maxWidth: 320, width: '100%', margin: '0 auto', color: '#000', fontFamily: 'monospace' }}>
+      <div style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, border: '1px solid #000', padding: '2px 0', marginBottom: 5, fontFamily: 'monospace' }}>{copyLabel}</div>
       <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: 6 }}>
         <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'monospace', color: '#000' }}>{company?.name || 'Aura Stay'}</div>
         <div style={{ fontSize: 9 }}>{company?.address}</div>
@@ -20,7 +42,7 @@ export function PosReceipt({ order, items, company, mushakNo }) {
         <tbody>
           <tr>
             <td><b>{order.order_no}</b></td>
-            <td style={{ textAlign: 'right' }}>{fmtDate(order.created_at)} · {timeOf(order.settled_at || order.created_at)}</td>
+            <td style={{ textAlign: 'right' }}>{fmtDate(order.created_at)} · {timeOf(issuedAt)}</td>
           </tr>
           <tr>
             <td>{order.order_type.replace('_', ' ')}{order.table_no ? ` · Table ${order.table_no}` : ''}</td>
@@ -31,6 +53,12 @@ export function PosReceipt({ order, items, company, mushakNo }) {
           )}
         </tbody>
       </table>
+
+      <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', marginBottom: 6, fontSize: 9.5, lineHeight: 1.45, fontFamily: 'monospace' }}>
+        <div>চালানপত্র নম্বর: <b>{invoiceNo}</b></div>
+        <div>ইস্যুর তারিখ: <b>{fmtDate(issuedAt)}</b></div>
+        <div>ইস্যুর সময়: <b>{timeOf(issuedAt)}</b></div>
+      </div>
 
       <table style={{ width: '100%', borderTop: '1px dashed #000', borderBottom: '1px dashed #000', borderCollapse: 'collapse', fontFamily: 'monospace' }}>
         <tbody>
