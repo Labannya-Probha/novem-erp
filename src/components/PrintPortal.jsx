@@ -100,14 +100,11 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         #print-root {
           font-family: 'Inter', sans-serif !important;
           display: block !important;
+          color: var(--print-ink) !important;
           width: 100% !important;
           max-width: ${isThermal ? thermalContentMaxWidth : '194mm'} !important;
           margin: 0 auto !important;
           padding: ${isThermal ? '0' : '0 0 8mm'} !important;
-          font-size: ${isThermal ? '10px' : '11px'} !important;
-          line-height: ${isThermal ? '1.25' : '1.4'} !important;
-          color: var(--print-ink) !important;
-          box-shadow: none !important;
           overflow: visible !important;
         }
         #print-root .print-a4-doc {
@@ -146,20 +143,53 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
 
         /* Thermal specific tuning for 58mm / 80mm receipts */
         #print-root.epos-receipt,
-        #print-root.print-pos-58,
-        #print-root.print-pos-80 {
-          width: ${thermalContentMaxWidth} !important;
-          max-width: ${thermalContentMaxWidth} !important;
-          min-width: ${thermalContentMaxWidth} !important;
+        #print-root.print-pos-58 {
+          width: 52mm !important;
+          max-width: 52mm !important;
+          min-width: 52mm !important;
           margin: 0 auto !important;
           padding: 0 !important;
           font-size: 10px !important;
           line-height: 1.2 !important;
         }
-        #print-root.epos-receipt table,
+
+        #print-root.print-pos-80 {
+          width: 72mm !important;
+          max-width: 72mm !important;
+          min-width: 72mm !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          font-size: 10px !important;
+          line-height: 1.2 !important;
+        }
+
         #print-root.print-pos-58 table,
         #print-root.print-pos-80 table {
+          width: 100% !important;
           table-layout: fixed !important;
+          border-collapse: collapse !important;
+        }
+
+        #print-root.print-pos-58 th,
+        #print-root.print-pos-58 td,
+        #print-root.print-pos-80 th,
+        #print-root.print-pos-80 td {
+          padding: 2px 3px !important;
+          word-break: break-word !important;
+          overflow-wrap: anywhere !important;
+          white-space: normal !important;
+          vertical-align: top !important;
+        }
+
+        #print-root.print-pos-58 .no-pos-print,
+        #print-root.print-pos-80 .no-pos-print {
+          display: none !important;
+        }
+
+        #print-root.print-pos-58 .print-copy-break,
+        #print-root.print-pos-80 .print-copy-break {
+          page-break-before: auto !important;
+          break-before: auto !important;
         }
 
         #print-footer {
@@ -191,8 +221,11 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
   return createPortal(
     <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto overscroll-contain p-3 sm:p-6">
       <div
-        className="bg-white max-w-3xl w-full my-0 sm:my-4 relative overflow-hidden rounded-xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col"
-        style={{ border: `1px solid rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.22)` }}
+        className="bg-white w-full my-0 sm:my-4 relative overflow-visible rounded-xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col"
+        style={{
+          border: `1px solid rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.22)`,
+          maxWidth: isThermal ? '420px' : '900px',
+        }}
       >
 
         {/* Toolbar */}
@@ -216,7 +249,13 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         {/* Print Content Wrapper */}
         <div
           id="print-root"
-          className={`p-4 sm:p-8 overflow-auto ${isThermal ? 'epos-receipt print-pos-58' : 'print-doc print-a4'}`}
+          className={`p-4 sm:p-8 overflow-auto ${
+            isThermal
+              ? normalizedType === 'thermal-80'
+                ? 'epos-receipt print-pos-80'
+                : 'epos-receipt print-pos-58'
+              : 'print-doc print-a4'
+          }`}
         >
           {children}
         </div>
