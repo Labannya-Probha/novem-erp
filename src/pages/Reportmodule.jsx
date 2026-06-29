@@ -614,6 +614,29 @@ export default function Reports() {
                 </div>
               </div>
 
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
+                {activePanelItems.map((item) => (
+                  <div key={`${item.code}-card`} className="rounded-lg border border-[--border-color] bg-white p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-pine/50">{item.code} - {item.department}</div>
+                        <h3 className="mt-1 text-sm font-semibold text-pine leading-snug">{item.name}</h3>
+                      </div>
+                      <Badge variant="outline" className="shrink-0">{item.status}</Badge>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-pine/65">{item.keyFields}</p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <Button size="sm" variant="outline" onClick={() => printReport(item)} disabled={loading}>
+                        <Printer size={13} /> Print
+                      </Button>
+                      <Button size="sm" onClick={() => exportReportXlsx(item)} disabled={loading}>
+                        <Download size={13} /> Excel
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <div className="mt-3 rounded-lg border border-[--border-color] overflow-hidden">
                 <div className="hidden xl:grid grid-cols-[82px_120px_minmax(190px,0.9fr)_minmax(260px,1.2fr)_105px_minmax(270px,auto)] bg-leaf/30 px-3 py-2 text-[11px] uppercase tracking-wide text-pine/70">
                   <span>Code</span>

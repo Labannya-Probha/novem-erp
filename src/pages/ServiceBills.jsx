@@ -488,7 +488,7 @@ function SalesList({ setPrintDoc, isAdmin, flash }) {
 
 /* ================= ITEMS MANAGER ================= */
 function ItemsManager({ items, reload, isAdmin, flash }) {
-  const createNewItem = () => ({ name: '', unit: 'pc', category: 'GENERAL', default_price: '' })
+  const createNewItem = () => ({ name: '', unit: 'pc', category: 'OTHER', default_price: '' })
   const [n, setN] = useState(createNewItem)
 
   const add = async () => {
