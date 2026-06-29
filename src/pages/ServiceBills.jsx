@@ -31,7 +31,15 @@ function ActionPopoverButton({ message, className, children, disabled = false, .
           </button>
         </span>
       </PopoverTrigger>
-      <PopoverContent side="top" align="center" className="w-auto max-w-[220px] px-2.5 py-1.5 text-xs text-pine">
+      <PopoverContent
+        side="top"
+        align="center"
+        className="w-auto max-w-sm rounded-lg border bg-white px-4 py-3 text-center text-sm font-semibold text-pine shadow-lg ring-0"
+        style={{
+          borderColor: 'rgba(var(--tenant-primary-rgb),0.22)',
+          boxShadow: '0 12px 30px rgba(var(--tenant-primary-rgb),0.14)',
+        }}
+      >
         {message}
       </PopoverContent>
     </Popover>
