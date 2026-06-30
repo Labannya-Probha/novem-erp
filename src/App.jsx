@@ -641,8 +641,8 @@ function firstAccessiblePath(role, privileges) {
           <Route path="/hr/compliance"          element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrCompliancePage          role={role} /></GuardedRoute>} />
 
           {/* Reports */}
-          <Route path="/Reports" element={<Navigate to="/reports" replace />} />
-          <Route path="/:slug/Reports" element={<Navigate to="/reports" replace />} />
+          <Route path="/Reports" caseSensitive element={<Navigate to="/reports" replace />} />
+          <Route path="/:slug/Reports" caseSensitive element={<TenantReportsRedirect />} />
           <Route path="/:slug/reports" element={
             <GuardedRoute role={role} navId="reports" privileges={privileges}>
               <Reportmodule userName={userName} role={role} />
@@ -717,6 +717,11 @@ function AppWelcome({ userName }) {
 function GuardedRoute({ role, navId, privileges, children }) {
   if (!can(role, navId, privileges)) return <Navigate to={firstAccessiblePath(role, privileges)} replace />
   return children
+}
+
+function TenantReportsRedirect() {
+  const { slug } = useParams()
+  return <Navigate to={`/${slug}/reports`} replace />
 }
 
 /* ------------------------------------------------------------------ */
