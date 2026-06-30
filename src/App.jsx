@@ -696,9 +696,9 @@ function firstAccessiblePath(role, privileges) {
               : <Navigate to={firstAccessiblePath(role, privileges)} replace />
           } />
           <Route path="/settings" element={
-            role === 'SUPERUSER'
-              ? <Settings userName={userName} role={role} isAdmin={isAdmin} reloadCompany={loadCompany} />
-              : <Navigate to={firstAccessiblePath(role, privileges)} replace />
+            <GuardedRoute role={role} navId="settings" privileges={privileges}>
+              <Settings userName={userName} role={role} isAdmin={isAdmin} reloadCompany={loadCompany} />
+            </GuardedRoute>
           } />
 
           <Route path="*" element={<Navigate to={firstAccessiblePath(role, privileges)} replace />} />
