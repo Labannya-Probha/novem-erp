@@ -55,7 +55,7 @@ export function exportReportExcel(report, rows, totals, meta) {
 export function exportReportPdf(report, rows, totals, meta) {
   const columns = report.columns
   const amount = (v) => fmtBDT(v)
-  const tableHead = columns.map((col) => `<th style="width:${col.width || 120}px;text-align:${col.align || 'left'}">${col.label}</th>`).join('')
+  const tableHead = columns.map((col) => `<th style="text-align:${col.align || 'left'}">${col.label}</th>`).join('')
   const tableBody = rows.map((row, i) => `<tr>${columns.map((col) => {
     const val = col.type === 'currency' ? amount(row[col.key]) : formatCell(row[col.key], col)
     return `<td style="text-align:${col.align || 'left'}">${val}</td>`
@@ -71,19 +71,21 @@ export function exportReportPdf(report, rows, totals, meta) {
       <head>
         <title>${report.name}</title>
         <style>
-          @page { size: A4 landscape; margin: 10mm; }
-          body { font-family: Arial, sans-serif; color: #0f172a; }
-          .top { border: 2px solid #0f3a5f; padding: 10px; margin-bottom: 8px; }
+          @page { size: A4 portrait; margin: 9mm; }
+          body { font-family: Arial, sans-serif; color: #0f172a; margin:0; font-size: 10px; }
+          .top { border: 1px solid #0f3a5f; border-bottom: 2px solid #0f3a5f; padding: 8px; margin-bottom: 6px; }
           .brand { text-align:center; color:#0f3a5f; }
-          .meta { display:grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 10px; margin-top: 8px; background:#eaf4ff; padding: 7px; }
-          table { width:100%; border-collapse: collapse; font-size: 9px; }
+          .brand h2 { margin:0 0 2px; font-size:13px; }
+          .brand h1 { margin:3px 0; font-size:16px; }
+          .meta { display:grid; grid-template-columns: repeat(2, 1fr); gap: 4px; font-size: 8px; margin-top: 6px; background:#eaf4ff; padding: 5px; }
+          table { width:100%; border-collapse: collapse; table-layout: fixed; font-size: 7px; line-height:1.2; }
           thead { display: table-header-group; }
           tfoot { display: table-row-group; }
-          th { background:#0f3a5f; color:white; border:1px solid #bfd7ea; padding:6px; font-weight:700; }
-          td { border:1px solid #d7e3ee; padding:5px; }
+          th { background:#0f3a5f; color:white; border:1px solid #bfd7ea; padding:3px; font-weight:700; overflow-wrap:anywhere; }
+          td { border:1px solid #d7e3ee; padding:3px; overflow-wrap:anywhere; vertical-align:top; }
           tbody tr:nth-child(even) { background:#f8fbff; }
           .grand td { background:#dbeafe; font-weight:700; }
-          .sign { display:grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 22px; font-size: 10px; }
+          .sign { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; font-size: 9px; break-inside: avoid; }
           .sign div { border-top:1px solid #0f172a; padding-top:5px; text-align:center; }
           footer { position: fixed; bottom: 0; left: 0; right: 0; text-align:center; font-size:9px; color:#64748b; }
         </style>
