@@ -775,22 +775,32 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 6000) }
 
   const [myTenantId, setMyTenantId] = useState(null)
+  const [tenantName, setTenantName] = useState('')
 
   // Tenant-filtered load: only show staff belonging to the current tenant
   const load = async (tid) => {
     const effectiveTid = tid !== undefined ? tid : myTenantId
+    if (!effectiveTid) {
+      setRows([])
+      return
+    }
     let q = supabase.from('app_users')
-      .select('id, email, full_name, username, role, is_active, created_at')
+      .select('id, email, full_name, username, role, is_active, created_at, tenant_id')
+      .eq('tenant_id', effectiveTid)
       .order('created_at')
-    if (effectiveTid) q = q.eq('tenant_id', effectiveTid)
     const { data } = await q
     setRows(data || [])
   }
   useEffect(() => {
     supabase.auth.getUser().then(({ data: u }) => {
       if (!u?.user?.id) { load(null); return }
-      supabase.from('app_users').select('tenant_id').eq('id', u.user.id).single()
-        .then(({ data: row }) => { const tid = row?.tenant_id || null; setMyTenantId(tid); load(tid) })
+      supabase.from('app_users').select('tenant_id, properties(name, slug)').eq('auth_id', u.user.id).maybeSingle()
+        .then(({ data: row }) => {
+          const tid = row?.tenant_id || null
+          setMyTenantId(tid)
+          setTenantName(row?.properties?.name || row?.properties?.slug || '')
+          load(tid)
+        })
     })
   }, [])
 
@@ -807,7 +817,7 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser()
       const { data: myRow, error: myRowErr } = await supabase
-        .from('app_users').select('tenant_id').eq('id', currentUser?.id).single()
+        .from('app_users').select('tenant_id').eq('auth_id', currentUser?.id).maybeSingle()
       if (myRowErr || !myRow?.tenant_id) { flash('Could not determine your company — please sign out and back in, then try again.'); setBusy(false); return }
 
       // Pre-check: username must be unique within this tenant
@@ -836,7 +846,13 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed to create user account.')
       const newId = json.user?.id
-      if (newId) await supabase.from('app_users').update({ role: nu.role, full_name: nu.full_name.trim(), username: uname }).eq('id', newId)
+      if (newId) {
+        await supabase
+          .from('app_users')
+          .update({ role: nu.role, full_name: nu.full_name.trim(), username: uname, tenant_id: myRow.tenant_id })
+          .eq('id', newId)
+          .eq('tenant_id', myRow.tenant_id)
+      }
       setNu({ full_name: '', username: '', password: '', role: 'FRONT_OFFICE' })
       await load()
       flash(`Staff "${uname}" created successfully.`)
@@ -847,12 +863,21 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
   // ── Inline edit ──
   const startEdit = (u) => { setEditId(u.id); setEditF({ full_name: u.full_name || '', username: u.username || '', role: u.role }) }
   const saveEdit  = async () => {
-    const { error } = await supabase.from('app_users').update({ full_name: editF.full_name, username: editF.username, role: editF.role }).eq('id', editId)
+    if (!myTenantId) { flash('Tenant not detected. Please sign out and back in.'); return }
+    const { error } = await supabase
+      .from('app_users')
+      .update({ full_name: editF.full_name, username: editF.username, role: editF.role })
+      .eq('id', editId)
+      .eq('tenant_id', myTenantId)
     if (error) flash(error.message); else { setEditId(null); load(); flash('Staff updated.') }
   }
 
   // ── Active/Inactive toggle ──
-  const toggle = async (u) => { await supabase.from('app_users').update({ is_active: !u.is_active }).eq('id', u.id); load() }
+  const toggle = async (u) => {
+    if (!myTenantId) return
+    await supabase.from('app_users').update({ is_active: !u.is_active }).eq('id', u.id).eq('tenant_id', myTenantId)
+    load()
+  }
 
   // ── Password reset for other users (Admin/Superuser) ──
   // Calls the existing wipe-nonuser-data Edge Function with action: reset_password
@@ -877,6 +902,9 @@ function StaffCard({ isAdminPlus, isSuperuser, currentUserName }) {
   return (
     <div className="card p-5">
       <h2 className="font-display font-semibold text-pine flex items-center gap-2 mb-2"><Users size={18} className="text-forest" /> Staff</h2>
+      <p className="text-xs text-pine/50 mb-3">
+        Showing users only for this tenant{tenantName ? `: ${tenantName}` : ''}. Cross-tenant user oversight stays in SaaS Tenants.
+      </p>
       {msg && <div className="mb-3 px-3 py-2 rounded-lg bg-forest/10 text-forest text-sm">{msg}</div>}
 
       {/* Add new staff row */}

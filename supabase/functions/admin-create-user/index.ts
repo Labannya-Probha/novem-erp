@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     const { data: callerRow, error: roleErr } = await adminClient
       .from('app_users')
       .select('role, tenant_id')
-      .eq('id', caller.id)
+      .or(`id.eq.${caller.id},auth_id.eq.${caller.id}`)
       .single()
 
     if (roleErr || !callerRow) {
