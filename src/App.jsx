@@ -8,6 +8,8 @@ import { setCurrency } from './lib/helpers'
 import { runAutoNoShowSweep } from './lib/noShowAutomation'
 import { can, ROLE_LABELS } from './lib/roles'
 import { getTenantId, setTenantId } from './lib/tenant'
+import { REPORT_CATEGORIES } from './lib/reporting/reportConfig'
+import { getRoleDefaultReportCatalog } from './lib/reporting/tenantReporting'
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
@@ -265,6 +267,8 @@ function firstAccessiblePath(role, privileges) {
 
   const softwareName    = company?.software_name || 'Aura Stay'
   const sidebarThemeStyle = { background: 'var(--sidebar-bg)' }
+  const activeReportCode = new URLSearchParams(location.search).get('report')
+  const sidebarReportCatalog = getRoleDefaultReportCatalog(role)
 
   useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
   useEffect(() => {
@@ -274,7 +278,7 @@ function firstAccessiblePath(role, privileges) {
   useEffect(() => {
     const isAccountingRoute = location.pathname.startsWith('/accounting') || location.pathname === '/vat'
     const isHrRoute = location.pathname.startsWith('/hr')
-    if (['settings', 'cms', 'inventory', 'consumption'].includes(currentTopId) || isAccountingRoute || isHrRoute) {
+    if (['settings', 'cms', 'inventory', 'consumption', 'reports'].includes(currentTopId) || isAccountingRoute || isHrRoute) {
       setOpenSystemMenu(
         ['inventory', 'consumption'].includes(currentTopId) ? 'inventory' :
         isAccountingRoute ? 'accounting' :
@@ -325,7 +329,7 @@ function firstAccessiblePath(role, privileges) {
                   {items.map((n) => {
                     if (n.id === 'consumption' || n.id === 'vat') return null
 
-                    const isExpandable = ['settings', 'cms', 'inventory', 'accounting', 'hr'].includes(n.id)
+                    const isExpandable = ['settings', 'cms', 'inventory', 'accounting', 'hr', 'reports'].includes(n.id)
                     if (!isExpandable) {
                       return (
                         <button key={n.id}
@@ -371,6 +375,23 @@ function firstAccessiblePath(role, privileges) {
                         ...s,
                         active: location.pathname === s.path,
                       }))
+                    } else if (n.id === 'reports') {
+                      nested = REPORT_CATEGORIES
+                        .map((category) => ({
+                          id: category.code,
+                          label: category.name,
+                          icon: category.icon,
+                          active: currentTopId === 'reports' && sidebarReportCatalog.some((report) => report.category === category.code && report.code === activeReportCode),
+                          children: sidebarReportCatalog
+                            .filter((report) => report.category === category.code)
+                            .map((report) => ({
+                              id: report.code,
+                              label: report.name,
+                              path: `/reports?report=${encodeURIComponent(report.code)}`,
+                              active: currentTopId === 'reports' && activeReportCode === report.code,
+                            })),
+                        }))
+                        .filter((category) => category.children.length > 0)
                     }
 
                     return (
@@ -381,9 +402,9 @@ function firstAccessiblePath(role, privileges) {
                           }`}
                           onClick={() => {
                             setOpenSystemMenu(isOpen ? null : n.id)
-                            if (!isOpen && ['inventory', 'accounting', 'hr'].includes(n.id)) {
+                            if (!isOpen && ['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
                               navigate(`/${n.id}`)
-                            } else if (!['inventory', 'accounting', 'hr'].includes(n.id)) {
+                            } else if (!['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
                               navigate(`/${n.id}`)
                             }
                           }}
@@ -393,7 +414,9 @@ function firstAccessiblePath(role, privileges) {
                         </button>
                         {isOpen && (
                           <div className="ml-6 space-y-0.5">
-                            {nested.map((child) => (
+                            {nested.map((child) => child.children ? (
+                              <HrSubGroup key={child.id} grp={child} navigate={navigate} location={location} />
+                            ) : (
                               <button
                                 key={child.id}
                                 className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${

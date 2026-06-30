@@ -1170,6 +1170,10 @@
   gap: 12px;
 }
 
+.erp-workspace-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .erp-report-sidebar {
   border-radius: 6px;
   padding: 0;
@@ -1269,6 +1273,46 @@
 .erp-report-canvas {
   border-radius: 6px;
   box-shadow: 0 1px 2px rgba(15, 58, 95, 0.05);
+}
+
+.erp-report-document-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--erp-line);
+  background: linear-gradient(180deg, #ffffff, #f7fbff);
+}
+
+.erp-report-document-bar div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-report-document-bar span {
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: color-mix(in srgb, var(--erp-blue) 10%, #fff);
+  color: var(--erp-blue);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.erp-report-document-bar strong {
+  color: var(--erp-ink);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erp-report-document-bar small {
+  color: var(--erp-muted);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .enterprise-report-header {
@@ -1402,7 +1446,8 @@
 }
 
 .erp-table-scroll {
-  max-height: 590px;
+  max-height: calc(100vh - 560px);
+  min-height: 260px;
 }
 
 .erp-report-table {
@@ -1503,6 +1548,17 @@
 
 @media (max-width: 1280px) {
   .erp-report-canvas > .erp-kpi-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+}
+
+@media (max-width: 1180px) {
+  .erp-dashboard-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .erp-top-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 @media print {
