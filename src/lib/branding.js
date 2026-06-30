@@ -2,7 +2,7 @@
  * Branding utilities — theme building, CSS variable application,
  * and resolution from company_settings.
  * 
- * Supports dynamic tenant color palette across all UI components.
+ * Supports dynamic tenant logo and color palette across all UI components.
  */
 
 export const DEFAULT_THEME = {
