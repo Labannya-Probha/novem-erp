@@ -9,8 +9,10 @@ import { setCurrency } from './lib/helpers'
 import { runAutoNoShowSweep } from './lib/noShowAutomation'
 import { can, ROLE_LABELS } from './lib/roles'
 import { getTenantId, setTenantId } from './lib/tenant'
+import { isModuleEnabled } from './lib/saasModules'
 import { REPORT_CATEGORIES } from './lib/reporting/reportConfig'
 import { getRoleDefaultReportCatalog } from './lib/reporting/tenantReporting'
+import { SaasModuleBlocked, SaasModuleFrame } from './components/saas/SaasModuleFrame.jsx'
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
@@ -220,8 +222,9 @@ const SIDEBAR_HR_TABS = [
   { id: 'compliance',           label: 'Compliance',              icon: Scale,          path: '/hr/compliance' },
 ]
 
-function firstAccessiblePath(role, privileges) {
+function firstAccessiblePath(role, privileges, modulesEnabled = null) {
   for (const id of ALL_NAV_IDS) {
+    if (!isModuleEnabled(id, modulesEnabled, role)) continue
     if (id === 'dashboard' || can(role, id, privileges)) return `/${id}`
   }
   return '/dashboard'
@@ -268,6 +271,7 @@ function firstAccessiblePath(role, privileges) {
   const [mobileNavOpen,  setMobileNavOpen]  = useState(false)
   const [openGroup,      setOpenGroup]      = useState(null)
   const [openSystemMenu, setOpenSystemMenu] = useState(null)
+  const [modulesEnabled, setModulesEnabled] = useState(null)
   const toggleGroup = (title) => setOpenGroup((prev) => (prev === title ? null : title))
 
   const currentTopId = location.pathname.split('/').filter(Boolean)[0] || 'dashboard'
@@ -286,6 +290,27 @@ function firstAccessiblePath(role, privileges) {
   const sidebarThemeStyle = { background: 'var(--sidebar-bg)' }
   const activeReportCode = new URLSearchParams(location.search).get('report')
   const sidebarReportCatalog = getRoleDefaultReportCatalog(role)
+
+  useEffect(() => {
+    const tenantId = getTenantId()
+    if (!tenantId || role === 'SUPERUSER') {
+      setModulesEnabled(null)
+      return
+    }
+    supabase
+      .from('tenant_subscriptions')
+      .select('modules_enabled,status')
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data || data.status === 'SUSPENDED') {
+          setModulesEnabled(data?.status === 'SUSPENDED' ? {} : null)
+          return
+        }
+        setModulesEnabled(data.modules_enabled || null)
+      })
+      .catch(() => setModulesEnabled(null))
+  }, [role, company?.tenant_id])
 
   useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
   useEffect(() => {
@@ -323,6 +348,7 @@ function firstAccessiblePath(role, privileges) {
       <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
         {NAV_GROUPS.map((g) => {
           const items = g.items.filter((n) => {
+            if (!isModuleEnabled(n.id, modulesEnabled, role)) return false
             if (n.superuserOnly)            return role === 'SUPERUSER'
             if (n.id === 'ai-tasker')       return can(role, 'tasks', privileges)
             if (n.id === 'cms')             return role === 'SUPERUSER'
@@ -530,210 +556,214 @@ function firstAccessiblePath(role, privileges) {
 
           {/* Dashboard */}
           <Route path="/dashboard" element={
-            <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} />
+            <SaasModuleRoute moduleId="dashboard" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
+              <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} />
+            </SaasModuleRoute>
           } />
           <Route path="/frontoffice" element={
-            <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} />
+            <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
+              <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} />
+            </SaasModuleRoute>
           } />
 
           {/* Reservations */}
           <Route path="/reservations" element={
-            <GuardedRoute role={role} navId="reservations" privileges={privileges}>
+            <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ReservationsRoute openReservation={openReservation} userName={userName} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/reservations/:id" element={
-            <GuardedRoute role={role} navId="reservations" privileges={privileges}>
+            <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ReservationModuleRoute userName={userName} role={role} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/frontoffice/reservations/:id" element={
-            <GuardedRoute role={role} navId="dashboard" privileges={privileges}>
+            <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <FrontOfficeReservationRoute userName={userName} role={role} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/reservation-payments" element={
-            <GuardedRoute role={role} navId="reservations" privileges={privileges}>
+            <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ReservationPayments userName={userName} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
 
           {/* Booking Calendar */}
           <Route path="/calendar" element={
-            <GuardedRoute role={role} navId="calendar" privileges={privileges}>
+            <SaasModuleRoute moduleId="reservations" role={role} navId="calendar" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <BookingCalendar
                 openReservation={openReservation}
                 onNewReservation={startReservation}
                 onOpenReservations={() => navigate('/reservations')}
               />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
 
           {/* Front Office */}
           <Route path="/nightaudit" element={
-            <GuardedRoute role={role} navId="nightaudit" privileges={privileges}>
+            <SaasModuleRoute moduleId="nightaudit" role={role} navId="nightaudit" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <NightAudit userName={userName} isAdmin={isAdmin} role={role} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/housekeeping" element={
-            <GuardedRoute role={role} navId="housekeeping" privileges={privileges}>
+            <SaasModuleRoute moduleId="housekeeping" role={role} navId="housekeeping" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <HousekeepingHub userName={userName} role={role} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/facilities" element={
-            <GuardedRoute role={role} navId="facilities" privileges={privileges}>
+            <SaasModuleRoute moduleId="facilities" role={role} navId="facilities" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Facilities userName={userName} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
 
           {/* Restaurant */}
           <Route path="/pos" element={
-            <GuardedRoute role={role} navId="pos" privileges={privileges}>
+            <SaasModuleRoute moduleId="pos" role={role} navId="pos" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <RestaurantPOS userName={userName} role={role} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/pos/print-center" element={
-            <GuardedRoute role={role} navId="pos" privileges={privileges}>
+            <SaasModuleRoute moduleId="pos" role={role} navId="pos" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <PosPrintCenter company={company} userName={userName} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/kiosk/pos" element={<GuestPosKiosk />} />
           <Route path="/menu-management" element={
-            (isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT')
-              ? <MenuManagement isAdmin={isAdmin} />
-              : <Navigate to={firstAccessiblePath(role, privileges)} replace />
+            (isModuleEnabled('menu-management', modulesEnabled, role) && (isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT'))
+              ? <SaasModuleFrame moduleId="pos" company={company} role={role} userName={userName}><MenuManagement isAdmin={isAdmin} /></SaasModuleFrame>
+              : <Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />
           } />
 
           {/* Inventory */}
           <Route path="/inventory" element={
-            <GuardedRoute role={role} navId="inventory" privileges={privileges}>
+            <SaasModuleRoute moduleId="inventory" role={role} navId="inventory" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <InventoryHub userName={userName} role={role} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/consumption" element={
-            <GuardedRoute role={role} navId="inventory" privileges={privileges}>
+            <SaasModuleRoute moduleId="consumption" role={role} navId="inventory" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ConsumptionEntry userName={userName} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
 
          {/* Accounting — separate routes per section */}
           <Route path="/vat" element={
-            <GuardedRoute role={role} navId="vat" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="vat" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <VatCenter userName={userName} company={company} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/vat-return" element={
-            <GuardedRoute role={role} navId="accounting" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <VATReturn />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/accounting" element={<Navigate to="/accounting/voucher-entry" replace />} />
           <Route path="/accounting/voucher-entry" element={
-            <GuardedRoute role={role} navId="accounting" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <VoucherEntryPage userName={userName} isAdmin={isAdmin} role={role} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/accounting/trial-balance" element={
-            <GuardedRoute role={role} navId="accounting" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <TrialBalancePage />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/accounting/chart-of-accounts" element={
-            <GuardedRoute role={role} navId="accounting" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ChartOfAccountsPage isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/accounting/fixed-assets" element={
-            <GuardedRoute role={role} navId="accounting" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <FixedAssetsPage userName={userName} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/accounting/opening-balance" element={
-            <GuardedRoute role={role} navId="accounting" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <OpeningBalancePage userName={userName} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/accounting/transaction-mapping" element={
-            <GuardedRoute role={role} navId="accounting" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <TransactionMappingPage userName={userName} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/accounting/vendor-payments" element={
-            <GuardedRoute role={role} navId="accounting" privileges={privileges}>
+            <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
              <VendorPaymentPage role={role} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
 
           {/* HR & Payroll */}
           <Route path="/hr" element={<Navigate to="/hr/employee-entry" replace />} />
-          <Route path="/hr/employee-entry"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrEmployeeEntryPage      userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/service-book"        element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrServiceBookPage         userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/nominee"             element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrNomineePage             userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/leave-entry"         element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLeaveEntryPage          userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/comp-leave"          element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrCompLeavePage           userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/festival-leave"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrFestivalLeavePage       userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/payroll-config"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrPayrollConfigPage       userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/payroll-gen"         element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrPayrollGenPage          userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/payroll-register"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrPayrollRegisterPage     userName={userName} role={role} isAdmin={isAdmin} company={company} /></GuardedRoute>} />
-          <Route path="/hr/offer-letter"        element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="OFFER_LETTER"        company={company} /></GuardedRoute>} />
-          <Route path="/hr/appointment-letter"  element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="APPOINTMENT"        company={company} /></GuardedRoute>} />
-          <Route path="/hr/joining-letter"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="JOINING"            company={company} /></GuardedRoute>} />
-          <Route path="/hr/confirmation-letter" element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="CONFIRMATION"       company={company} /></GuardedRoute>} />
-          <Route path="/hr/increment-letter"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="SALARY_INCREMENT"   company={company} /></GuardedRoute>} />
-          <Route path="/hr/promotion-letter"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="PROMOTION"          company={company} /></GuardedRoute>} />
-          <Route path="/hr/objection-letter"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="OBJECTION"          company={company} /></GuardedRoute>} />
-          <Route path="/hr/show-cause"          element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="SHOW_CAUSE"         company={company} /></GuardedRoute>} />
-          <Route path="/hr/warning-letter"      element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="WARNING"            company={company} /></GuardedRoute>} />
-          <Route path="/hr/dismissal-letter"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="RELIEVING"          company={company} /></GuardedRoute>} />
-          <Route path="/hr/noc"                 element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="NOC"                company={company} /></GuardedRoute>} />
-          <Route path="/hr/experience-cert"     element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="EXP_CERT"           company={company} /></GuardedRoute>} />
-          <Route path="/hr/employment-cert"     element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="SALARY_CERT"        company={company} /></GuardedRoute>} />
-          <Route path="/hr/final-payment"       element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrLetterPage type="FINAL_PAYMENT"      company={company} /></GuardedRoute>} />
-          <Route path="/hr/attendance-register" element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrAttendanceRegisterPage flash={(m)=>m} /></GuardedRoute>} />
-          <Route path="/hr/employee-register"   element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrEmployeeRegisterPage   role={role} /></GuardedRoute>} />
-          <Route path="/hr/service-book-reg"    element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrServiceBookRegPage      userName={userName} /></GuardedRoute>} />
-          <Route path="/hr/incidents"           element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrIncidentsPage           userName={userName} flash={(m)=>m} /></GuardedRoute>} />
-          <Route path="/hr/compliance"          element={<GuardedRoute role={role} navId="hr" privileges={privileges}><HrCompliancePage          role={role} /></GuardedRoute>} />
+          <Route path="/hr/employee-entry"      element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrEmployeeEntryPage      userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/service-book"        element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrServiceBookPage         userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/nominee"             element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrNomineePage             userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/leave-entry"         element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLeaveEntryPage          userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/comp-leave"          element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrCompLeavePage           userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/festival-leave"      element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrFestivalLeavePage       userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/payroll-config"      element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrPayrollConfigPage       userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/payroll-gen"         element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrPayrollGenPage          userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/payroll-register"    element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrPayrollRegisterPage     userName={userName} role={role} isAdmin={isAdmin} company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/offer-letter"        element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="OFFER_LETTER"        company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/appointment-letter"  element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="APPOINTMENT"        company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/joining-letter"      element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="JOINING"            company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/confirmation-letter" element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="CONFIRMATION"       company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/increment-letter"    element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="SALARY_INCREMENT"   company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/promotion-letter"    element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="PROMOTION"          company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/objection-letter"    element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="OBJECTION"          company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/show-cause"          element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="SHOW_CAUSE"         company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/warning-letter"      element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="WARNING"            company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/dismissal-letter"    element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="RELIEVING"          company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/noc"                 element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="NOC"                company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/experience-cert"     element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="EXP_CERT"           company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/employment-cert"     element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="SALARY_CERT"        company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/final-payment"       element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrLetterPage type="FINAL_PAYMENT"      company={company} /></SaasModuleRoute>} />
+          <Route path="/hr/attendance-register" element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrAttendanceRegisterPage flash={(m)=>m} /></SaasModuleRoute>} />
+          <Route path="/hr/employee-register"   element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrEmployeeRegisterPage   role={role} /></SaasModuleRoute>} />
+          <Route path="/hr/service-book-reg"    element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrServiceBookRegPage      userName={userName} /></SaasModuleRoute>} />
+          <Route path="/hr/incidents"           element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrIncidentsPage           userName={userName} flash={(m)=>m} /></SaasModuleRoute>} />
+          <Route path="/hr/compliance"          element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrCompliancePage          role={role} /></SaasModuleRoute>} />
 
           {/* Reports */}
           <Route path="/Reports" caseSensitive element={<Navigate to="/reports" replace />} />
           <Route path="/:slug/Reports" caseSensitive element={<TenantReportsRedirect />} />
           <Route path="/:slug/reports" element={
-            <GuardedRoute role={role} navId="reports" privileges={privileges}>
+            <SaasModuleRoute moduleId="reports" role={role} navId="reports" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Reportmodule userName={userName} userId={userId} role={role} company={company} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/reports" element={
-            <GuardedRoute role={role} navId="reports" privileges={privileges}>
+            <SaasModuleRoute moduleId="reports" role={role} navId="reports" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Reportmodule userName={userName} userId={userId} role={role} company={company} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
 
           {/* Tasks */}
           <Route path="/tasks" element={
-            <GuardedRoute role={role} navId="tasks" privileges={privileges}>
+            <SaasModuleRoute moduleId="tasks" role={role} navId="tasks" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
           <Route path="/ai-tasker" element={
-            <GuardedRoute role={role} navId="tasks" privileges={privileges}>
+            <SaasModuleRoute moduleId="tasks" role={role} navId="tasks" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} aiTaskerMode />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
 
           {/* System — superuser only */}
           <Route path="/cms" element={
             role === 'SUPERUSER'
-              ? <CmsPortal role={role} isAdmin={isAdmin} />
-              : <Navigate to={firstAccessiblePath(role, privileges)} replace />
+              ? <SaasModuleFrame moduleId="settings" company={company} role={role} userName={userName}><CmsPortal role={role} isAdmin={isAdmin} /></SaasModuleFrame>
+              : <Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />
           } />
           <Route path="/settings" element={
-            <GuardedRoute role={role} navId="settings" privileges={privileges}>
+            <SaasModuleRoute moduleId="settings" role={role} navId="settings" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Settings userName={userName} role={role} isAdmin={isAdmin} reloadCompany={loadCompany} />
-            </GuardedRoute>
+            </SaasModuleRoute>
           } />
 
-          <Route path="*" element={<Navigate to={firstAccessiblePath(role, privileges)} replace />} />
+          <Route path="*" element={<Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />} />
         </Routes>
 
         <footer className="no-print mt-10 pt-4 border-t border-leaf/80 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-pine/45">
@@ -769,9 +799,22 @@ function AppWelcome({ userName }) {
 /* ------------------------------------------------------------------ */
 // Use can() for both loaded privileges and fallback role defaults. This avoids
 // blank guarded pages if the role_privileges query is still loading or fails.
-function GuardedRoute({ role, navId, privileges, children }) {
-  if (!can(role, navId, privileges)) return <Navigate to={firstAccessiblePath(role, privileges)} replace />
+function GuardedRoute({ role, navId, privileges, modulesEnabled = null, children }) {
+  if (!isModuleEnabled(navId, modulesEnabled, role)) {
+    return <SaasModuleBlocked moduleId={navId} />
+  }
+  if (!can(role, navId, privileges)) return <Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />
   return children
+}
+
+function SaasModuleRoute({ moduleId, role, navId, privileges, modulesEnabled, company, userName, children }) {
+  return (
+    <GuardedRoute role={role} navId={navId || moduleId} privileges={privileges} modulesEnabled={modulesEnabled}>
+      <SaasModuleFrame moduleId={moduleId} company={company} role={role} userName={userName}>
+        {children}
+      </SaasModuleFrame>
+    </GuardedRoute>
+  )
 }
 
 function TenantReportsRedirect() {
