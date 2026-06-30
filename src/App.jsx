@@ -851,7 +851,21 @@ function AppRoot() {
         applyBrandTheme(fallbackTheme)
       })
     return () => { active = false }
-  }, [company?.logo_url, company?.primary_color, company?.accent_color, company?.brand_primary, company?.brand_accent])
+  }, [
+    company?.logo_url,
+    company?.primary_color,
+    company?.secondary_color,
+    company?.accent_color,
+    company?.brand_primary,
+    company?.brand_accent,
+    company?.sidebar_bg_color,
+    company?.sidebar_text_color,
+    company?.button_color,
+    company?.table_header_color,
+    company?.report_header_color,
+    company?.font_family,
+    company?.theme_mode,
+  ])
 
   useEffect(() => {
     const role = profile?.role
