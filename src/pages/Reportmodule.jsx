@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Download, FileDown, Printer, Search } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -13,28 +13,11 @@ import {
   getDefaultFilters,
   REPORT_CATEGORIES,
   REPORT_TEMPLATES,
-  SAMPLE_KPI_VALUES,
-  SAMPLE_ROWS,
 } from '../lib/reporting/reportConfig'
+import { loadLiveReportData } from '../lib/reporting/liveReportData'
 import { exportReportCsv, exportReportExcel, exportReportPdf } from '../lib/reporting/reportExport'
 import { todayISO } from '../lib/helpers'
-
-const includesAll = (value) => !value || value.startsWith('All ')
-
-function filterRows(rows, filters, report) {
-  return rows.filter((row) => {
-    if (filters.dateFrom && row.transactionDate < filters.dateFrom) return false
-    if (filters.dateTo && row.transactionDate > filters.dateTo) return false
-    if (!includesAll(filters.department) && row.department !== filters.department) return false
-    if (!includesAll(filters.costCenter) && row.costCenter !== filters.costCenter) return false
-    if (!includesAll(filters.roomType) && row.roomType !== filters.roomType) return false
-    if (!includesAll(filters.paymentMethod) && row.paymentMethod !== filters.paymentMethod) return false
-    if (!includesAll(filters.status) && row.status !== filters.status) return false
-    if (report.category === 'POS' && !['Restaurant', 'F&B'].includes(row.department) && row.costCenter !== 'F&B') return false
-    if (report.category === 'HOTEL_KPI' && !['Rooms', 'Housekeeping'].includes(row.department)) return false
-    return true
-  }).map((row, index) => ({ ...row, slNo: index + 1 }))
-}
+import { buildBrandTheme } from '../lib/branding'
 
 export default function Reports({ userName, company }) {
   const [activeCode, setActiveCode] = useState('IFRS-PNL')
@@ -43,14 +26,28 @@ export default function Reports({ userName, company }) {
   const [printSize, setPrintSize] = useState('A4')
   const [printReport, setPrintReport] = useState(null)
   const [openCategories, setOpenCategories] = useState({ IFRS: true, HOTEL_KPI: false, POS: false, ACCOUNTING: false })
+  const [reportData, setReportData] = useState({ rows: [], kpis: {}, sourceCounts: {}, errors: [] })
+  const [loading, setLoading] = useState(false)
 
   const activeReport = useMemo(
     () => REPORT_TEMPLATES.find((report) => report.code === activeCode) || REPORT_TEMPLATES[0],
     [activeCode]
   )
   const activeKpiKeys = activeReport.kpis?.length ? activeReport.kpis : ['totalRevenue', 'roomRevenue', 'restaurantRevenue', 'outstandingReceivable']
-  const rows = useMemo(() => filterRows(SAMPLE_ROWS, filters, activeReport), [activeReport, filters])
+  const rows = reportData.rows
   const totals = useMemo(() => calculateTotals(activeReport.columns, rows), [activeReport, rows])
+  const sourceCount = Object.values(reportData.sourceCounts || {}).reduce((sum, count) => sum + Number(count || 0), 0)
+  const reportTheme = useMemo(() => buildBrandTheme({
+    primary: company?.primary_color || company?.brand_primary,
+    accent: company?.accent_color || company?.brand_accent,
+    printPrimary: company?.print_primary_color || company?.brand_primary || company?.primary_color,
+    printAccent: company?.print_accent_color || company?.brand_accent || company?.accent_color,
+  }), [company])
+  const reportStyle = {
+    '--erp-blue': reportTheme.printPrimary,
+    '--erp-blue-2': reportTheme.primary,
+    '--erp-accent': reportTheme.printAccent,
+  }
   const meta = {
     companyName: company?.software_name || company?.name || 'Aura Stay',
     propertyName: filters.property === 'All Properties' ? company?.name || 'All Properties' : filters.property,
@@ -59,6 +56,22 @@ export default function Reports({ userName, company }) {
     currency: filters.currency,
     generatedBy: userName,
   }
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    loadLiveReportData(activeReport, filters)
+      .then((data) => {
+        if (!cancelled) setReportData(data)
+      })
+      .catch((error) => {
+        if (!cancelled) setReportData({ rows: [], kpis: {}, sourceCounts: {}, errors: [error.message] })
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [activeReport, filters])
 
   const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }))
   const selectReport = (report) => {
@@ -71,13 +84,13 @@ export default function Reports({ userName, company }) {
   )
 
   return (
-    <div className="enterprise-reporting-module">
+    <div className="enterprise-reporting-module" style={reportStyle}>
       {printReport && (
         <PrintPortal
           title={`${printReport.name} - ${printSize} landscape`}
           onClose={() => setPrintReport(null)}
-          primaryColor="#0f3a5f"
-          accentColor="#2563eb"
+          primaryColor={reportTheme.printPrimary}
+          accentColor={reportTheme.printAccent}
           type={printSize === 'A3' ? 'A3-landscape' : 'A4-landscape'}
         >
           <div className={printSize === 'A3' ? 'print-a3-landscape' : 'print-a4-landscape'}>
@@ -89,7 +102,7 @@ export default function Reports({ userName, company }) {
       <section className="erp-dashboard-top no-print">
         <div>
           <h1>Reports</h1>
-          <p>{activeReport.code} · {activeReport.name}</p>
+          <p>{activeReport.code} - {activeReport.name} - Live tenant data</p>
         </div>
         <div className="erp-top-actions">
           <select className="input" value={printSize} onChange={(e) => setPrintSize(e.target.value)}>
@@ -161,7 +174,17 @@ export default function Reports({ userName, company }) {
 
         <main className="erp-report-canvas">
           <EnterpriseReportHeader company={company} report={activeReport} filters={filters} generatedBy={userName} />
-          <ReportKpiCards values={SAMPLE_KPI_VALUES} activeKeys={activeKpiKeys} />
+          <div className="erp-live-report-status no-print">
+            <span className={loading ? 'loading' : 'ready'}>{loading ? 'Loading original records...' : 'Original data source'}</span>
+            <b>{rows.length} report rows</b>
+            <small>{sourceCount} tenant records scanned</small>
+          </div>
+          {reportData.errors?.length > 0 && (
+            <div className="erp-report-warning no-print">
+              {reportData.errors.join(' ')}
+            </div>
+          )}
+          <ReportKpiCards values={reportData.kpis} activeKeys={activeKpiKeys} />
           <ReportFilterPanel
             filters={filters}
             onChange={updateFilter}
