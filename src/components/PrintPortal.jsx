@@ -141,6 +141,9 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           padding: ${isThermal ? '0' : '0 0 8mm'} !important;
           overflow: visible !important;
         }
+        #print-root.print-doc.print-a4 {
+          max-width: ${printRootMaxWidth} !important;
+        }
         #print-root .print-a4-doc {
           width: 100% !important;
           max-width: ${isA3Landscape ? '392mm' : isA4Landscape ? '269mm' : '186mm'} !important;
