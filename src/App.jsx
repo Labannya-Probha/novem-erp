@@ -243,7 +243,7 @@ function firstAccessiblePath(role, privileges) {
     )
   }
   
-  function AppShell({ company, role, isAdmin, userName, loadCompany, privileges }) {
+  function AppShell({ company, role, isAdmin, userName, userId, loadCompany, privileges }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileNavOpen,  setMobileNavOpen]  = useState(false)
@@ -645,12 +645,12 @@ function firstAccessiblePath(role, privileges) {
           <Route path="/:slug/Reports" caseSensitive element={<TenantReportsRedirect />} />
           <Route path="/:slug/reports" element={
             <GuardedRoute role={role} navId="reports" privileges={privileges}>
-              <Reportmodule userName={userName} userId={profile?.auth_id || profile?.id} role={role} company={company} />
+              <Reportmodule userName={userName} userId={userId} role={role} company={company} />
             </GuardedRoute>
           } />
           <Route path="/reports" element={
             <GuardedRoute role={role} navId="reports" privileges={privileges}>
-              <Reportmodule userName={userName} userId={profile?.auth_id || profile?.id} role={role} company={company} />
+              <Reportmodule userName={userName} userId={userId} role={role} company={company} />
             </GuardedRoute>
           } />
 
@@ -940,6 +940,7 @@ function AppRoot() {
       role={role}
       isAdmin={isAdmin}
       userName={userName}
+      userId={profile?.auth_id || profile?.id}
       loadCompany={loadCompany}
       privileges={privileges}
     />
