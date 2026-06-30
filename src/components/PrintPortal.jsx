@@ -117,6 +117,23 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
       #print-root .print-copy {
         overflow: visible;
       }
+      #print-root.print-pos-58,
+      #print-root.print-pos-80 {
+        color: #000 !important;
+        background: #fff !important;
+        box-sizing: border-box;
+        overflow: visible;
+      }
+      #print-root.print-pos-58 *,
+      #print-root.print-pos-80 * {
+        color: #000 !important;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      #print-root.print-pos-58 img,
+      #print-root.print-pos-80 img {
+        filter: grayscale(1) saturate(0) contrast(2) !important;
+      }
       #print-root .mushak-63-doc {
         color: #000 !important;
       }
@@ -199,6 +216,10 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           padding: 0 !important;
           font-size: 10px !important;
           line-height: 1.2 !important;
+          color: #000 !important;
+          background: #fff !important;
+          overflow: visible !important;
+          box-sizing: border-box !important;
         }
 
         #print-root.print-pos-80 {
@@ -209,6 +230,10 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           padding: 0 !important;
           font-size: 10px !important;
           line-height: 1.2 !important;
+          color: #000 !important;
+          background: #fff !important;
+          overflow: visible !important;
+          box-sizing: border-box !important;
         }
 
         #print-root.print-pos-58 table,
@@ -227,6 +252,24 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
           overflow-wrap: anywhere !important;
           white-space: normal !important;
           vertical-align: top !important;
+        }
+
+        #print-root.print-pos-58 *,
+        #print-root.print-pos-80 * {
+          box-shadow: none !important;
+          text-shadow: none !important;
+          color: #000 !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
+        }
+
+        #print-root.print-pos-58 img,
+        #print-root.print-pos-80 img {
+          height: auto !important;
+          object-fit: contain !important;
+          filter: grayscale(1) contrast(1.2) !important;
         }
 
         #print-root.print-pos-58 .no-pos-print,

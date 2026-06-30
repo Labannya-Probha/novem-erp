@@ -51,7 +51,7 @@ export default function Facilities({ userName, isAdmin }) {
     const [{ data: it }, { data: tc }, { data: co }] = await Promise.all([
       withTenant(supabase.from('facility_items').select('*')).order('name'),
       withTenant(supabase.from('tax_config').select('*')),
-      withTenant(supabase.from('company_settings').select('*')).eq('id', 1).single(),
+      withTenant(supabase.from('company_settings').select('*')).limit(1).maybeSingle(),
     ])
     setItems(it || []); setTaxConfig(tc || []); setCompany(co)
   }
@@ -85,6 +85,7 @@ export default function Facilities({ userName, isAdmin }) {
 
       {printDoc?.type === 'RECEIPT' && (
         <PrintPortal
+          type="thermal-80"
           title={`${printDoc.order.outlet} — ${printDoc.order.order_no}`}
           onClose={() => setPrintDoc(null)}
           primaryColor={company?.primary_color || company?.brand_primary}

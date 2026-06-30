@@ -127,6 +127,7 @@ const ALL_NAV_IDS = NAV_GROUPS.flatMap((g) => g.items.map((n) => n.id))
 const SIDEBAR_SETTINGS_SECTIONS = [
   { id: 'my-account',              label: 'My Account',              adminOnly: false, superuserOnly: false },
   { id: 'branding',                label: 'Branding',                adminOnly: true,  superuserOnly: false },
+  { id: 'pos-print',               label: 'POS Print Settings',      adminOnly: true,  superuserOnly: false },
   { id: 'tax-policy',              label: 'Tax Policy',              adminOnly: false, superuserOnly: false },
   { id: 'allowance',               label: 'Allowance Configuration', adminOnly: false, superuserOnly: true  },
   { id: 'role-permissions',        label: 'Role Permissions',        adminOnly: false, superuserOnly: true  },
@@ -798,10 +799,20 @@ function AppRoot() {
   // FIX 1 & 2: loadCompany defined BEFORE the useEffect that calls it,
   // and wrapped in useCallback so it has a stable reference for the dep array.
   const loadCompany = useCallback(async (forceTenantId) => {
-    const tenantId = forceTenantId || getTenantId()
-    let query = supabase.from('company_settings').select('*')
-    if (tenantId) query = query.eq('tenant_id', tenantId)
-    const { data } = await query.limit(1).single()
+    let tenantId = forceTenantId || getTenantId()
+    if (!tenantId) {
+      const firstPathPart = location.pathname.split('/').filter(Boolean)[0]
+      const reservedPaths = new Set(['login', 'frontoffice', 'dashboard', 'calendar', 'reservations', 'reservation-payments', 'tasks', 'ai-tasker', 'nightaudit', 'housekeeping', 'facilities', 'pos', 'menu-management', 'accounting', 'inventory', 'consumption', 'hr', 'reports', 'cms', 'settings', 'vat', 'vat-return', 'kiosk'])
+      if (firstPathPart && !reservedPaths.has(firstPathPart.toLowerCase())) {
+        const { data: slugProperty } = await supabase.from('properties').select('id').eq('slug', firstPathPart).maybeSingle()
+        tenantId = slugProperty?.id || null
+      }
+    }
+    if (!tenantId) {
+      setCompany(null)
+      return
+    }
+    const { data } = await supabase.from('company_settings').select('*').eq('tenant_id', tenantId).limit(1).maybeSingle()
     if (data) {
       setCurrency(data.currency || '৳')
       let propertyQuery = supabase.from('properties').select('slug')
@@ -809,7 +820,7 @@ function AppRoot() {
       const { data: prop } = await propertyQuery.limit(1).maybeSingle()
       setCompany({ ...data, slug: prop?.slug || null })
     }
-  }, []) // no external deps — uses getTenantId() at call time
+  }, [location.pathname])
 
   useEffect(() => {
     if (!session) {
