@@ -65,7 +65,4 @@ export const reportTemplates = [
   template('NIGHT-AUDIT', 'Night Audit Report', 'ACCOUNTING', { kpis: ['totalRevenue', 'cashCollection', 'outstandingReceivable'], grouping: 'department' }),
 ]
 
-export const sampleRows = [
-  { slNo: 1, transactionDate: '2026-06-30', documentNo: 'INV-0001', reservationNo: 'RES-1021', guestId: 'GST-101', guestName: 'Rahman Group', roomNo: '201', roomType: 'Deluxe', department: 'Rooms', costCenter: 'ROOMS', accountCode: '4001', accountName: 'Room Revenue', description: 'Room night revenue', quantity: 2, rate: 7500, grossAmount: 15000, discount: 500, vat: 2175, serviceCharge: 1450, netAmount: 18125, debit: 0, credit: 18125, balance: 18125, paymentMethod: 'Card', createdBy: 'Front Desk', approvedBy: 'Demo Superuser', status: 'Posted', remarks: 'IFRS 15 recognized' },
-  { slNo: 2, transactionDate: '2026-06-30', documentNo: 'POS-0188', reservationNo: 'RES-1021', guestId: 'GST-101', guestName: 'Rahman Group', roomNo: '201', roomType: 'Deluxe', department: 'Restaurant', costCenter: 'F&B', accountCode: '4010', accountName: 'Restaurant Revenue', description: 'Restaurant dinner bill', quantity: 4, rate: 1250, grossAmount: 5000, discount: 250, vat: 713, serviceCharge: 475, netAmount: 5938, debit: 0, credit: 5938, balance: 24063, paymentMethod: 'Cash', createdBy: 'Cashier', approvedBy: 'Demo Superuser', status: 'Settled', remarks: 'POS settled' },
-]
+export const sampleRows = []

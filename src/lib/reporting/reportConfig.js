@@ -35,7 +35,7 @@ export const STANDARD_FILTERS = [
   { key: 'reservationSource', label: 'Reservation Source', type: 'select', options: ['All Sources', 'Direct', 'OTA', 'Corporate', 'Walk-in'] },
   { key: 'paymentMethod', label: 'Payment Method', type: 'select', options: ['All Methods', 'Cash', 'Card', 'Mobile Banking', 'Bank Transfer'] },
   { key: 'status', label: 'Status', type: 'select', options: ['All Status', 'Open', 'Approved', 'Posted', 'Settled', 'Cancelled'] },
-  { key: 'user', label: 'User', type: 'select', options: ['All Users', 'Demo Superuser', 'Front Desk', 'Cashier'] },
+  { key: 'user', label: 'User', type: 'select', options: ['All Users'] },
   { key: 'currency', label: 'Currency', type: 'select', options: ['BDT', 'USD'] },
 ]
 
@@ -175,37 +175,6 @@ export const REPORT_TEMPLATES = [
   makeTemplate('DAILY-SALES', 'Daily Sales Report', 'ACCOUNTING', baseColumns, { kpis: ['totalRevenue', 'roomRevenue', 'restaurantRevenue'], grouping: 'department' }),
   makeTemplate('NIGHT-AUDIT', 'Night Audit Report', 'ACCOUNTING', baseColumns, { kpis: ['totalRevenue', 'cashCollection', 'outstandingReceivable'], grouping: 'department' }),
 ]
-
-export const SAMPLE_ROWS = [
-  { slNo: 1, transactionDate: '2026-06-30', documentNo: 'INV-0001', voucherNo: 'JV-0001', reservationNo: 'RES-1021', guestId: 'GST-101', guestName: 'Rahman Group', roomNo: '201', roomType: 'Deluxe', department: 'Rooms', costCenter: 'ROOMS', accountCode: '4001', accountName: 'Room Revenue', description: 'Room night revenue', quantity: 2, rate: 7500, grossAmount: 15000, discount: 500, vat: 2175, serviceCharge: 1450, netAmount: 18125, debit: 0, credit: 18125, balance: 18125, paymentMethod: 'Card', createdBy: 'Front Desk', approvedBy: 'Demo Superuser', status: 'Posted', remarks: 'IFRS 15 recognized' },
-  { slNo: 2, transactionDate: '2026-06-30', documentNo: 'POS-0188', voucherNo: 'JV-0002', reservationNo: 'RES-1021', guestId: 'GST-101', guestName: 'Rahman Group', roomNo: '201', roomType: 'Deluxe', department: 'Restaurant', costCenter: 'F&B', accountCode: '4010', accountName: 'Restaurant Revenue', description: 'Restaurant dinner bill', quantity: 4, rate: 1250, grossAmount: 5000, discount: 250, vat: 713, serviceCharge: 475, netAmount: 5938, debit: 0, credit: 5938, balance: 24063, paymentMethod: 'Cash', createdBy: 'Cashier', approvedBy: 'Demo Superuser', status: 'Settled', remarks: 'POS settled' },
-  { slNo: 3, transactionDate: '2026-06-29', documentNo: 'INV-0002', voucherNo: 'JV-0003', reservationNo: 'RES-1022', guestId: 'GST-102', guestName: 'Nabila Karim', roomNo: '305', roomType: 'Suite', department: 'Rooms', costCenter: 'ROOMS', accountCode: '4001', accountName: 'Room Revenue', description: 'Suite room charge', quantity: 1, rate: 12000, grossAmount: 12000, discount: 0, vat: 1980, serviceCharge: 1200, netAmount: 15180, debit: 0, credit: 15180, balance: 15180, paymentMethod: 'Mobile Banking', createdBy: 'Front Desk', approvedBy: 'Manager', status: 'Posted', remarks: 'OTA booking' },
-  { slNo: 4, transactionDate: '2026-06-29', documentNo: 'PV-0044', voucherNo: 'PV-0044', reservationNo: '', guestId: '', guestName: '', roomNo: '', roomType: '', department: 'Accounting', costCenter: 'ADMIN', accountCode: '2105', accountName: 'Accounts Payable', description: 'Vendor payable settlement', quantity: 1, rate: 6500, grossAmount: 6500, discount: 0, vat: 0, serviceCharge: 0, netAmount: 6500, debit: 6500, credit: 0, balance: 8675, paymentMethod: 'Bank Transfer', createdBy: 'Accounts', approvedBy: 'Demo Superuser', status: 'Approved', remarks: 'AP aging cleared' },
-  { slNo: 5, transactionDate: '2026-06-28', documentNo: 'INV-0003', voucherNo: 'JV-0004', reservationNo: 'RES-1023', guestId: 'GST-103', guestName: 'Corporate Guest', roomNo: '104', roomType: 'Family Villa', department: 'Rooms', costCenter: 'ROOMS', accountCode: '2201', accountName: 'Deferred Revenue', description: 'Advance deposit pending stay completion', quantity: 1, rate: 10000, grossAmount: 10000, discount: 0, vat: 0, serviceCharge: 0, netAmount: 10000, debit: 10000, credit: 10000, balance: 10000, paymentMethod: 'Card', createdBy: 'Reservation', approvedBy: 'Manager', status: 'Open', remarks: 'Deferred under IFRS 15' },
-]
-
-export const SAMPLE_KPI_VALUES = {
-  totalRevenue: 49243,
-  roomRevenue: 33305,
-  restaurantRevenue: 5938,
-  otherRevenue: 10000,
-  occupancy: 68.5,
-  adr: 9735,
-  revpar: 6669.48,
-  totalGuests: 18,
-  checkIns: 7,
-  checkOuts: 5,
-  cancellations: 2,
-  noShows: 1,
-  cashCollection: 5938,
-  cardCollection: 28125,
-  mobileCollection: 15180,
-  outstandingReceivable: 24063,
-  vatPayable: 4868,
-  netProfit: 14773,
-  gop: 22159,
-  ebitdaMargin: 29.9,
-}
 
 export function getDefaultFilters(todayISO) {
   const today = todayISO()
