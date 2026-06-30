@@ -32,10 +32,15 @@
     /* ── Dynamic Tenant Colors (overridable via JS) ─────────────────── */
     --tenant-primary:     #1F6F78;
     --tenant-primary-rgb: 31 111 120;
+    --tenant-secondary:   #EAF4F1;
+    --tenant-secondary-rgb: 234 244 241;
     --tenant-accent:      #2E7D32;
     --tenant-accent-rgb:  46 125 50;
     --tenant-dark:        #1B4D2E;
     --tenant-dark-rgb:    27 77 46;
+    --tenant-button:      #1F6F78;
+    --tenant-button-rgb:  31 111 120;
+    --tenant-font-family: "Inter", sans-serif;
 
     /* ── Design tokens ───────────────────────────────────────────────── */
     --brand-color:        var(--tenant-primary);
@@ -48,6 +53,10 @@
     --interactive-glow:   rgba(var(--tenant-primary-rgb), 0.16);
     --interactive-shadow: 0 16px 36px rgba(23, 23, 23, 0.10);
     --sidebar-bg:         var(--tenant-dark);
+    --sidebar-text:       #FFFFFF;
+    --button-bg:          var(--tenant-button);
+    --table-header-bg:    var(--tenant-secondary);
+    --report-header-bg:   #0F4C81;
 
     /* ── shadcn/ui semantic tokens (HSL) — mapped to brand palette ────
        These power the Tailwind classes: bg-background, text-foreground,
@@ -127,7 +136,7 @@
       radial-gradient(900px  700px at 112% 0%,  rgba(208,169,104,0.08), transparent 52%),
       linear-gradient(180deg, #FBFAF8 0%, #F7F5F2 100%);
     min-height: 100vh;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--tenant-font-family);
     font-size: 14.5px;
     line-height: 1.5;
     overflow-x: hidden;
@@ -207,7 +216,11 @@
   }
   .theme {
     --font-heading: var(--font-sans);
-    --font-sans: 'Inter Variable', sans-serif;
+    --font-sans: var(--tenant-font-family);
+  }
+  .tenant-dark body {
+    background: #111827;
+    color: #F9FAFB;
   }
   .dark {
     --background: oklch(0.145 0 0);
@@ -347,13 +360,13 @@
   }
   .btn-primary {
     @apply text-white;
-    background: linear-gradient(135deg, var(--brand-color), color-mix(in srgb, var(--brand-color) 80%, #000));
+    background: linear-gradient(135deg, var(--button-bg), color-mix(in srgb, var(--button-bg) 80%, #000));
     border: 1px solid rgba(255,255,255,0.18);
-    box-shadow: 0 8px 18px rgba(var(--tenant-primary-rgb), 0.18);
+    box-shadow: 0 8px 18px rgba(var(--tenant-button-rgb), 0.18);
   }
   .btn-primary:hover  { 
     filter: brightness(1.06); 
-    box-shadow: 0 12px 26px rgba(var(--tenant-primary-rgb), 0.26); 
+    box-shadow: 0 12px 26px rgba(var(--tenant-button-rgb), 0.26); 
     transform: translateY(-1px); 
   }
   .btn-primary:active { transform: translateY(0); }
@@ -399,7 +412,7 @@
     padding: 11px 14px;
     border-bottom: 1.5px solid var(--border-color);
     white-space: nowrap;
-    background: var(--surface-muted);
+    background: var(--table-header-bg);
   }
   .td {
     @apply text-ink;
@@ -646,9 +659,9 @@
 }
 
 .enterprise-reporting-module {
-  --erp-blue: #0f3a5f;
-  --erp-blue-2: #145b8f;
-  --erp-soft: #eaf4ff;
+  --erp-blue: var(--report-header-bg);
+  --erp-blue-2: var(--brand-color);
+  --erp-soft: var(--table-header-bg);
   --erp-line: #c9d9e8;
   --erp-ink: #102033;
   --erp-muted: #64748b;
@@ -1140,10 +1153,10 @@
 
 /* Enterprise reporting refinements */
 .enterprise-reporting-module {
-  --erp-blue: var(--brand-print-primary);
+  --erp-blue: var(--report-header-bg);
   --erp-blue-2: var(--brand-color);
   --erp-accent: var(--brand-print-accent);
-  --erp-soft: #eef6fc;
+  --erp-soft: var(--table-header-bg);
   --erp-line: #d3e0eb;
   --erp-ink: #172033;
   --erp-muted: #687589;

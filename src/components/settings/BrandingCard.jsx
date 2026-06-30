@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 import { setCurrency } from '../../lib/helpers'
+import { getTenantId } from '../../lib/tenant'
 import { Save, Building2, Image, Upload, ChevronDown } from 'lucide-react'
 
 function RichTextEditor({ initialHtml, onSave, saveLabel = 'Save' }) {
@@ -284,12 +285,98 @@ function VatCircleDropdown({ value, onChange }) {
     </div>
   )
 }
+const FONT_OPTIONS = [
+  'Inter',
+  'Arial',
+  'Roboto',
+  'Noto Sans',
+  'Source Sans 3',
+  'System UI',
+]
+
+const ColorInput = ({ label, value, fallback, onChange }) => (
+  <div>
+    <label className="label">{label}</label>
+    <div className="flex items-center gap-2">
+      <input type="color" className="input !p-1 !w-14 shrink-0" value={/^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback} onChange={(e) => onChange(e.target.value)} />
+      <input className="input money uppercase" value={value || ''} placeholder={fallback} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  </div>
+)
+
+function TenantBrandPreview({ company }) {
+  const primary = company.primary_color || '#1F6F78'
+  const accent = company.accent_color || '#2E7D32'
+  const sidebar = company.sidebar_bg_color || company.brand_primary || '#123F2A'
+  const sidebarText = company.sidebar_text_color || '#FFFFFF'
+  const button = company.button_color || primary
+  const tableHeader = company.table_header_color || '#EAF4F1'
+  const reportHeader = company.report_header_color || company.brand_primary || '#0F4C81'
+  const fontFamily = company.font_family || 'Inter'
+
+  return (
+    <div className="col-span-2 rounded-xl border border-leaf overflow-hidden bg-white">
+      <div className="grid md:grid-cols-[170px_1fr] min-h-[210px]" style={{ fontFamily: `"${fontFamily}", Inter, sans-serif` }}>
+        <aside className="p-4 text-sm" style={{ background: sidebar, color: sidebarText }}>
+          <div className="flex items-center gap-2 mb-5">
+            <div className="h-9 w-9 rounded-lg bg-white/12 border border-white/20 flex items-center justify-center overflow-hidden">
+              {company.logo_url ? <img src={company.logo_url} alt="" className="h-full w-full object-contain" /> : <Building2 size={18} />}
+            </div>
+            <div>
+              <div className="font-bold leading-tight">{company.software_name || 'Aura Stay ERP'}</div>
+              <div className="text-[11px] opacity-65">{company.name || 'Property'}</div>
+            </div>
+          </div>
+          {['Dashboard', 'Reservations', 'Reports'].map((item, idx) => (
+            <div key={item} className="mb-2 rounded-lg px-3 py-2" style={{ background: idx === 2 ? 'rgba(255,255,255,.14)' : 'transparent' }}>
+              {item}
+            </div>
+          ))}
+        </aside>
+        <main className="p-4 bg-slate-50">
+          <div className="rounded-lg overflow-hidden border border-slate-200 bg-white">
+            <div className="px-4 py-3 text-white font-bold" style={{ background: reportHeader }}>
+              {company.name || 'Tenant'} - Reporting Workbench
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3 p-4">
+              <div className="rounded-lg border p-3" style={{ borderColor: `${accent}44` }}>
+                <div className="text-[10px] uppercase text-slate-500 font-bold">Revenue</div>
+                <div className="text-xl font-bold" style={{ color: primary }}>BDT 0.00</div>
+              </div>
+              <div className="rounded-lg border p-3">
+                <div className="text-[10px] uppercase text-slate-500 font-bold">Occupancy</div>
+                <div className="text-xl font-bold" style={{ color: accent }}>0%</div>
+              </div>
+              <button type="button" className="rounded-lg px-4 py-3 text-white font-bold" style={{ background: button }}>Primary action</button>
+            </div>
+            <table className="w-full text-xs">
+              <thead style={{ background: tableHeader }}>
+                <tr><th className="text-left p-3">Report</th><th className="text-left p-3">Status</th><th className="text-right p-3">Amount</th></tr>
+              </thead>
+              <tbody>
+                <tr><td className="p-3">Daily Sales</td><td className="p-3">Ready</td><td className="p-3 text-right">0.00</td></tr>
+                <tr className="bg-slate-50"><td className="p-3">Guest Ledger</td><td className="p-3">Ready</td><td className="p-3 text-right">0.00</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
 function BrandingCard({ reloadCompany }) {
   const [c, setC]   = useState(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg]   = useState('')
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
-  const load  = async () => { const { data } = await supabase.from('company_settings').select('*').single(); setC(data) }
+  const load  = async () => {
+    const tenantId = getTenantId()
+    let query = supabase.from('company_settings').select('*')
+    if (tenantId) query = query.eq('tenant_id', tenantId)
+    const { data } = await query.limit(1).single()
+    setC(data)
+  }
   useEffect(() => { load() }, [])
   if (!c) return <div className="card p-5 text-pine/50">Loading…</div>
   const set = (k, v) => setC((p) => ({ ...p, [k]: v }))
@@ -331,6 +418,14 @@ function BrandingCard({ reloadCompany }) {
       accent_color: c.accent_color || null,
       brand_primary: c.brand_primary || null,
       brand_accent: c.brand_accent || null,
+      secondary_color: c.secondary_color || null,
+      sidebar_bg_color: c.sidebar_bg_color || null,
+      sidebar_text_color: c.sidebar_text_color || null,
+      button_color: c.button_color || null,
+      table_header_color: c.table_header_color || null,
+      report_header_color: c.report_header_color || null,
+      font_family: c.font_family || 'Inter',
+      theme_mode: c.theme_mode || 'light',
       mushak610_threshold: +c.mushak610_threshold || 0,
       updated_at: new Date().toISOString(),
     }).eq('id', c.id)
@@ -363,11 +458,35 @@ function BrandingCard({ reloadCompany }) {
         <div><label className="label">Phone</label><input className="input" value={c.phone || ''} onChange={(e) => set('phone', e.target.value)} /></div>
         <div><label className="label">Email</label><input className="input" value={c.email || ''} onChange={(e) => set('email', e.target.value)} /></div>
         <div><label className="label">BIN</label><input className="input money" value={c.bin || ''} onChange={(e) => set('bin', e.target.value)} /></div>
-        <div><label className="label">Short code</label><input className="input money" value={c.short_code || ''} onChange={(e) => set('short_code', e.target.value)} /></div>
+        <div><label className="label">Software name</label><input className="input" value={c.software_name || ''} onChange={(e) => set('software_name', e.target.value)} /></div>
         <div><label className="label">Primary UI color (optional)</label><input type="color" className="input !p-1" value={c.primary_color || '#1F6F78'} onChange={(e) => set('primary_color', e.target.value)} /></div>
         <div><label className="label">Accent UI color (optional)</label><input type="color" className="input !p-1" value={c.accent_color || '#2E7D32'} onChange={(e) => set('accent_color', e.target.value)} /></div>
         <div><label className="label">Print primary (optional)</label><input type="color" className="input !p-1" value={c.brand_primary || '#1B4D2E'} onChange={(e) => set('brand_primary', e.target.value)} /></div>
         <div><label className="label">Print accent (optional)</label><input type="color" className="input !p-1" value={c.brand_accent || '#2E7D32'} onChange={(e) => set('brand_accent', e.target.value)} /></div>
+        <div className="col-span-2 mt-2 border-t border-leaf pt-4">
+          <h3 className="font-display font-semibold text-pine">Tenant UI palette</h3>
+          <p className="text-sm text-pine/50">Controls the ERP shell, buttons, report headers, and table headers for this tenant.</p>
+        </div>
+        <ColorInput label="Secondary / soft background" value={c.secondary_color} fallback="#EAF4F1" onChange={(v) => set('secondary_color', v)} />
+        <ColorInput label="Sidebar background" value={c.sidebar_bg_color} fallback="#123F2A" onChange={(v) => set('sidebar_bg_color', v)} />
+        <ColorInput label="Sidebar text" value={c.sidebar_text_color} fallback="#FFFFFF" onChange={(v) => set('sidebar_text_color', v)} />
+        <ColorInput label="Button color" value={c.button_color} fallback={c.primary_color || '#1F6F78'} onChange={(v) => set('button_color', v)} />
+        <ColorInput label="Table header color" value={c.table_header_color} fallback="#EAF4F1" onChange={(v) => set('table_header_color', v)} />
+        <ColorInput label="Report header color" value={c.report_header_color} fallback="#0F4C81" onChange={(v) => set('report_header_color', v)} />
+        <div>
+          <label className="label">Font family</label>
+          <select className="input" value={c.font_family || 'Inter'} onChange={(e) => set('font_family', e.target.value)}>
+            {FONT_OPTIONS.map((font) => <option key={font} value={font}>{font}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Theme mode</label>
+          <select className="input" value={c.theme_mode || 'light'} onChange={(e) => set('theme_mode', e.target.value)}>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <TenantBrandPreview company={c} />
         <div className="col-span-2"><label className="label">VAT circle / division</label><VatCircleDropdown value={c.vat_circle || ''} onChange={(v) => set('vat_circle', v)} />{c.vat_circle && (<p className="text-xs text-pine/40 mt-1 font-mono">Challan code: 1/1133/{VAT_CIRCLES.find((g) => g.circles.includes(c.vat_circle))?.code || '????'}/0311</p>)}</div>
         <div><label className="label">Mushak-6.10 threshold</label><input type="number" className="input money" value={c.mushak610_threshold || 0} onChange={(e) => set('mushak610_threshold', e.target.value)} /></div>
         <div><label className="label">Invoice footer</label><input className="input" value={c.invoice_footer || ''} onChange={(e) => set('invoice_footer', e.target.value)} /></div>
