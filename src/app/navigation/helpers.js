@@ -5,6 +5,7 @@ import { PATHS } from '../paths'
 
 const NAV_ID_PATHS = {
   dashboard: PATHS.FRONTOFFICE,
+  pos: PATHS.RESTAURANT,
   'pos-print-center': PATHS.POS_PRINT_CENTER,
 }
 
@@ -23,7 +24,13 @@ export function getActiveNavGroupTitle(currentTopId, pathname) {
     currentTopId === 'housekeeping' ||
     currentTopId === 'facilities'
   ) return 'Modules'
-  if (pathname.startsWith('/pos') || pathname.startsWith('/menu-management')) return 'Modules'
+  if (
+    pathname.startsWith('/restaurant') ||
+    pathname.startsWith('/pos') ||
+    pathname.startsWith('/menu-management') ||
+    pathname.startsWith('/kiosk/pos') ||
+    pathname.startsWith('/verify/pos/')
+  ) return 'Modules'
   const group = NAV_GROUPS.find((entry) => entry.items.some((item) => item.id === currentTopId))
   return group?.title || null
 }

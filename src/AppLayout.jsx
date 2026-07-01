@@ -98,9 +98,10 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
   const [sidebarHidden,  setSidebarHidden]  = useState(false)
 
   const currentTopSegment = location.pathname.split('/').filter(Boolean)[0] || 'dashboard'
-  const currentTopId = currentTopSegment === 'frontoffice' ? 'dashboard' : currentTopSegment
+  const currentTopId = currentTopSegment === 'frontoffice' ? 'dashboard' : currentTopSegment === 'restaurant' ? 'pos' : currentTopSegment
   const navPathById = (id) => {
     if (id === 'dashboard') return PATHS.FRONTOFFICE
+    if (id === 'pos') return PATHS.RESTAURANT
     if (id === 'pos-print-center') return PATHS.POS_PRINT_CENTER
     return `/${id}`
   }
@@ -161,13 +162,15 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
     const isFrontOfficeRoute = (
       location.pathname.startsWith('/frontoffice') ||
       location.pathname === PATHS.NIGHTAUDIT ||
-      location.pathname === PATHS.FACILITIES ||
-      location.pathname.startsWith('/verify/pos/')
+      location.pathname === PATHS.FACILITIES
     )
     const isRestaurantRoute = (
+      location.pathname.startsWith('/restaurant') ||
       location.pathname === PATHS.POS ||
       location.pathname === PATHS.MENU_MANAGEMENT ||
-      location.pathname.startsWith('/pos/print-center')
+      location.pathname.startsWith('/pos/print-center') ||
+      location.pathname === PATHS.GUEST_KIOSK ||
+      location.pathname.startsWith('/verify/pos/')
     )
     const isAccountingRoute = location.pathname.startsWith('/accounting') || location.pathname === PATHS.VAT || location.pathname === PATHS.VAT_RETURN
     const isHrRoute = location.pathname.startsWith('/hr')
@@ -302,22 +305,17 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                   } else if (n.id === 'pos') {
                     nested = [
                       {
-                        id: 'pos',
-                        label: 'Restaurant POS',
-                        path: PATHS.POS,
-                        active: location.pathname === PATHS.POS,
-                      },
-                      {
-                        id: 'menu-management',
-                        label: 'Menu Management',
-                        path: PATHS.MENU_MANAGEMENT,
-                        active: location.pathname === PATHS.MENU_MANAGEMENT,
-                      },
-                      {
-                        id: 'pos-print-center',
-                        label: 'POS Print Center',
-                        path: PATHS.POS_PRINT_CENTER,
-                        active: location.pathname.startsWith('/pos/print-center'),
+                        id: 'restaurant',
+                        label: 'Restaurant',
+                        path: PATHS.RESTAURANT,
+                        active: (
+                          location.pathname.startsWith('/restaurant') ||
+                          location.pathname === PATHS.POS ||
+                          location.pathname === PATHS.MENU_MANAGEMENT ||
+                          location.pathname.startsWith('/pos/print-center') ||
+                          location.pathname === PATHS.GUEST_KIOSK ||
+                          location.pathname.startsWith('/verify/pos/')
+                        ),
                       },
                     ]
                   } else if (n.id === 'inventory') {
