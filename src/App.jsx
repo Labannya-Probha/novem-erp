@@ -382,13 +382,14 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
                     if (!isExpandable) {
                       return (
                         <button key={n.id}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors min-w-0 ${
                             currentTopId === n.id
                               ? 'bg-white/14 text-white ring-1 ring-white/20'
                               : 'text-white/75 hover:bg-white/10 hover:text-white'
                           }`}
                           onClick={() => navigate(`/${n.id}`)}>
-                          <n.icon size={17} /> {n.label}
+                          <n.icon size={17} className="shrink-0" />
+                          <span className="min-w-0 truncate whitespace-nowrap">{n.label}</span>
                         </button>
                       )
                     }
@@ -465,7 +466,10 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
                             }
                           }}
                         >
-                          <span className="flex items-center gap-3"><n.icon size={17} /> {n.label}</span>
+                          <span className="flex items-center gap-3 min-w-0">
+                            <n.icon size={17} className="shrink-0" />
+                            <span className="min-w-0 truncate whitespace-nowrap">{n.label}</span>
+                          </span>
                           <ChevronDown size={13} className={`transition-transform ${isOpen ? '' : '-rotate-90'}`} />
                         </button>
                         {isOpen && (
