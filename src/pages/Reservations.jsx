@@ -189,8 +189,7 @@ export default function Reservations({ openReservation, userName, prefill, clear
             </div>
           </>
         )}
-      </div></>
-      )
+      </div>
       {showNew && (
         <NewReservation
           prefill={prefill}
@@ -199,6 +198,8 @@ export default function Reservations({ openReservation, userName, prefill, clear
           userName={userName}
         />
       )}
+    </>
+  )
 }
 
 function GuestSearchPopup({ onSelect, onClose, onCreateContact }) {
@@ -375,6 +376,19 @@ function NewReservation({ close, openReservation, userName, prefill }) {
   const [focusGuestName, setFocusGuestName]   = useState(false)
 
   const set          = (k, v) => setF((p) => ({ ...p, [k]: v }))
+
+  // Apply prefill data from Booking Calendar (check-in date, check-out date, room)
+  useEffect(() => {
+    if (!prefill) return
+    setF((p) => ({
+      ...p,
+      ...(prefill.from_date ? { check_in: prefill.from_date } : {}),
+      ...(prefill.to_date   ? { check_out: prefill.to_date }  : {}),
+    }))
+    if (prefill.room_id && prefill.from_date && prefill.to_date) {
+      setRoomRows([{ room_id: prefill.room_id, from_date: prefill.from_date, to_date: prefill.to_date }])
+    }
+  }, [])
 
   const writeAudit = async ({ action, entity, entityId, details = {} }) => {
     try {

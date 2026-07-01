@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../supabase'
-import { fmtDate, todayISO } from '../lib/helpers'
-import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle } from 'lucide-react'
+import { fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
+import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle, Search, Users } from 'lucide-react'
 import KPICards from '../components/KPICards.jsx'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -9,7 +9,6 @@ import { Badge } from '../components/ui/badge'
 import { Separator } from '../components/ui/separator'
 import { useToast } from '../components/Toast'
 import { cn } from '../lib/utils'
-const TABS = ['Check-In', 'Billings & Check-Out']
 const HK_STYLE = {
   'Clean':        'bg-forest/15 text-forest border-forest/30',
   'Inspected':    'bg-sky-100 text-sky-700 border-sky-300',
@@ -53,11 +52,36 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
   const [boardBusy, setBoardBusy] = useState(false)
   const [dayBusy, setDayBusy] = useState(false)
   const [foCloseRow, setFoCloseRow] = useState(null)
+  const [allGuests, setAllGuests] = useState([])
+  const [guestsBusy, setGuestsBusy] = useState(false)
+  const [guestSearch, setGuestSearch] = useState('')
+  const [guestStatusFilter, setGuestStatusFilter] = useState('ALL')
   const toast = useToast()
   const today = todayISO()
   const canCloseFrontDay = isAdmin || role === 'MANAGER' || role === 'FRONT_OFFICE' || role === 'ACCOUNTS'
   const canOpenDay = role === 'SUPERUSER'
   const flashDay = (m, type = 'info') => { toast(m, type) }
+
+  const loadAllGuests = async () => {
+    setGuestsBusy(true)
+    const { data } = await supabase
+      .from('reservations')
+      .select('id,res_no,reservation_name,check_in,check_out,status,source, guests:primary_guest_id(full_name,phone,customer_id), reservation_rooms(rooms(room_no,room_name))')
+      .order('check_in', { ascending: false })
+      .limit(300)
+    setAllGuests(data || [])
+    setGuestsBusy(false)
+  }
+
+  const filteredGuests = useMemo(() => {
+    const q = guestSearch.toLowerCase()
+    return allGuests.filter((r) => {
+      if (guestStatusFilter !== 'ALL' && r.status !== guestStatusFilter) return false
+      if (!q) return true
+      return [r.res_no, r.reservation_name, r.guests?.full_name, r.guests?.phone, r.guests?.customer_id]
+        .join(' ').toLowerCase().includes(q)
+    })
+  }, [allGuests, guestSearch, guestStatusFilter])
 
   const loadBoard = async () => {
     setBoardBusy(true)
@@ -105,6 +129,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
     load()
     loadBoard()
     loadFrontOfficeClose()
+    loadAllGuests()
   }, [])
 
   const loadFrontOfficeClose = async () => {
@@ -321,6 +346,125 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
               )
             })}
       </div>
+
+      {/* ── All Guests Panel ── */}
+      <div className="erp-section-header no-print mt-6">
+        <h2>
+          <Users size={18} className="text-forest" /> All Guests
+        </h2>
+        <Button variant="outline" size="sm" onClick={loadAllGuests} disabled={guestsBusy}>
+          <RefreshCw size={14} className={guestsBusy ? 'animate-spin' : ''} /> Refresh
+        </Button>
+      </div>
+
+      <Card className="mb-6">
+        <CardContent className="p-4 space-y-3">
+          {/* Search & filter bar */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pine/40 pointer-events-none" />
+              <input
+                type="text"
+                className="input !pl-8 w-full"
+                placeholder="Search by name, phone, res no…"
+                value={guestSearch}
+                onChange={(e) => setGuestSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setGuestStatusFilter(s)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                    guestStatusFilter === s
+                      ? 'bg-pine text-white border-pine'
+                      : 'border-leaf text-pine/60 hover:text-pine hover:border-pine/40'
+                  }`}
+                >
+                  {s === 'ALL' ? 'All' : s.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Guest list */}
+          {guestsBusy ? (
+            <div className="text-sm text-pine/50 py-4 text-center">Loading…</div>
+          ) : filteredGuests.length === 0 ? (
+            <div className="text-sm text-pine/50 py-4 text-center">No guests found.</div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className="th">Res No.</th>
+                      <th className="th">Guest / Reservation</th>
+                      <th className="th">Stay</th>
+                      <th className="th">Room(s)</th>
+                      <th className="th">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredGuests.map((r) => (
+                      <tr
+                        key={r.id}
+                        className="hover:bg-leaf/30 cursor-pointer"
+                        onClick={() => openReservation(r.id, 'Overview')}
+                      >
+                        <td className="td money font-medium text-xs">{r.res_no}</td>
+                        <td className="td">
+                          <div className="font-semibold text-sm">{r.reservation_name || r.guests?.full_name || '—'}</div>
+                          <div className="text-xs text-pine/50">
+                            {r.guests?.full_name && r.guests.full_name !== r.reservation_name && <span>{r.guests.full_name} · </span>}
+                            {r.guests?.phone || ''}
+                          </div>
+                        </td>
+                        <td className="td money text-xs">{fmtDate(r.check_in)} → {fmtDate(r.check_out)}</td>
+                        <td className="td text-xs">
+                          {(r.reservation_rooms || []).map((x) => x.rooms?.room_no).filter(Boolean).join(', ') || '—'}
+                        </td>
+                        <td className="td">
+                          <span className={`status-chip ${STATUS_COLORS[r.status] || ''}`}>
+                            {r.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="md:hidden divide-y divide-leaf">
+                {filteredGuests.map((r) => (
+                  <button
+                    key={r.id}
+                    className="w-full text-left p-3 hover:bg-leaf/20 active:bg-leaf/40 transition-colors"
+                    onClick={() => openReservation(r.id, 'Overview')}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm truncate">{r.reservation_name || r.guests?.full_name || '—'}</div>
+                        <div className="text-xs text-pine/50 truncate">{r.res_no} · {r.guests?.phone || ''}</div>
+                        <div className="text-xs text-pine/60 money mt-0.5">{fmtDate(r.check_in)} → {fmtDate(r.check_out)}</div>
+                      </div>
+                      <span className={`status-chip shrink-0 whitespace-nowrap ${STATUS_COLORS[r.status] || ''}`}>
+                        {r.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-pine/40 text-right pt-1">
+                Showing {filteredGuests.length} of {allGuests.length} reservations
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
