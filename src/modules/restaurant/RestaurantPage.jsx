@@ -14,11 +14,6 @@ import PrintCenterTab from './tabs/PrintCenterTab'
 import DayCloseReportsTab from './tabs/DayCloseReportsTab'
 import { useRestaurantTabs } from './hooks/useRestaurantTabs'
 
-function withTenant(query) {
-  const tenantId = getTenantId()
-  return tenantId ? query.eq('tenant_id', tenantId) : query
-}
-
 export default function RestaurantPage({ userName, isAdmin, role, modulesEnabled, company }) {
   const canManageMenu = isModuleEnabled('menu-management', modulesEnabled, role) && (isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT')
   const { activeTab, tabs, setTab } = useRestaurantTabs({ canManageMenu })
@@ -28,10 +23,13 @@ export default function RestaurantPage({ userName, isAdmin, role, modulesEnabled
     let isMounted = true
 
     async function loadKpis() {
+      const tenantId = getTenantId()
+      if (!tenantId) return
+
       const [ordersRes, openRes, menuRes] = await Promise.all([
-        withTenant(supabase.from('pos_orders').select('*', { count: 'exact', head: true })),
-        withTenant(supabase.from('pos_orders').select('*', { count: 'exact', head: true }).in('status', ['OPEN', 'ACCEPTED', 'READY'])),
-        withTenant(supabase.from('menu_items').select('*', { count: 'exact', head: true }).eq('is_active', true)),
+        supabase.from('pos_orders').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+        supabase.from('pos_orders').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).in('status', ['OPEN', 'ACCEPTED', 'READY']),
+        supabase.from('menu_items').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('is_active', true),
       ])
 
       if (!isMounted) return
@@ -71,4 +69,3 @@ export default function RestaurantPage({ userName, isAdmin, role, modulesEnabled
     </div>
   )
 }
-

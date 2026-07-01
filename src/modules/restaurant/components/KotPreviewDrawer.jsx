@@ -1,16 +1,13 @@
-export default function KotPreviewDrawer({ open = false, onClose, children }) {
-  if (!open) return null
+import DrawerForm from 'src/components/forms/DrawerForm'
 
+export default function KotPreviewDrawer({ open = false, onClose, children }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/40">
-      <div className="ml-auto h-full w-full max-w-xl bg-background p-4 shadow-xl">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">KOT Preview</h3>
-          <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={onClose}>Close</button>
-        </div>
-        {children}
-      </div>
-    </div>
+    <DrawerForm
+      open={open}
+      onOpenChange={(nextOpen) => { if (!nextOpen) onClose?.() }}
+      title="KOT Preview"
+    >
+      {children}
+    </DrawerForm>
   )
 }
-
