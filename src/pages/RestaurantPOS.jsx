@@ -115,6 +115,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   const [activeCat, setActiveCat] = useState('ALL')
   const [payments, setPayments] = useState(PAYMENT_METHODS.reduce((acc, m) => ({ ...acc, [m]: '' }), {}))
   const [showPicker, setShowPicker] = useState(false)
+  const [staffDueName, setStaffDueName] = useState('')
   const [busy, setBusy] = useState(false)
   const [itemSearch, setItemSearch] = useState('')
   const rate = rateFor(taxConfig, 'RESTAURANT', todayISO())
@@ -230,6 +231,19 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   } catch (e) { flash(e.message) }
   setBusy(false)
 }
+
+  const chargeAsStaffDue = async () => {
+    if (!guard()) return
+    if (!staffDueName.trim()) { flash('Enter staff/shareholder name to add due.'); return }
+    setBusy(true)
+    try {
+      const { order, items: oi } = await persist({ status: 'STAFF_DUE', guest_name: staffDueName.trim() })
+      onDone({ type: 'RECEIPT', order: { ...order, status: 'STAFF_DUE' }, items: oi })
+      flash(`${order.order_no} added as Due for ${staffDueName.trim()}.`)
+    } catch (e) { flash(e.message) }
+    setBusy(false)
+  }
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
       <div className="xl:col-span-3">
@@ -322,11 +336,34 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
               </div>
             ))}
           </div>
-          <div className="border-t border-leaf pt-2 text-xs font-semibold text-forest">
-            Total Paid: {fmtBDT(Object.values(payments).reduce((a, v) => a + (Number(v) || 0), 0))}
-          </div>
+          {(() => {
+            const totalPaid = Object.values(payments).reduce((a, v) => a + (Number(v) || 0), 0)
+            const remaining = Math.max(0, t.total - totalPaid)
+            const change = Math.max(0, totalPaid - t.total)
+            return (
+              <div className="border-t border-leaf pt-2 space-y-1 text-xs">
+                <div className="flex justify-between font-semibold text-forest">
+                  <span>Total Paid</span><span>{fmtBDT(totalPaid)}</span>
+                </div>
+                {remaining > 0 && <div className="flex justify-between text-red-600 font-semibold"><span>Remaining Due</span><span>{fmtBDT(remaining)}</span></div>}
+                {change > 0 && <div className="flex justify-between text-amber font-semibold"><span>Change</span><span>{fmtBDT(change)}</span></div>}
+              </div>
+            )
+          })()}
           <button className="btn-primary w-full justify-center" onClick={payNow} disabled={busy}><Banknote size={16} /> Pay now</button>
           <button className="btn-amber w-full justify-center" onClick={chargeToRoom} disabled={busy || !link.reservation_id}><BedDouble size={16} /> Charge to room</button>
+          <div className="border-t border-leaf pt-2 space-y-1">
+            <div className="text-xs font-semibold text-pine">Staff / Shareholder Due</div>
+            <div className="flex gap-2">
+              <input className="input flex-1 !py-1.5 text-xs" placeholder="Staff / shareholder name" value={staffDueName} onChange={(e) => setStaffDueName(e.target.value)} />
+              <button className="btn-ghost !py-1.5 !px-3 text-xs whitespace-nowrap" onClick={chargeAsStaffDue} disabled={busy || !staffDueName.trim()}>Add Due</button>
+            </div>
+          </div>
+          <button className="btn-ghost w-full justify-center" onClick={() => {
+            if (!guard()) return
+            const orderPreview = { order_type: meta.order_type, table_no: meta.table_no || null, notes: meta.notes || null, reservation_id: link.reservation_id, guest_name: link.guest_name || null, room_no: link.room_no || null, discount_pct: discountPct, base_amount: t.base_amount, discount: t.discount, service_charge: t.service_charge, vat: t.vat, total: t.total, status: 'PREVIEW', order_no: 'PREVIEW', created_by: userName }
+            setPrintDoc({ type: 'RECEIPT', order: orderPreview, items: cart.map((c) => ({ item_name: c.item_name, qty: c.qty, unit_price: c.unit_price, line_total: +(c.qty * c.unit_price).toFixed(2) })), mushakNo: null })
+          }} disabled={busy}><Receipt size={16} /> Preview Bill</button>
           <button className="btn-ghost w-full justify-center" onClick={generateKOT} disabled={busy}><ChefHat size={16} /> Generate KOT</button>
         </div>
       </div>

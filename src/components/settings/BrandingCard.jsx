@@ -427,6 +427,8 @@ function BrandingCard({ reloadCompany }) {
       font_family: c.font_family || 'Inter',
       theme_mode: c.theme_mode || 'light',
       mushak610_threshold: +c.mushak610_threshold || 0,
+      is_restaurant_available: !!c.is_restaurant_available,
+      restaurant_name: c.is_restaurant_available ? (c.restaurant_name || null) : null,
       updated_at: new Date().toISOString(),
     }).eq('id', c.id)
     setBusy(false)
@@ -454,6 +456,19 @@ function BrandingCard({ reloadCompany }) {
         <div><label className="label">Short code</label><input className="input money" value={c.short_code || ''} onChange={(e) => set('short_code', e.target.value)} /></div>
         <div><label className="label">Property name</label><input className="input" value={c.name || ''} onChange={(e) => set('name', e.target.value)} /></div>
         <div><label className="label">Legal name</label><input className="input" value={c.legal_name || ''} onChange={(e) => set('legal_name', e.target.value)} /></div>
+        <div className="col-span-2 border border-leaf rounded-lg p-3 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={!!c.is_restaurant_available} onChange={(e) => set('is_restaurant_available', e.target.checked)} className="w-4 h-4 accent-forest" />
+            <span className="text-sm font-semibold text-pine">Is restaurant available?</span>
+          </label>
+          {c.is_restaurant_available && (
+            <div>
+              <label className="label">Restaurant name</label>
+              <input className="input" value={c.restaurant_name || ''} onChange={(e) => set('restaurant_name', e.target.value)} placeholder="e.g. The Garden Bistro" />
+            </div>
+          )}
+          {!c.is_restaurant_available && <p className="text-xs text-pine/50">When disabled, documents will use the property name for restaurant bills.</p>}
+        </div>
         <div className="col-span-2"><label className="label">Address</label><input className="input" value={c.address || ''} onChange={(e) => set('address', e.target.value)} /></div>
         <div><label className="label">Phone</label><input className="input" value={c.phone || ''} onChange={(e) => set('phone', e.target.value)} /></div>
         <div><label className="label">Email</label><input className="input" value={c.email || ''} onChange={(e) => set('email', e.target.value)} /></div>

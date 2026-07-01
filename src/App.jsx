@@ -23,6 +23,7 @@ import BookingCalendar from './pages/BookingCalendar.jsx'
 import HousekeepingHub from './pages/HousekeepingHub.jsx'
 import RestaurantPOS, { GuestPosKiosk } from './pages/RestaurantPOS.jsx'
 import PosPrintCenter from './pages/PosPrintCenter.jsx'
+import VerifyBill from './pages/VerifyBill.jsx'
 import Facilities from './pages/ServiceBills.jsx'
 import InventoryHub from './pages/InventoryHub.jsx'
 import ConsumptionEntry from './pages/ConsumptionEntry.jsx'
@@ -644,6 +645,7 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
             </SaasModuleRoute>
           } />
           <Route path="/kiosk/pos" element={<GuestPosKiosk />} />
+          <Route path="/verify/pos/:id" element={<VerifyBill />} />
           <Route path="/menu-management" element={
             (isModuleEnabled('menu-management', modulesEnabled, role) && (isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT'))
               ? <SaasModuleFrame moduleId="pos" company={company} role={role} userName={userName}><MenuManagement isAdmin={isAdmin} /></SaasModuleFrame>
@@ -1056,6 +1058,7 @@ function AppRoot() {
   }
 
   if (!session && location.pathname.startsWith('/kiosk/pos')) return <GuestPosKiosk />
+  if (!session && location.pathname.startsWith('/verify/pos/')) return <VerifyBill />
   if (!session) return <Login />
   if (!profile) return (
     <div className="min-h-screen flex items-center justify-center text-pine/60">Loading profile...</div>

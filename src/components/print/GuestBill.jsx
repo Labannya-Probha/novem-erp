@@ -57,12 +57,12 @@ export default function GuestBill({
   buyer_name, buyer_address, buyer_bin, copyLabel, singleCopy = false,
 }) {
   const co = {
-    name: company?.name || 'Aura Stay',
-    address: company?.address || 'Demo Property, Bangladesh',
-    phone: company?.phone || '+8801344775404',
-    email: company?.email || 'sales@aurastay.bd',
+    name: company?.name || company?.company_name || '',
+    address: company?.address || '',
+    phone: company?.phone || '',
+    email: company?.email || '',
     website: company?.website || '',
-    bin: company?.bin || company?.bin_no || company?.vat_reg || company?.vat_bin || '000000000-0000',
+    bin: company?.bin || company?.bin_no || company?.vat_reg || company?.vat_bin || '',
     tin: company?.tin || company?.tin_no || company?.etin || '',
     logo: company?.logo_url || '',
     software: company?.software_name || 'Aura Stay ERP',
@@ -85,9 +85,8 @@ export default function GuestBill({
   const roomNo = valueOf(res?.room_no, res?.room_numbers, res?.rooms, res?.room)
   const roomType = valueOf(res?.room_type, res?.roomType, res?.rate_plan)
   const cashier = valueOf(res?.cashier, res?.created_by, res?.created_by_name, 'System')
-  const invoiceHash = stableHash(`${invoiceNumber}|${grandTotal}|${paid}|${buyer.name}|${issued.toISOString()}`)
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://erp.aurastay.bd'
-  const verifyUrl = `${origin}/verify/invoice/${encodeURIComponent(invoiceNumber)}?h=${invoiceHash}`
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const verifyUrl = `${origin}/verify/invoice/${encodeURIComponent(invoiceNumber)}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=92x92&margin=1&data=${encodeURIComponent(verifyUrl)}`
 
   const th = { textAlign: 'left', fontSize: 8.6, fontWeight: 900, textTransform: 'uppercase', color: '#fff', padding: '4px 5px', background: PINE }
@@ -145,20 +144,6 @@ export default function GuestBill({
           .gb-wrap .w-auto-table { table-layout: auto !important; }
         }
       `}</style>
-
-      <div aria-hidden style={{
-        position: 'absolute',
-        inset: '48mm 0 auto',
-        textAlign: 'center',
-        transform: 'rotate(-28deg)',
-        fontSize: 54,
-        fontWeight: 900,
-        letterSpacing: '0.08em',
-        color: 'rgba(27,77,46,0.055)',
-        zIndex: 0,
-        pointerEvents: 'none',
-        textTransform: 'uppercase',
-      }}>{copyLabel}</div>
 
       <header className="break-avoid" style={{ position: 'relative', zIndex: 1, border: `1px solid ${LINE}`, borderRadius: 6, overflow: 'hidden', marginBottom: 7 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '58px 1fr 82px', gap: 10, alignItems: 'center', padding: '7px 9px' }}>
@@ -310,8 +295,6 @@ export default function GuestBill({
           Powered by <span style={{ fontWeight: 800, color: PINE }}>{co.software || 'Aura Stay ERP'}</span>
           <span> | Printed By: {cashier}</span>
           <span> | Terminal: WEB</span>
-          <span> | IP: Client</span>
-          <span> | Invoice Hash: {invoiceHash}</span>
         </div>
       </footer>
     </div>
