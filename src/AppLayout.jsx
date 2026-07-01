@@ -10,9 +10,6 @@ import { REPORT_CATEGORIES } from './lib/reporting/reportConfig'
 import { getRoleDefaultReportCatalog } from './lib/reporting/tenantReporting'
 import { NAV_GROUPS } from './app/navigation/navGroups'
 import {
-  SIDEBAR_CMS_ENTITY_TABS,
-  SIDEBAR_INVENTORY_TABS,
-  SIDEBAR_POS_TABS,
   SIDEBAR_ACCOUNTING_TABS,
   SIDEBAR_HR_TABS,
 } from './app/navigation/sidebarTabs'
@@ -154,18 +151,44 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
     if (activeNavGroup) setOpenNavGroup(activeNavGroup)
   }, [currentTopId, location.pathname])
   useEffect(() => {
-    const isAccountingRoute = location.pathname.startsWith('/accounting') || location.pathname === '/vat' || location.pathname === '/vat-return'
+    const isReservationRoute = (
+      location.pathname.startsWith('/reservations') ||
+      location.pathname === PATHS.RESERVATION_PAYMENTS ||
+      location.pathname === PATHS.CALENDAR ||
+      location.pathname === PATHS.BOOKING_CALENDAR ||
+      location.pathname === PATHS.CRM
+    )
+    const isFrontOfficeRoute = (
+      location.pathname.startsWith('/frontoffice') ||
+      location.pathname === PATHS.NIGHTAUDIT ||
+      location.pathname === PATHS.FACILITIES ||
+      location.pathname.startsWith('/verify/pos/')
+    )
+    const isRestaurantRoute = (
+      location.pathname === PATHS.POS ||
+      location.pathname === PATHS.MENU_MANAGEMENT ||
+      location.pathname.startsWith('/pos/print-center')
+    )
+    const isAccountingRoute = location.pathname.startsWith('/accounting') || location.pathname === PATHS.VAT || location.pathname === PATHS.VAT_RETURN
     const isHrRoute = location.pathname.startsWith('/hr')
-    const isPosPrintRoute = location.pathname.startsWith('/pos/print-center')
-    if (['settings', 'cms', 'inventory', 'consumption', 'reports'].includes(currentTopId) || isAccountingRoute || isHrRoute || isPosPrintRoute) {
-      setOpenSystemMenu(
-        isPosPrintRoute ? 'pos-print-center' :
-        ['inventory', 'consumption'].includes(currentTopId) ? 'inventory' :
-        isAccountingRoute ? 'accounting' :
-        isHrRoute ? 'hr' :
-        currentTopId
-      )
-    } else setOpenSystemMenu(null)
+    const isReportsRoute = (
+      location.pathname === PATHS.REPORTS ||
+      location.pathname === PATHS.REPORTS_CASED_ALIAS ||
+      location.pathname.endsWith('/reports') ||
+      location.pathname.endsWith('/Reports')
+    )
+    const isTasksRoute = location.pathname === PATHS.TASKS || location.pathname === PATHS.AI_TASKER
+
+    if (currentTopId === 'settings') setOpenSystemMenu('settings')
+    else if (isTasksRoute) setOpenSystemMenu('tasks')
+    else if (isReportsRoute) setOpenSystemMenu('reports')
+    else if (isHrRoute) setOpenSystemMenu('hr')
+    else if (isAccountingRoute) setOpenSystemMenu('accounting')
+    else if (['inventory', 'consumption'].includes(currentTopId)) setOpenSystemMenu('inventory')
+    else if (isRestaurantRoute) setOpenSystemMenu('pos')
+    else if (isFrontOfficeRoute) setOpenSystemMenu('nightaudit')
+    else if (isReservationRoute) setOpenSystemMenu('reservations')
+    else setOpenSystemMenu(null)
   }, [currentTopId, location.pathname])
 
   const SidebarContent = (
@@ -185,13 +208,11 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
         {NAV_GROUPS.map((g, gi) => {
           const items = g.items.filter((n) => {
             if (!isModuleEnabled(n.id, modulesEnabled, role)) return false
-            if (n.superuserOnly)            return role === 'SUPERUSER'
-            if (n.id === 'ai-tasker')       return can(role, 'tasks', privileges)
-            if (n.id === 'cms')             return role === 'SUPERUSER'
-            if (n.id === 'menu-management') return isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT'
-            if (n.id === 'pos-print-center') return isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT'
-            if (n.id === 'consumption')     return can(role, 'inventory', privileges)
-            if (n.id === 'reservation-payments') return can(role, 'reservations', privileges)
+            if (n.id === 'nightaudit') return (
+              can(role, 'dashboard', privileges) ||
+              can(role, 'nightaudit', privileges) ||
+              can(role, 'facilities', privileges)
+            )
             return can(role, n.id, privileges)
           })
           if (items.length === 0) return null
@@ -199,9 +220,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
             <div key={g.title} className={gi > 0 ? 'mt-1 pt-1 border-t border-white/[0.08]' : ''}>
               <div className="space-y-0.5">
                 {items.map((n) => {
-                  if (n.id === 'consumption' || n.id === 'vat') return null
-
-                  const isExpandable = ['settings', 'cms', 'inventory', 'accounting', 'hr', 'reports', 'pos-print-center'].includes(n.id)
+                  const isExpandable = ['reservations', 'nightaudit', 'pos', 'inventory', 'accounting', 'hr', 'reports', 'tasks', 'settings'].includes(n.id)
                   if (!isExpandable) {
                     return (
                       <button key={n.id}
@@ -225,18 +244,83 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                       path: `${PATHS.SETTINGS}?section=${s.id}`,
                       active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`),
                     }))
-                  } else if (n.id === 'cms') {
-                    nested = SIDEBAR_CMS_ENTITY_TABS.map((s) => ({ ...s, path: `${PATHS.CMS}?entity=${s.id}`, active: currentTopId === 'cms' && location.search.includes(`entity=${s.id}`) }))
-                  } else if (n.id === 'pos-print-center') {
-                    nested = SIDEBAR_POS_TABS.map((s) => ({
-                      ...s,
-                      active: s.path === '/pos'
-                        ? location.pathname === '/pos'
-                        : location.pathname === '/pos/print-center' && s.path.includes(new URLSearchParams(location.search).get('tab') || 'receipt-preview'),
-                    }))
+                  } else if (n.id === 'reservations') {
+                    nested = [
+                      {
+                        id: 'calendar',
+                        label: 'Booking Calendar',
+                        path: PATHS.CALENDAR,
+                        active: location.pathname === PATHS.CALENDAR || location.pathname === PATHS.BOOKING_CALENDAR,
+                      },
+                      {
+                        id: 'reservations',
+                        label: 'Reservations',
+                        path: PATHS.RESERVATIONS,
+                        active: location.pathname.startsWith('/reservations'),
+                      },
+                      {
+                        id: 'reservation-payments',
+                        label: 'Reservation Payments',
+                        path: PATHS.RESERVATION_PAYMENTS,
+                        active: location.pathname === PATHS.RESERVATION_PAYMENTS,
+                      },
+                      {
+                        id: 'crm',
+                        label: 'Guest CRM',
+                        path: PATHS.CRM,
+                        active: location.pathname === PATHS.CRM,
+                      },
+                    ]
+                  } else if (n.id === 'nightaudit') {
+                    nested = [
+                      {
+                        id: 'frontoffice-module',
+                        label: 'Frontoffice Module',
+                        path: PATHS.FRONTOFFICE,
+                        active: location.pathname.startsWith('/frontoffice'),
+                      },
+                      {
+                        id: 'nightaudit',
+                        label: 'Night Audit',
+                        path: PATHS.NIGHTAUDIT,
+                        active: location.pathname === PATHS.NIGHTAUDIT,
+                      },
+                      {
+                        id: 'facilities',
+                        label: 'Service Bills',
+                        path: PATHS.FACILITIES,
+                        active: location.pathname === PATHS.FACILITIES,
+                      },
+                      {
+                        id: 'verify-bill',
+                        label: 'Verify Bill',
+                        active: location.pathname.startsWith('/verify/pos/'),
+                      },
+                    ]
+                  } else if (n.id === 'pos') {
+                    nested = [
+                      {
+                        id: 'pos',
+                        label: 'Restaurant POS',
+                        path: PATHS.POS,
+                        active: location.pathname === PATHS.POS,
+                      },
+                      {
+                        id: 'menu-management',
+                        label: 'Menu Management',
+                        path: PATHS.MENU_MANAGEMENT,
+                        active: location.pathname === PATHS.MENU_MANAGEMENT,
+                      },
+                      {
+                        id: 'pos-print-center',
+                        label: 'POS Print Center',
+                        path: PATHS.POS_PRINT_CENTER,
+                        active: location.pathname.startsWith('/pos/print-center'),
+                      },
+                    ]
                   } else if (n.id === 'inventory') {
                     nested = [
-                      ...SIDEBAR_INVENTORY_TABS.map((s) => ({ ...s, path: `/inventory?tab=${encodeURIComponent(s.id)}`, active: currentTopId === 'inventory' && location.search.includes(`tab=${encodeURIComponent(s.id)}`) })),
+                      { id: 'inventory', label: 'Inventory', path: PATHS.INVENTORY, active: currentTopId === 'inventory' },
                       { id: 'consumption', label: 'Consumption Entry', path: PATHS.CONSUMPTION, active: currentTopId === 'consumption' },
                     ]
                   } else if (n.id === 'accounting') {
@@ -251,10 +335,40 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                           : location.pathname === s.path,
                       }))
                   } else if (n.id === 'hr') {
-                    nested = SIDEBAR_HR_TABS.map((s) => ({
-                      ...s,
-                      active: location.pathname === s.path,
-                    }))
+                    const groupByIds = (id) => SIDEBAR_HR_TABS.find((tab) => tab.id === id)
+                    const toChild = (tab) => ({
+                      id: tab.id,
+                      label: tab.label,
+                      path: tab.path,
+                      icon: tab.icon,
+                      active: location.pathname === tab.path,
+                    })
+                    const groups = [
+                      { id: 'employee', label: 'Employee', tabIds: ['employee-entry', 'service-book', 'nominee'] },
+                      { id: 'attendance', label: 'Attendance', tabIds: ['attendance-register', 'employee-register', 'service-book-reg'] },
+                      { id: 'leave', label: 'Leave', tabIds: ['leave-entry', 'comp-leave', 'festival-leave'] },
+                      { id: 'payroll', label: 'Payroll', tabIds: ['payroll-config', 'payroll-gen', 'payroll-register'] },
+                      {
+                        id: 'letters',
+                        label: 'Letters',
+                        tabIds: [
+                          'offer-letter', 'appointment-letter', 'joining-letter', 'confirmation-letter',
+                          'increment-letter', 'promotion-letter', 'objection-letter', 'show-cause',
+                          'warning-letter', 'dismissal-letter', 'noc', 'experience-cert',
+                          'employment-cert', 'final-payment',
+                        ],
+                      },
+                      { id: 'compliance', label: 'Compliance', tabIds: ['incidents', 'compliance'] },
+                    ]
+                    nested = groups.map((grp) => {
+                      const children = grp.tabIds.map(groupByIds).filter(Boolean).map(toChild)
+                      return {
+                        id: grp.id,
+                        label: grp.label,
+                        active: children.some((child) => child.active),
+                        children,
+                      }
+                    })
                   } else if (n.id === 'reports') {
                     nested = REPORT_CATEGORIES
                       .map((category) => ({
@@ -272,6 +386,11 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                           })),
                       }))
                       .filter((category) => category.children.length > 0)
+                  } else if (n.id === 'tasks') {
+                    nested = [
+                      { id: 'tasks', label: 'Task Management', path: PATHS.TASKS, active: location.pathname === PATHS.TASKS },
+                      { id: 'ai-tasker', label: 'AI Tasker', path: PATHS.AI_TASKER, active: location.pathname === PATHS.AI_TASKER },
+                    ]
                   }
 
                   return (
@@ -282,9 +401,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                         }`}
                         onClick={() => {
                           setOpenSystemMenu(isOpen ? null : n.id)
-                          if (!isOpen && ['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
-                            navigate(navPathById(n.id))
-                          } else if (!['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
+                          if (!isOpen) {
                             navigate(navPathById(n.id))
                           }
                         }}
@@ -303,9 +420,13 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                             <button
                               key={child.id}
                               className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
-                                child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
+                                child.active
+                                  ? 'bg-white/14 text-white'
+                                  : child.path
+                                  ? 'text-white/65 hover:bg-white/10 hover:text-white'
+                                  : 'text-white/45 cursor-default'
                               }`}
-                              onClick={() => navigate(child.path)}
+                              onClick={() => child.path && navigate(child.path)}
                             >
                               {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
                               {child.label}

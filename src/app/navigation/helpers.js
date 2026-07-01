@@ -13,16 +13,17 @@ function pathForNavId(id) {
 }
 
 export function getActiveNavGroupTitle(currentTopId, pathname) {
-  if (pathname.startsWith('/accounting') || pathname === '/vat' || pathname === '/vat-return') return 'Accounting'
-  if (pathname.startsWith('/hr')) return 'HR & Payroll'
+  if (pathname.startsWith('/accounting') || pathname === '/vat' || pathname === '/vat-return') return 'Modules'
+  if (pathname.startsWith('/hr')) return 'Modules'
   if (
     pathname.startsWith('/frontoffice') ||
+    pathname.startsWith('/verify/pos/') ||
     currentTopId === 'dashboard' ||
     currentTopId === 'nightaudit' ||
     currentTopId === 'housekeeping' ||
     currentTopId === 'facilities'
-  ) return 'Front Office'
-  if (pathname.startsWith('/pos')) return 'Food & Beverage'
+  ) return 'Modules'
+  if (pathname.startsWith('/pos') || pathname.startsWith('/menu-management')) return 'Modules'
   const group = NAV_GROUPS.find((entry) => entry.items.some((item) => item.id === currentTopId))
   return group?.title || null
 }
