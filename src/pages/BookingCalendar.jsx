@@ -31,14 +31,17 @@ export default function BookingCalendar({ openReservation, onNewReservation }) {
       supabase.from('reservation_rooms')
         .select('id, room_id, from_date, to_date, reservations!inner(id, res_no, reservation_name, status, check_in, check_out, source, guests:primary_guest_id(full_name, phone))')
         .in('reservations.status', ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED', 'QUOTED'])
-        .lte('reservations.check_in', end).gte('reservations.check_out', start),
+        .lte('from_date', end).gte('to_date', start),
     ])
     setRooms(rm || [])
     const map = {}
     for (const row of rr || []) {
       const res = row.reservations
+      // from_date/to_date on reservation_rooms are always set when a room is assigned;
+      // fall back to reservation-level dates only as a safety net
       const ci = row.from_date || res.check_in
       const co = row.to_date || res.check_out
+      if (!ci || !co) continue
       const cell = { ...res, rrId: row.id, rr_ci: ci, rr_co: co }
       for (const day of days) if (day >= ci && day < co) map[`${row.room_id}|${day}`] = cell
     }
@@ -62,6 +65,8 @@ export default function BookingCalendar({ openReservation, onNewReservation }) {
   }
 
   const days = monthDays(ym)
+  // collect all check-in dates visible this month for column highlighting
+  const checkInDays = new Set(Object.values(cells).map((c) => c.rr_ci))
   const occRoomNights = Object.keys(cells).length
   const occPct = rooms.length ? (occRoomNights / (rooms.length * days.length)) * 100 : 0
 
@@ -102,8 +107,8 @@ export default function BookingCalendar({ openReservation, onNewReservation }) {
             <thead>
               <tr>
                 <th className="th sticky left-0 bg-white z-10 border-r border-leaf" style={{ minWidth: 150 }}>Room</th>
-                {days.map((d) => { const dow = new Date(d + 'T00:00:00').getDay(); const isWe = dow === 5 || dow === 6; return (
-                  <th key={d} className={`th text-center !px-1 ${isWe ? 'bg-leaf/40' : ''}`} style={{ minWidth: DAY_W }} title={d}>{d.slice(8)}</th>) })}
+                {days.map((d) => { const dow = new Date(d + 'T00:00:00').getDay(); const isWe = dow === 5 || dow === 6; const isCi = checkInDays.has(d); return (
+                  <th key={d} className={`th text-center !px-1 ${isWe ? 'bg-leaf/40' : ''} ${isCi ? 'bg-forest/20 font-bold text-forest' : ''}`} style={{ minWidth: DAY_W }} title={isCi ? `Check-In: ${d}` : d}>{d.slice(8)}{isCi ? <span className="block text-[8px] leading-none text-forest">CI</span> : null}</th>) })}
               </tr>
             </thead>
             <tbody>
