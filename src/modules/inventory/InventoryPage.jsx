@@ -31,6 +31,9 @@ export default function InventoryPage({ userName, role, isAdmin }) {
           supabase.from('purchase_orders').select('id', { head: true, count: 'exact' }),
         ])
 
+        const error = itemsRes.error || vendorsRes.error || reqRes.error || poRes.error
+        if (error) throw error
+
         if (ignore) return
 
         setKpiItems([
