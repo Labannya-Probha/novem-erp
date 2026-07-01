@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------------ */
 /*  APP ROUTES                                                          */
 /* ------------------------------------------------------------------ */
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { isModuleEnabled } from './lib/saasModules'
 import { firstAccessiblePath } from './app/navigation/helpers'
 import { PATHS } from './app/paths'
@@ -59,6 +59,14 @@ export default function AppRoutes({
   role, isAdmin, userName, userId, company, privileges, modulesEnabled, loadCompany,
   openReservation, openFrontOfficeReservation, startReservation, navigate,
 }) {
+  const location = useLocation()
+  const reservationTab = new URLSearchParams(location.search).get('tab')
+  const reservationNavId = reservationTab === 'calendar'
+    ? 'calendar'
+    : reservationTab === 'crm'
+      ? 'crm'
+      : 'reservations'
+
   return (
     <Routes>
       <Route path={PATHS.ROOT} element={<Navigate to={PATHS.FRONTOFFICE} replace />} />
@@ -73,7 +81,7 @@ export default function AppRoutes({
 
       {/* Reservations — unified tab page */}
       <Route path={PATHS.RESERVATIONS} element={
-        <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
+        <SaasModuleRoute moduleId="reservations" role={role} navId={reservationNavId} privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
           <ReservationsPage
             openReservation={openReservation}
             startReservation={startReservation}

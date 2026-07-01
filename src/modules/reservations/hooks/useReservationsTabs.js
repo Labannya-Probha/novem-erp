@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { RESERVATION_TABS, DEFAULT_RESERVATION_TAB } from '../reservations.config'
 
@@ -8,7 +9,13 @@ export function useReservationsTabs() {
   const rawTab = searchParams.get('tab')
   const activeTab = VALID_TAB_IDS.has(rawTab) ? rawTab : DEFAULT_RESERVATION_TAB
 
+  useEffect(() => {
+    if (rawTab && VALID_TAB_IDS.has(rawTab)) return
+    setSearchParams({ tab: DEFAULT_RESERVATION_TAB }, { replace: true })
+  }, [rawTab, setSearchParams])
+
   const setActiveTab = (tabId) => {
+    if (!VALID_TAB_IDS.has(tabId)) return
     setSearchParams({ tab: tabId }, { replace: true })
   }
 
