@@ -21,7 +21,6 @@ import { GuestPosKiosk } from './pages/RestaurantPOS.jsx'
 import VerifyBill from './pages/VerifyBill.jsx'
 import Facilities from './pages/ServiceBills.jsx'
 import InventoryPage from './modules/inventory/InventoryPage.jsx'
-import MenuManagement from './pages/MenuManagement.jsx'
 import VatCenter from './pages/VatCenter.jsx'
 import VATReturn from './pages/VATReturn'
 import {
