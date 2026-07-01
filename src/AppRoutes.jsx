@@ -75,7 +75,7 @@ export default function AppRoutes({
       {/* Front Office — unified AEDS v2 module page */}
       <Route path={PATHS.FRONT_OFFICE} element={
         <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <FrontOfficePage openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
+          <FrontOfficePage openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} privileges={privileges} />
         </SaasModuleRoute>
       } />
 
