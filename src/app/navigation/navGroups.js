@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CalendarDays, UtensilsCrossed, Boxes,
-  Calculator, Users, BarChart3, Settings2, BedDouble, Building2, ListChecks,
+  Calculator, Users, BarChart3, Settings2, BedDouble, Building2, ListChecks, Database,
 } from 'lucide-react'
 
 /* ------------------------------------------------------------------ */
@@ -19,6 +19,7 @@ export const NAV_GROUPS = [
     { id: 'hr',           label: 'HR & Payroll',   icon: Users },
     { id: 'reports',      label: 'Reports Center', icon: BarChart3 },
     { id: 'tasks',        label: 'Tasks',          icon: ListChecks },
+    { id: 'master-data',  label: 'Master Data',    icon: Database },
     { id: 'settings',     label: 'Settings',       icon: Settings2 },
   ]},
 ]

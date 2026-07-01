@@ -52,11 +52,12 @@ import {
 import NightAudit from './pages/NightAudit.jsx'
 import ReportsCenterPage from './modules/reports/ReportsCenterPage.jsx'
 import Settings from './pages/Settings.jsx'
-import CmsPortal from './pages/CmsPortal.jsx'
+import MasterDataPage from './modules/master-data/MasterDataPage.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
 import RestaurantPage from './modules/restaurant/RestaurantPage.jsx'
 import PosPrintCenter from './pages/PosPrintCenter.jsx'
 import { RESERVATION_TABS, DEFAULT_RESERVATION_TAB } from './modules/reservations/reservations.config'
+import { DEFAULT_MASTER_DATA_TAB, MASTER_DATA_LEGACY_TAB_MAP } from './modules/master-data/masterData.config'
 
 const RESERVATION_NAV_BY_TAB = {
   list: 'reservations',
@@ -66,6 +67,19 @@ const RESERVATION_NAV_BY_TAB = {
 }
 
 const VALID_RESERVATION_TABS = new Set(RESERVATION_TABS.map((tab) => tab.id))
+
+function CmsLegacyRedirect() {
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  const legacyEntity = params.get('entity')
+  const tab = MASTER_DATA_LEGACY_TAB_MAP[legacyEntity] || DEFAULT_MASTER_DATA_TAB
+  const nextParams = new URLSearchParams()
+  nextParams.set('tab', tab)
+  if (legacyEntity === 'agencies' || legacyEntity === 'shareholders') {
+    nextParams.set('entity', legacyEntity)
+  }
+  return <Navigate to={`${PATHS.MASTER_DATA}?${nextParams.toString()}`} replace />
+}
 
 export default function AppRoutes({
   role, isAdmin, userName, userId, company, privileges, modulesEnabled, loadCompany,
@@ -285,9 +299,18 @@ export default function AppRoutes({
       } />
 
       {/* System — superuser only */}
+      <Route path={PATHS.MASTER_DATA} element={
+        role === 'SUPERUSER'
+          ? (
+            <SaasModuleFrame moduleId="settings" company={company} role={role} userName={userName}>
+              <MasterDataPage role={role} isAdmin={isAdmin} />
+            </SaasModuleFrame>
+          )
+          : <Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />
+      } />
       <Route path={PATHS.CMS} element={
         role === 'SUPERUSER'
-          ? <SaasModuleFrame moduleId="settings" company={company} role={role} userName={userName}><CmsPortal role={role} isAdmin={isAdmin} /></SaasModuleFrame>
+          ? <CmsLegacyRedirect />
           : <Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />
       } />
       <Route path={PATHS.SETTINGS} element={
