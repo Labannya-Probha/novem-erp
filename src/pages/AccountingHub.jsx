@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { getTenantId, withTenantInsert } from '../lib/tenant'
+import { getCompanySettingsQuery, getPrintBrandProps } from '../lib/companySettings'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
 import {
   Calculator, Plus, Trash2, Scale, Building2, Printer, Pencil,
@@ -63,7 +64,7 @@ export default function AccountingHub({ userName, isAdmin, role }) {
 
   useEffect(() => {
     loadAccounts()
-    supabase.from('company_settings').select('*').limit(1).single()
+    getCompanySettingsQuery('*').limit(1).single()
       .then(({ data }) => setCompany(data))
   }, [])
 
@@ -625,7 +626,7 @@ function JournalsTab({ accounts, userName, flash, company, isAdmin }) {
   return (
     <div className="space-y-4">
       {printV && (
-        <PrintPortal title={`Voucher — ${printV.entry.jv_no}`} onClose={() => setPrintV(null)}>
+        <PrintPortal title={`Voucher — ${printV.entry.jv_no}`} onClose={() => setPrintV(null)} {...getPrintBrandProps(company)}>
           <VoucherDoc entry={printV.entry} lines={printV.lines} company={company} voucherType={printV.voucherType} />
         </PrintPortal>
       )}
@@ -1593,7 +1594,7 @@ export function VoucherEntryPage({ userName, isAdmin, role }) {
 
   useEffect(() => {
     loadAccounts()
-    supabase.from('company_settings').select('*').limit(1).single()
+    getCompanySettingsQuery('*').limit(1).single()
       .then(({ data }) => setCompany(data))
   }, [])
 

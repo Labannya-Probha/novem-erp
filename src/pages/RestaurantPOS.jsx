@@ -6,7 +6,8 @@ import KPICards from '../components/KPICards.jsx'
 import { PosReceipt, KitchenTicket } from '../components/print/PosDocs.jsx'
 import Mushak63 from '../components/print/Mushak63.jsx'
 import GuestPicker from '../components/GuestPicker.jsx'
-import { getTenantId } from '../lib/tenant'
+import { getTenantId, withTenantInsert, withTenantInsertMany } from '../lib/tenant'
+import { getCompanySettingsQuery, withTenantScope } from '../lib/companySettings'
 import { Plus, Minus, Trash2, Printer, ChefHat, Banknote, BedDouble, Search, Save, XCircle, RotateCcw, Receipt, Clock, FileText } from 'lucide-react'
 
 const TABS = ['Orders', 'Menu', 'Day Close']
@@ -49,17 +50,17 @@ export default function RestaurantPOS({ userName, isAdmin, role }) {
 
   const loadMenu = async () => {
     const [{ data: c }, { data: it }, { data: tc }, { data: co }] = await Promise.all([
-      supabase.from('menu_categories').select('*').order('sort_order'),
-      supabase.from('menu_items').select('*').order('sort_order').order('name'),
-      supabase.from('tax_config').select('*'),
-      withTenant(supabase.from('company_settings').select('*')).limit(1).maybeSingle(),
+      withTenantScope(supabase.from('menu_categories').select('*')).order('sort_order'),
+      withTenantScope(supabase.from('menu_items').select('*')).order('sort_order').order('name'),
+      withTenantScope(supabase.from('tax_config').select('*')),
+      getCompanySettingsQuery('*').limit(1).maybeSingle(),
     ])
     setCats(c || []); setItems(it || []); setTaxConfig(tc || []); setCompany(co)
   }
   useEffect(() => { loadMenu() }, [])
 
   const resumeOrder = async (order) => {
-    const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', order.id)
+    const { data: oi } = await withTenant(supabase.from('pos_order_items').select('*').eq('order_id', order.id))
     setEditOrder({ order, items: oi || [] })
     setShowOrderBuilder(true)
     setTab('Orders')
@@ -153,17 +154,17 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
     const payload = { order_type: meta.order_type, table_no: meta.table_no || null, notes: meta.notes || null, reservation_id: link.reservation_id, guest_name: link.guest_name || null, room_no: link.room_no || null, discount_pct: discountPct, base_amount: t.base_amount, discount: discountAmount, service_charge: t.service_charge, vat: t.vat, total: t.total, created_by: userName, ...statusFields }
     let order
     if (existing) {
-      const { data, error } = await supabase.from('pos_orders').update(payload).eq('id', existing.order.id).select().single()
+      const { data, error } = await withTenant(supabase.from('pos_orders').update(payload).eq('id', existing.order.id)).select().single()
       if (error) throw error
       order = data
-      await supabase.from('pos_order_items').delete().eq('order_id', order.id)
+      await withTenant(supabase.from('pos_order_items').delete().eq('order_id', order.id))
     } else {
-      const { data, error } = await supabase.from('pos_orders').insert(payload).select().single()
+      const { data, error } = await supabase.from('pos_orders').insert(withTenantInsert(payload)).select().single()
       if (error) throw error
       order = data
     }
     const lineRows = cart.map((c) => ({ order_id: order.id, menu_item_id: c.menu_item_id, item_name: c.item_name, qty: c.qty, unit_price: c.unit_price, line_total: +(c.qty * c.unit_price).toFixed(2) }))
-    const { data: savedItems, error: ie } = await supabase.from('pos_order_items').insert(lineRows).select()
+    const { data: savedItems, error: ie } = await supabase.from('pos_order_items').insert(withTenantInsertMany(lineRows)).select()
     if (ie) throw ie
     return { order, items: savedItems }
   }
@@ -185,11 +186,11 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
       const { order, items: oi } = await persist(settled)
       let mushakNo = null
       if (order.reservation_id) {
-        const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT', description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, base_amount: t.base_amount, discount: discountAmount, service_charge: t.service_charge, vat: t.vat, total: t.total, status: 'PAID', created_by: userName }).select().single()
+        const { data: fc, error: fe } = await supabase.from('folio_charges').insert(withTenantInsert({ reservation_id: order.reservation_id, charge_date: todayISO(), charge_type: 'RESTAURANT', description: `Restaurant ${order.order_no}${order.table_no ? ' · Table ' + order.table_no : ''}`, base_amount: t.base_amount, discount: discountAmount, service_charge: t.service_charge, vat: t.vat, total: t.total, status: 'PAID', created_by: userName })).select().single()
         if (fe) throw fe
-        const { error: pe } = await supabase.from('payments').insert({ reservation_id: order.reservation_id, received_date: todayISO(), amount: t.total, method: paidMethods.map(([m]) => m).join(', '), reference: order.order_no, received_by: userName, notes: 'Restaurant POS' })
+        const { error: pe } = await supabase.from('payments').insert(withTenantInsert({ reservation_id: order.reservation_id, received_date: todayISO(), amount: t.total, method: paidMethods.map(([m]) => m).join(', '), reference: order.order_no, received_by: userName, notes: 'Restaurant POS' }))
         if (pe) throw pe
-        await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
+        await withTenant(supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id))
       }
       onDone({
         type: 'RECEIPT',
@@ -229,7 +230,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   try {
     const { order, items: oi } = await persist({ status: 'CHARGED_TO_ROOM' })
     
-    const { data: fc, error: fe } = await supabase.from('folio_charges').insert({ 
+    const { data: fc, error: fe } = await supabase.from('folio_charges').insert(withTenantInsert({ 
       reservation_id: order.reservation_id, 
       charge_date: todayISO(), 
       charge_type: 'RESTAURANT', 
@@ -242,10 +243,10 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
       status: 'DUE', 
       invoice_type: 'RESTAURANT',
       created_by: userName 
-    }).select().single()
+    })).select().single()
     
     if (fe) throw fe
-    await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
+    await withTenant(supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id))
     onDone({ type: 'RECEIPT', order: { ...order, status: 'CHARGED_TO_ROOM' }, items: oi })
     flash(`${order.order_no} charged to Room ${order.room_no} as DUE — settles at check-out.`)
   } catch (e) { flash(e.message) }
@@ -416,7 +417,7 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
   const [filter, setFilter] = useState('TODAY')
 
   const load = async () => {
-    let qy = supabase.from('pos_orders').select('*').order('created_at', { ascending: false }).limit(200)
+    let qy = withTenant(supabase.from('pos_orders').select('*')).order('created_at', { ascending: false }).limit(200)
     if (filter === 'TODAY') qy = qy.gte('created_at', `${todayISO()}T00:00:00+06:00`)
     if (filter === 'OPEN') qy = qy.in('status', ['OPEN', 'ACCEPTED', 'READY', 'SERVED'])
     const { data } = await qy
@@ -427,38 +428,38 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
   const sumBy = (st) => rows.filter((r) => r.status === st).reduce((a, r) => a + Number(r.total), 0)
   const canEdit = (order) => { return (isAdmin || userName === 'Manager') ? true : order.status !== 'SETTLED' }
   const printReceipt = async (o) => {
-    const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', o.id)
+    const { data: oi } = await withTenant(supabase.from('pos_order_items').select('*').eq('order_id', o.id))
     setPrintDoc({ type: 'RECEIPT', order: o, items: oi || [], mushakNo: null })
   }
   const printKot = async (o) => {
-    const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', o.id)
+    const { data: oi } = await withTenant(supabase.from('pos_order_items').select('*').eq('order_id', o.id))
     setPrintDoc({ type: 'KOT', order: o, items: oi || [] })
     await syncGuestOrderTask(o, 'KOT_GENERATED')
   }
   const printMushak = async (o) => {
-    const { data: inv } = await supabase.from('invoices').select('*').eq('id', o.invoice_id).single()
+    const { data: inv } = await withTenant(supabase.from('invoices').select('*').eq('id', o.invoice_id)).single()
     if (inv) setPrintDoc({ type: 'MUSHAK', invoice: inv, refNo: o.order_no })
   }
   const cancel = async (o) => {
-    await supabase.from('pos_orders').update({ status: 'CANCELLED' }).eq('id', o.id)
+    await withTenant(supabase.from('pos_orders').update({ status: 'CANCELLED' }).eq('id', o.id))
     flash(`${o.order_no} cancelled.`); load()
   }
   const voidOrder = async (o) => {
-    if (o.folio_charge_id) await supabase.from('folio_charges').delete().eq('id', o.folio_charge_id)
-    if (o.reservation_id) await supabase.from('payments').delete().eq('reservation_id', o.reservation_id).eq('reference', o.order_no)
-    if (o.invoice_id) await supabase.from('invoices').delete().eq('id', o.invoice_id)
-    await supabase.from('pos_orders').update({ status: 'CANCELLED', notes: ((o.notes || '') + ' [VOIDED by admin]').trim() }).eq('id', o.id)
+    if (o.folio_charge_id) await withTenant(supabase.from('folio_charges').delete().eq('id', o.folio_charge_id))
+    if (o.reservation_id) await withTenant(supabase.from('payments').delete().eq('reservation_id', o.reservation_id).eq('reference', o.order_no))
+    if (o.invoice_id) await withTenant(supabase.from('invoices').delete().eq('id', o.invoice_id))
+    await withTenant(supabase.from('pos_orders').update({ status: 'CANCELLED', notes: ((o.notes || '') + ' [VOIDED by admin]').trim() }).eq('id', o.id))
     flash(`${o.order_no} voided — folio charge, payment and Mushak entry reversed.`); load()
   }
   const syncGuestOrderTask = async (order, nextStage, nextStatus = 'IN_PROGRESS') => {
     const ref = `POS_ORDER_ID:${order.id}`
-    const { data: linkedTasks } = await supabase
+    const { data: linkedTasks } = await withTenant(supabase
       .from('tasks')
       .select('id, description')
       .eq('source', 'GUEST_POS_ORDER')
       .ilike('description', `%${ref}%`)
       .in('status', ['OPEN', 'IN_PROGRESS'])
-      .limit(10)
+      .limit(10))
     if (linkedTasks?.length) {
       for (const row of linkedTasks) {
         const patch = {
@@ -470,13 +471,13 @@ function OrdersList({ company, flash, resumeOrder, setPrintDoc, isAdmin, userNam
           patch.completed_at = new Date().toISOString()
           patch.completed_by = userName || 'Restaurant'
         }
-        await supabase.from('tasks').update(patch).eq('id', row.id)
+        await withTenant(supabase.from('tasks').update(patch).eq('id', row.id))
       }
     }
   }
 
   const advanceOrderStatus = async (order, orderStatus, taskStage, taskStatus = 'IN_PROGRESS') => {
-    await supabase.from('pos_orders').update({ status: orderStatus }).eq('id', order.id)
+    await withTenant(supabase.from('pos_orders').update({ status: orderStatus }).eq('id', order.id))
     await syncGuestOrderTask(order, taskStage, taskStatus)
     load()
   }
@@ -555,21 +556,21 @@ function MenuManager({ cats, items, reload, isAdmin }) {
 
   const addCat = async () => {
     if (!nc.trim()) return
-    await supabase.from('menu_categories').insert({ name: nc.trim(), sort_order: cats.length + 1 })
+    await supabase.from('menu_categories').insert(withTenantInsert({ name: nc.trim(), sort_order: cats.length + 1 }))
     setNc(''); reload()
   }
-  const toggleCat = async (c) => { await supabase.from('menu_categories').update({ is_active: !c.is_active }).eq('id', c.id); reload() }
+  const toggleCat = async (c) => { await withTenantScope(supabase.from('menu_categories').update({ is_active: !c.is_active }).eq('id', c.id)); reload() }
   const addItem = async () => {
     if (!ni.name.trim() || ni.price === '' || !ni.category_id) return
-    await supabase.from('menu_items').insert({ category_id: ni.category_id, name: ni.name.trim(), price: +ni.price })
+    await supabase.from('menu_items').insert(withTenantInsert({ category_id: ni.category_id, name: ni.name.trim(), price: +ni.price }))
     setNi({ category_id: ni.category_id, name: '', price: '' }); reload()
   }
   const updatePrice = async (it, price) => {
     if (price === '' || +price === +it.price) return
-    await supabase.from('menu_items').update({ price: +price }).eq('id', it.id); reload()
+    await withTenantScope(supabase.from('menu_items').update({ price: +price }).eq('id', it.id)); reload()
   }
-  const toggleItem = async (it) => { await supabase.from('menu_items').update({ is_active: !it.is_active }).eq('id', it.id); reload() }
-  const delItem = async (it) => { await supabase.from('menu_items').delete().eq('id', it.id); reload() }
+  const toggleItem = async (it) => { await withTenantScope(supabase.from('menu_items').update({ is_active: !it.is_active }).eq('id', it.id)); reload() }
+  const delItem = async (it) => { await withTenantScope(supabase.from('menu_items').delete().eq('id', it.id)); reload() }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -646,10 +647,10 @@ export function GuestPosKiosk() {
     useEffect(() => {
       const load = async () => {
         const [{ data: c }, { data: it }, { data: tc }, { data: co }] = await Promise.all([
-          supabase.from('menu_categories').select('*').order('sort_order'),
-          supabase.from('menu_items').select('*').eq('is_active', true).order('sort_order').order('name'),
-          supabase.from('tax_config').select('*'),
-          supabase.from('company_settings').select('*').limit(1).single(),
+          withTenantScope(supabase.from('menu_categories').select('*')).order('sort_order'),
+          withTenantScope(supabase.from('menu_items').select('*').eq('is_active', true)).order('sort_order').order('name'),
+          withTenantScope(supabase.from('tax_config').select('*')),
+          getCompanySettingsQuery('*').limit(1).single(),
         ])
         setCats(c || [])
         setItems(it || [])
@@ -703,7 +704,7 @@ export function GuestPosKiosk() {
           status: 'OPEN',
           created_by: 'Guest Kiosk',
         }
-        const { data: order, error } = await supabase.from('pos_orders').insert(payload).select().single()
+        const { data: order, error } = await supabase.from('pos_orders').insert(withTenantInsert(payload)).select().single()
         if (error) throw error
 
         const lineRows = cart.map((c) => ({
@@ -714,10 +715,10 @@ export function GuestPosKiosk() {
           unit_price: c.unit_price,
           line_total: +(c.qty * c.unit_price).toFixed(2),
         }))
-        const { error: itemError } = await supabase.from('pos_order_items').insert(lineRows)
+        const { error: itemError } = await supabase.from('pos_order_items').insert(withTenantInsertMany(lineRows))
         if (itemError) throw itemError
 
-        await supabase.from('tasks').insert({
+        await supabase.from('tasks').insert(withTenantInsert({
           title: `New guest food order · ${order.order_no || 'POS'}`,
           description: buildWorkflowDescription([
             `Guest: ${guestName || '—'}`,
@@ -736,7 +737,7 @@ export function GuestPosKiosk() {
           status: 'OPEN',
           source: 'GUEST_POS_ORDER',
           created_by: 'Guest Kiosk',
-        })
+        }))
 
         setCart([])
         setNotes('')
@@ -838,8 +839,8 @@ function DayClose({ flash, isAdmin, userName, role }) {
   const load = async () => {
     const dayStart = `${day}T00:00:00+06:00`
     const dayEnd = `${day}T23:59:59+06:00`
-    const { data: rest } = await supabase.from('pos_orders').select('*').is('reservation_id', null).gte('created_at', dayStart).lte('created_at', dayEnd)
-    const { data: close } = await supabase.from('day_closes').select('*').eq('close_date', day).eq('type', 'RESTAURANT').maybeSingle()
+    const { data: rest } = await withTenant(supabase.from('pos_orders').select('*').is('reservation_id', null).gte('created_at', dayStart).lte('created_at', dayEnd))
+    const { data: close } = await withTenant(supabase.from('day_closes').select('*').eq('close_date', day).eq('type', 'RESTAURANT')).maybeSingle()
     setRestOrders(rest || [])
     setClosedRow(close || null)
   }
@@ -856,8 +857,8 @@ function DayClose({ flash, isAdmin, userName, role }) {
     try {
       const closeData = { close_date: day, closed_by: userName, closed_at: new Date().toISOString() }
       const restTotal = calcTotal(restOrders, 'SETTLED')
-      await supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'RESTAURANT')
-      const { error: rError } = await supabase.from('day_closes').insert({ ...closeData, type: 'RESTAURANT', settled_amount: restTotal, settled_orders: restOrders.filter((o) => o.status === 'SETTLED').length })
+      await withTenant(supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'RESTAURANT'))
+      const { error: rError } = await supabase.from('day_closes').insert(withTenantInsert({ ...closeData, type: 'RESTAURANT', settled_amount: restTotal, settled_orders: restOrders.filter((o) => o.status === 'SETTLED').length }))
       if (rError) throw rError
       flash(`Day closed for ${day} — Restaurant ৳${restTotal.toFixed(2)}`)
       setShowConfirm(false)
@@ -869,7 +870,7 @@ function DayClose({ flash, isAdmin, userName, role }) {
   const openDay = async () => {
     if (!canOpenDay) { flash('Only SUPERUSER can open a closed day.'); return }
     setBusy(true)
-    const { error } = await supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'RESTAURANT')
+    const { error } = await withTenant(supabase.from('day_closes').delete().eq('close_date', day).eq('type', 'RESTAURANT'))
     setBusy(false)
     if (error) flash(error.message)
     else { flash(`Day opened for ${day} — Restaurant.`); load() }

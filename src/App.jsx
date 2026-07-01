@@ -861,10 +861,12 @@ function AppRoot() {
       let privs = basePrivs || []
 
       if (role === 'ADMIN') {
-        const { data: accessRows } = await supabase
+        let adminAccessQuery = supabase
           .from('admin_feature_access')
           .select('module, can_access')
           .eq('user_id', userId) // ✅ FIX 4: no extra getUser() call needed
+        if (tenantId) adminAccessQuery = adminAccessQuery.eq('tenant_id', tenantId)
+        const { data: accessRows } = await adminAccessQuery
 
         if (accessRows && accessRows.length > 0) {
           const restricted = new Set(

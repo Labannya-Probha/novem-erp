@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 import { setCurrency } from '../../lib/helpers'
 import { getTenantId } from '../../lib/tenant'
+import { getCompanySettingsQuery } from '../../lib/companySettings'
 import { Save, Building2, Image, Upload, ChevronDown } from 'lucide-react'
 
 function RichTextEditor({ initialHtml, onSave, saveLabel = 'Save' }) {
@@ -372,9 +373,7 @@ function BrandingCard({ reloadCompany }) {
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
   const load  = async () => {
     const tenantId = getTenantId()
-    let query = supabase.from('company_settings').select('*')
-    if (tenantId) query = query.eq('tenant_id', tenantId)
-    const { data } = await query.limit(1).single()
+    const { data } = await getCompanySettingsQuery('*', tenantId).limit(1).single()
     setC(data)
   }
   useEffect(() => { load() }, [])
@@ -410,6 +409,7 @@ function BrandingCard({ reloadCompany }) {
 
   const save = async () => {
     setBusy(true)
+    const supportsRestaurantBranding = Object.prototype.hasOwnProperty.call(c || {}, 'is_restaurant_available')
     const { error } = await supabase.from('company_settings').update({
       name: c.name, legal_name: c.legal_name, address: c.address, phone: c.phone, email: c.email,
       bin: c.bin, vat_circle: c.vat_circle, invoice_footer: c.invoice_footer,
@@ -427,8 +427,10 @@ function BrandingCard({ reloadCompany }) {
       font_family: c.font_family || 'Inter',
       theme_mode: c.theme_mode || 'light',
       mushak610_threshold: +c.mushak610_threshold || 0,
-      is_restaurant_available: !!c.is_restaurant_available,
-      restaurant_name: c.is_restaurant_available ? (c.restaurant_name || null) : null,
+      ...(supportsRestaurantBranding ? {
+        is_restaurant_available: !!c.is_restaurant_available,
+        restaurant_name: c.is_restaurant_available ? (c.restaurant_name || null) : null,
+      } : {}),
       updated_at: new Date().toISOString(),
     }).eq('id', c.id)
     setBusy(false)

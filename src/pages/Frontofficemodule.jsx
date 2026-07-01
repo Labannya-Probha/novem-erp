@@ -20,6 +20,7 @@ import Quotation from '../components/print/Quotation.jsx'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import { Combobox } from '../components/ui/combobox.jsx'
 import { logAudit } from '../lib/pms.api.js'
+import { getPrintBrandProps } from '../lib/companySettings'
 import useReservationDetail from '../hooks/useReservationDetail.js'
 import AddonTable from '../components/reservation/AddonTable.jsx'
 import BillingsAndCheckOutTab from '../components/reservation/BillingsAndCheckOutTab.jsx'
@@ -139,7 +140,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
           ================================================================ */}
 
       {printDoc?.type === 'REG' && (
-        <PrintPortal title="Registration Card" onClose={() => setPrintDoc(null)}>
+        <PrintPortal title="Registration Card" onClose={() => setPrintDoc(null)} {...getPrintBrandProps(company)}>
           <RegistrationCard
             res={res} guest={guest} resGuests={resGuests}
             resRooms={resRooms} payments={payments} company={company}
@@ -148,7 +149,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       )}
 
       {printDoc?.type === 'BILL' && printDoc?.phase !== 'RESORT' && (
-        <PrintPortal title="Guest Bill" onClose={() => { if (window.confirm('Resort copy print করবেন?')) { setPrintDoc((prev) => ({ ...prev, phase: 'RESORT' })) } else { setPrintDoc(null) } }}>
+        <PrintPortal title="Guest Bill" onClose={() => { if (window.confirm('Resort copy print করবেন?')) { setPrintDoc((prev) => ({ ...prev, phase: 'RESORT' })) } else { setPrintDoc(null) } }} {...getPrintBrandProps(company)}>
           <GuestBill
             charges={printDoc.invoiceData?.charges ?? []}
             line_snapshot={printDoc.invoiceData?.line_snapshot ?? []}
@@ -171,7 +172,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       )}
 
       {printDoc?.type === 'BILL' && printDoc?.phase === 'RESORT' && (
-        <PrintPortal title="Guest Bill (Resort Copy)" onClose={() => setPrintDoc(null)}>
+        <PrintPortal title="Guest Bill (Resort Copy)" onClose={() => setPrintDoc(null)} {...getPrintBrandProps(company)}>
           <GuestBill
             charges={printDoc.invoiceData?.charges ?? []}
             line_snapshot={printDoc.invoiceData?.line_snapshot ?? []}
@@ -194,7 +195,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       )}
 
       {printDoc?.type === 'MUSHAK' && (
-        <PrintPortal title="Mushak-6.3" onClose={() => setPrintDoc(null)}>
+        <PrintPortal title="Mushak-6.3" onClose={() => setPrintDoc(null)} {...getPrintBrandProps(company)}>
           <Mushak63
             charges={printDoc.invoiceData?.charges ?? []}
             line_snapshot={printDoc.invoiceData?.line_snapshot ?? []}
@@ -215,7 +216,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
       )}
 
       {printDoc?.type === 'QUOTE' && (
-        <PrintPortal title="Quotation" onClose={() => setPrintDoc(null)}>
+        <PrintPortal title="Quotation" onClose={() => setPrintDoc(null)} {...getPrintBrandProps(company)}>
           <Quotation
             res={res}
             guest={guest}

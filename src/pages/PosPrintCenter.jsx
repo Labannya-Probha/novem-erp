@@ -8,6 +8,7 @@ import { supabase } from '../supabase'
 import PrintPortal from '../components/PrintPortal.jsx'
 import { BarOrderTicket, KitchenTicket, PosReceipt } from '../components/print/PosDocs.jsx'
 import { getTenantId } from '../lib/tenant'
+import { getCompanySettingsQuery } from '../lib/companySettings'
 import { formatMoney } from '../lib/posPrintEngine'
 import { fmtDate } from '../lib/helpers'
 
@@ -76,7 +77,7 @@ export default function PosPrintCenter({ company: shellCompany, userName }) {
       logsRes,
       ordersRes,
     ] = await Promise.all([
-      withTenant(supabase.from('company_settings').select('*')).limit(1).maybeSingle(),
+      getCompanySettingsQuery('*', tenantId).limit(1).maybeSingle(),
       withTenant(supabase.from('print_settings').select('*')).limit(1).maybeSingle(),
       withTenant(supabase.from('print_profiles').select('*')).order('profile_code'),
       withTenant(supabase.from('printer_devices').select('*')).order('device_name'),
@@ -105,7 +106,7 @@ export default function PosPrintCenter({ company: shellCompany, userName }) {
       setOrderItems([])
       return
     }
-    const { data, error } = await supabase.from('pos_order_items').select('*').eq('order_id', orderId)
+    const { data, error } = await withTenant(supabase.from('pos_order_items').select('*').eq('order_id', orderId))
     if (error) flash(error.message)
     else setOrderItems(data || [])
   }
@@ -128,7 +129,7 @@ export default function PosPrintCenter({ company: shellCompany, userName }) {
       updated_at: new Date().toISOString(),
     }
     const request = settings?.id
-      ? supabase.from('print_settings').update(payload).eq('id', settings.id)
+      ? withTenant(supabase.from('print_settings').update(payload).eq('id', settings.id))
       : supabase.from('print_settings').insert(payload).select('*').single()
     const { data, error } = await request
     if (error) flash(error.message)
@@ -141,7 +142,7 @@ export default function PosPrintCenter({ company: shellCompany, userName }) {
   }
 
   const saveProfile = async (profile) => {
-    const { error } = await supabase.from('print_profiles').update({
+    const { error } = await withTenant(supabase.from('print_profiles').update({
       copies: Number(profile.copies) || 1,
       active: !!profile.active,
       auto_print_enabled: !!profile.auto_print_enabled,
@@ -149,7 +150,7 @@ export default function PosPrintCenter({ company: shellCompany, userName }) {
       show_qr: !!profile.show_qr,
       show_logo: !!profile.show_logo,
       updated_at: new Date().toISOString(),
-    }).eq('id', profile.id)
+    }).eq('id', profile.id))
     if (error) flash(error.message)
     else { flash('Print profile saved.'); load() }
   }
@@ -175,7 +176,7 @@ export default function PosPrintCenter({ company: shellCompany, userName }) {
       updated_at: new Date().toISOString(),
     }
     const { error } = device.id
-      ? await supabase.from('printer_devices').update(payload).eq('id', device.id)
+      ? await withTenant(supabase.from('printer_devices').update(payload).eq('id', device.id))
       : await supabase.from('printer_devices').insert(payload)
     if (error) flash(error.message)
     else { flash('Printer device saved.'); load() }
@@ -197,7 +198,7 @@ export default function PosPrintCenter({ company: shellCompany, userName }) {
       active: route.active ?? true,
     }
     const { error } = route.id
-      ? await supabase.from('printer_routes').update(payload).eq('id', route.id)
+      ? await withTenant(supabase.from('printer_routes').update(payload).eq('id', route.id))
       : await supabase.from('printer_routes').insert(payload)
     if (error) flash(error.message)
     else { flash('Printer route saved.'); load() }

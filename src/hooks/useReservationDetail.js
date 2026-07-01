@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase'
 import { applyRounding, nightsBetween, sumCharges } from '../lib/helpers'
+import { getCompanySettingsQuery, withTenantScope } from '../lib/companySettings'
 
 export default function useReservationDetail(id) {
   const [res, setRes] = useState(null)
@@ -18,20 +19,21 @@ export default function useReservationDetail(id) {
   const [company, setCompany] = useState(null)
 
   const loadAll = useCallback(async () => {
-    const { data: r } = await supabase
-      .from('reservations')
-      .select('*, agencies(*), shareholders(*)')
-      .eq('id', id)
-      .single()
+    const { data: r } = await withTenantScope(
+      supabase
+        .from('reservations')
+        .select('*, agencies(*), shareholders(*)')
+        .eq('id', id)
+    ).limit(1).maybeSingle()
     setRes(r)
     if (r?.primary_guest_id) {
-      const { data: g } = await supabase.from('guests').select('*').eq('id', r.primary_guest_id).single()
+      const { data: g } = await withTenantScope(supabase.from('guests').select('*').eq('id', r.primary_guest_id)).single()
       setGuest(g)
     } else {
       setGuest(null)
     }
     if (r?.company_id) {
-      const { data: gc } = await supabase.from('companies').select('*').eq('id', r.company_id).maybeSingle()
+      const { data: gc } = await withTenantScope(supabase.from('companies').select('*').eq('id', r.company_id)).maybeSingle()
       setGuestCompany(gc)
     } else {
       setGuestCompany(null)
@@ -40,16 +42,16 @@ export default function useReservationDetail(id) {
       { data: rg }, { data: rr }, { data: rm }, { data: ch },
       { data: pm }, { data: inv }, { data: ad }, { data: tc }, { data: co }, { data: gi },
     ] = await Promise.all([
-      supabase.from('reservation_guests').select('*').eq('reservation_id', id).order('is_primary', { ascending: false }),
-      supabase.from('reservation_rooms').select('*, rooms(*)').eq('reservation_id', id),
-      supabase.from('rooms').select('*').eq('is_active', true).order('room_no'),
-      supabase.from('folio_charges').select('*').eq('reservation_id', id).order('charge_date'),
-      supabase.from('payments').select('*').eq('reservation_id', id).order('received_date'),
-      supabase.from('invoices').select('*').eq('reservation_id', id).order('created_at', { ascending: false }),
-      supabase.from('reservation_addons').select('*').eq('reservation_id', id).order('created_at'),
-      supabase.from('tax_config').select('*'),
-      supabase.from('company_settings').select('*').limit(1).maybeSingle(),
-      supabase.from('guest_ids').select('*').eq('reservation_id', id).order('created_at'),
+      withTenantScope(supabase.from('reservation_guests').select('*').eq('reservation_id', id)).order('is_primary', { ascending: false }),
+      withTenantScope(supabase.from('reservation_rooms').select('*, rooms(*)').eq('reservation_id', id)),
+      withTenantScope(supabase.from('rooms').select('*').eq('is_active', true)).order('room_no'),
+      withTenantScope(supabase.from('folio_charges').select('*').eq('reservation_id', id)).order('charge_date'),
+      withTenantScope(supabase.from('payments').select('*').eq('reservation_id', id)).order('received_date'),
+      withTenantScope(supabase.from('invoices').select('*').eq('reservation_id', id)).order('created_at', { ascending: false }),
+      withTenantScope(supabase.from('reservation_addons').select('*').eq('reservation_id', id)).order('created_at'),
+      withTenantScope(supabase.from('tax_config').select('*')),
+      getCompanySettingsQuery('*').limit(1).maybeSingle(),
+      withTenantScope(supabase.from('guest_ids').select('*').eq('reservation_id', id)).order('created_at'),
     ])
     setResGuests(rg || [])
     setResRooms(rr || [])

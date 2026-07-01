@@ -1,6 +1,7 @@
 // src/pages/VATReturn.jsx
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
+import { getCompanySettingsQuery, withTenantScope } from "../lib/companySettings";
 import {
   FileText, TrendingUp, TrendingDown, DollarSign,
   Download, Calendar, CheckCircle, XCircle, AlertCircle
@@ -16,7 +17,7 @@ export default function VATReturn() {
 
   // Load company name once
   useEffect(() => {
-    supabase.from("company_settings").select("name").limit(1).single()
+    getCompanySettingsQuery("name").limit(1).single()
       .then(({ data: cs }) => { if (cs?.name) setCompanyName(cs.name); });
   }, []);
 
@@ -29,19 +30,19 @@ export default function VATReturn() {
 
     // RLS handles tenant filtering automatically — no .eq("tenant_id") needed
     const [{ data: sales }, { data: purchases }] = await Promise.all([
-      supabase
+      withTenantScope(supabase
         .from("vat_sales_register")
         .select("*")
         .gte("issue_date", from)
         .lte("issue_date", to)
         .eq("is_void", false)
-        .order("issue_date"),
-      supabase
+        .order("issue_date")),
+      withTenantScope(supabase
         .from("vat_purchase_register")
         .select("*")
         .gte("entry_date", from)
         .lte("entry_date", to)
-        .order("entry_date"),
+        .order("entry_date")),
     ]);
 
     const s = sales     || [];

@@ -5,6 +5,7 @@ import { PosReceipt } from '../components/print/PosDocs.jsx'
 import { Download, Printer } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+import { getCompanySettingsQuery, withTenantScope } from '../lib/companySettings'
 
 export default function VerifyBill() {
   const { id } = useParams()
@@ -27,9 +28,9 @@ export default function VerifyBill() {
           .single()
         if (oe || !o) { setError('Order not found.'); setLoading(false); return }
         setOrder(o)
-        const { data: oi } = await supabase.from('pos_order_items').select('*').eq('order_id', o.id)
+        const { data: oi } = await withTenantScope(supabase.from('pos_order_items').select('*').eq('order_id', o.id), o.tenant_id)
         setItems(oi || [])
-        const { data: co } = await supabase.from('company_settings').select('*').limit(1).maybeSingle()
+        const { data: co } = await getCompanySettingsQuery('*', o.tenant_id).limit(1).maybeSingle()
         setCompany(co || null)
       } catch (e) {
         setError(e.message || 'Failed to load order.')

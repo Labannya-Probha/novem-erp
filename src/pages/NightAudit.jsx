@@ -5,6 +5,8 @@ import KPICards from '../components/KPICards.jsx'
 import PrintPortal from '../components/PrintPortal.jsx'
 import { MoonStar, BedDouble, UserX, CheckCircle2, FileDown, BookOpenCheck, Printer, XCircle } from 'lucide-react'
 import { logAudit } from '../lib/pms.api.js'
+import { getCompanySettingsQuery, getPrintBrandProps, withTenantScope } from '../lib/companySettings'
+import { withTenantInsert, withTenantInsertMany } from '../lib/tenant'
 
 const CASH_ACC = { CASH: '1010', BKASH: '1020', NAGAD: '1020', CARD: '1030', BANK: '1030', OTHER: '1030' }
 const REV_ACC = { ROOM: '4100', RESTAURANT: '4200', TEA: '4300', PICKLE: '4300', SPORTS: '4300', LAUNDRY: '4400', OTHER: '4400' }
@@ -28,17 +30,17 @@ export default function NightAudit({ userName, isAdmin, role }) {
   const [msg, setMsg] = useState('')
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 6000) }
 
-  useEffect(() => { supabase.from('company_settings').select('*').limit(1).maybeSingle().then(({ data }) => setCompany(data)) }, [])
+  useEffect(() => { getCompanySettingsQuery('*').limit(1).maybeSingle().then(({ data }) => setCompany(data)) }, [])
 
   const loadAll = async () => {
     const [ih, ns, fc, tc, na, ex, dc] = await Promise.all([
-      supabase.from('reservations').select('*, reservation_rooms(*, rooms(*))').eq('status', 'CHECKED_IN'),
-      supabase.from('reservations').select('*, guests:primary_guest_id(full_name)').eq('status', 'CONFIRMED').lt('check_in', auditDate),
-      supabase.from('folio_charges').select('reservation_id, charge_type').eq('charge_date', auditDate).eq('charge_type', 'ROOM'),
-      supabase.from('tax_config').select('*'),
-      supabase.from('night_audits').select('*').order('audit_date', { ascending: false }).limit(15),
-      supabase.from('night_audits').select('*').eq('audit_date', auditDate).maybeSingle(),
-      supabase.from('day_closes').select('*').eq('close_date', auditDate).in('type', ['RESERVATION', 'RESTAURANT']),
+      withTenantScope(supabase.from('reservations').select('*, reservation_rooms(*, rooms(*))').eq('status', 'CHECKED_IN')),
+      withTenantScope(supabase.from('reservations').select('*, guests:primary_guest_id(full_name)').eq('status', 'CONFIRMED').lt('check_in', auditDate)),
+      withTenantScope(supabase.from('folio_charges').select('reservation_id, charge_type').eq('charge_date', auditDate).eq('charge_type', 'ROOM')),
+      withTenantScope(supabase.from('tax_config').select('*')),
+      withTenantScope(supabase.from('night_audits').select('*')).order('audit_date', { ascending: false }).limit(15),
+      withTenantScope(supabase.from('night_audits').select('*').eq('audit_date', auditDate)).maybeSingle(),
+      withTenantScope(supabase.from('day_closes').select('*').eq('close_date', auditDate)).in('type', ['RESERVATION', 'RESTAURANT']),
     ])
     const inHouseRows = ih.data || []
     setInHouse(inHouseRows); setNoShows(ns.data || []); setPostedToday(fc.data || [])
@@ -50,19 +52,19 @@ export default function NightAudit({ userName, isAdmin, role }) {
   const buildSummary = async (inHouseRows = inHouse) => {
     const inHouseIds = (inHouseRows || []).map((r) => r.id)
     const [fc, pay, posWalk, facWalk, invAll, folioAll, payAll] = await Promise.all([
-      supabase.from('folio_charges').select('*').eq('charge_date', auditDate),
-      supabase.from('payments').select('*').eq('received_date', auditDate),
-      supabase.from('pos_orders').select('*').eq('status', 'SETTLED').is('reservation_id', null)
+      withTenantScope(supabase.from('folio_charges').select('*').eq('charge_date', auditDate)),
+      withTenantScope(supabase.from('payments').select('*').eq('received_date', auditDate)),
+      withTenantScope(supabase.from('pos_orders').select('*').eq('status', 'SETTLED').is('reservation_id', null))
         .gte('settled_at', auditDate + 'T00:00:00').lte('settled_at', auditDate + 'T23:59:59'),
-      supabase.from('facility_sales').select('*').eq('status', 'SETTLED').is('reservation_id', null).eq('sale_date', auditDate),
+      withTenantScope(supabase.from('facility_sales').select('*').eq('status', 'SETTLED').is('reservation_id', null).eq('sale_date', auditDate)),
       inHouseIds.length > 0
-        ? supabase.from('invoices').select('id,reservation_id,invoice_no,issued_at,totals,due,paid,status,is_void').in('reservation_id', inHouseIds).eq('is_void', false).order('issued_at', { ascending: false })
+        ? withTenantScope(supabase.from('invoices').select('id,reservation_id,invoice_no,issued_at,totals,due,paid,status,is_void').in('reservation_id', inHouseIds).eq('is_void', false)).order('issued_at', { ascending: false })
         : Promise.resolve({ data: [] }),
       inHouseIds.length > 0
-        ? supabase.from('folio_charges').select('reservation_id,total').in('reservation_id', inHouseIds)
+        ? withTenantScope(supabase.from('folio_charges').select('reservation_id,total').in('reservation_id', inHouseIds))
         : Promise.resolve({ data: [] }),
       inHouseIds.length > 0
-        ? supabase.from('payments').select('reservation_id,amount').in('reservation_id', inHouseIds)
+        ? withTenantScope(supabase.from('payments').select('reservation_id,amount').in('reservation_id', inHouseIds))
         : Promise.resolve({ data: [] }),
     ])
     const revenue = {}
@@ -148,7 +150,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
       }
     }
     if (rows.length === 0) { setBusy(false); flash('Nothing to post — every in-house room already has tonight\'s charge.'); return }
-    const { error } = await supabase.from('folio_charges').insert(rows)
+    const { error } = await supabase.from('folio_charges').insert(withTenantInsertMany(rows))
     setBusy(false)
     if (error) flash(error.message)
     else { flash(`${rows.length} room charge line(s) posted for ${fmtDate(auditDate)}.`); await loadAll() }
@@ -156,7 +158,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
 
   const markNoShow = async (res) => {
     if (!window.confirm(`Mark ${res.res_no} (${res.reservation_name || res.guests?.full_name || ''}) as NO-SHOW?`)) return
-    await supabase.from('reservations').update({ status: 'NO_SHOW' }).eq('id', res.id)
+    await withTenantScope(supabase.from('reservations').update({ status: 'NO_SHOW' }).eq('id', res.id))
     await logAudit({ actor: userName, action: 'NO_SHOW', entity: 'reservation', entity_id: res.res_no, details: { audit_date: auditDate, source: 'MANUAL' } })
     await loadAll()
   }
@@ -168,7 +170,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
     let jvId = null
     try {
       if (makeJV && summary.recTotal + summary.totals.total > 0) {
-        const { data: coa } = await supabase.from('chart_of_accounts').select('id, code')
+        const { data: coa } = await withTenantScope(supabase.from('chart_of_accounts').select('id, code'))
         const acc = Object.fromEntries((coa || []).map((a) => [a.code, a.id]))
         const lines = []
         for (const [m, amt] of Object.entries(summary.receipts))
@@ -182,27 +184,27 @@ export default function NightAudit({ userName, isAdmin, role }) {
         if (diff > 0) lines.push({ account_id: acc['1100'], debit: diff, credit: 0, line_note: 'Charged to folios — receivable' })
         if (diff < 0) lines.push({ account_id: acc['2400'], debit: 0, credit: -diff, line_note: 'Advance / unapplied receipts' })
         if (lines.length > 1) {
-          const { data: jv, error: je } = await supabase.from('journal_entries').insert({ jv_date: auditDate, narration: `Night audit — ${fmtDate(auditDate)}`, source: 'NIGHT_AUDIT', posted_by: userName }).select().single()
+          const { data: jv, error: je } = await supabase.from('journal_entries').insert(withTenantInsert({ jv_date: auditDate, narration: `Night audit — ${fmtDate(auditDate)}`, source: 'NIGHT_AUDIT', posted_by: userName })).select().single()
           if (je) throw je
-          const { error: jle } = await supabase.from('journal_lines').insert(lines.map((l) => ({ ...l, entry_id: jv.id })))
+          const { error: jle } = await supabase.from('journal_lines').insert(withTenantInsertMany(lines.map((l) => ({ ...l, entry_id: jv.id }))))
           if (jle) throw jle
           jvId = jv.id
         }
       }
-      const payload = { audit_date: auditDate, performed_by: userName, performed_at: new Date().toISOString(), summary, jv_id: jvId, notes: makeJV ? 'Auto-JV posted' : null }
+      const payload = withTenantInsert({ audit_date: auditDate, performed_by: userName, performed_at: new Date().toISOString(), summary, jv_id: jvId, notes: makeJV ? 'Auto-JV posted' : null })
       const { error } = await supabase.from('night_audits').upsert(payload, { onConflict: 'tenant_id,audit_date' })
       if (error) throw error
 
       const dayStart = `${auditDate}T00:00:00+06:00`
       const dayEnd = `${auditDate}T23:59:59+06:00`
       const [{ data: rest }, { data: resv }] = await Promise.all([
-        supabase.from('pos_orders').select('total,status').is('reservation_id', null).gte('created_at', dayStart).lte('created_at', dayEnd),
-        supabase.from('pos_orders').select('total,status').not('reservation_id', 'is', null).gte('created_at', dayStart).lte('created_at', dayEnd),
+        withTenantScope(supabase.from('pos_orders').select('total,status').is('reservation_id', null).gte('created_at', dayStart).lte('created_at', dayEnd)),
+        withTenantScope(supabase.from('pos_orders').select('total,status').not('reservation_id', 'is', null).gte('created_at', dayStart).lte('created_at', dayEnd)),
       ])
       const restSettled = (rest || []).filter((o) => o.status === 'SETTLED')
       const resCharged = (resv || []).filter((o) => o.status === 'CHARGED_TO_ROOM')
-      await supabase.from('day_closes').delete().eq('close_date', auditDate).in('type', ['RESERVATION', 'RESTAURANT'])
-      const { error: dcErr } = await supabase.from('day_closes').insert([
+      await withTenantScope(supabase.from('day_closes').delete().eq('close_date', auditDate)).in('type', ['RESERVATION', 'RESTAURANT'])
+      const { error: dcErr } = await supabase.from('day_closes').insert(withTenantInsertMany([
         {
           close_date: auditDate,
           closed_by: userName,
@@ -219,10 +221,10 @@ export default function NightAudit({ userName, isAdmin, role }) {
           charged_amount: resCharged.reduce((a, o) => a + Number(o.total || 0), 0),
           charged_orders: resCharged.length,
         },
-      ])
+      ]))
       if (dcErr) throw dcErr
 
-      await supabase.from('company_settings').update({ last_audit_date: auditDate }).gt('id', 0)
+      await withTenantScope(supabase.from('company_settings').update({ last_audit_date: auditDate })).gt('id', 0)
       flash(`Night audit for ${fmtDate(auditDate)} ${existing ? 'updated' : 'closed'}.${jvId ? ' Journal voucher posted.' : ''}`)
       await loadAll()
     } catch (e) { flash(e.message) }
@@ -232,7 +234,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
   const openDay = async () => {
     if (!canOpenDay) { flash('Only SUPERUSER can open a closed day.'); return }
     setBusy(true)
-    const { error } = await supabase.from('day_closes').delete().eq('close_date', auditDate).in('type', ['RESERVATION', 'RESTAURANT'])
+    const { error } = await withTenantScope(supabase.from('day_closes').delete().eq('close_date', auditDate)).in('type', ['RESERVATION', 'RESTAURANT'])
     setBusy(false)
     if (error) flash(error.message)
     else { flash(`Day opened for ${fmtDate(auditDate)} — Reservation and Restaurant.`); await loadAll() }
@@ -260,7 +262,7 @@ export default function NightAudit({ userName, isAdmin, role }) {
   return (
     <div className="space-y-5">
       {printAudit && (
-        <PrintPortal title={`Night Audit — ${printAudit.audit_date}`} onClose={() => setPrintAudit(null)}>
+        <PrintPortal title={`Night Audit — ${printAudit.audit_date}`} onClose={() => setPrintAudit(null)} {...getPrintBrandProps(company)}>
           <NightAuditReport audit={printAudit} company={company} />
         </PrintPortal>
       )}
