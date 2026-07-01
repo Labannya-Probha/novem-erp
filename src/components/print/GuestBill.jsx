@@ -141,7 +141,16 @@ export default function GuestBill({
         @media print {
           .gb-wrap { padding: 0 !important; max-width: 100% !important; }
           .gb-wrap .break-avoid { page-break-inside: avoid; break-inside: avoid; }
-          .gb-wrap .w-auto-table { table-layout: auto !important; }
+          .gb-wrap .w-auto-table { table-layout: fixed !important; width: 100% !important; }
+          .gb-wrap .gb-billing-table th,
+          .gb-wrap .gb-billing-table td {
+            font-size: 7.5px !important;
+            padding: 2px 3px !important;
+            width: auto !important;
+            min-width: 0 !important;
+          }
+          .gb-wrap .gb-billing-table th:nth-child(4),
+          .gb-wrap .gb-billing-table td:nth-child(4) { width: 28% !important; }
         }
       `}</style>
 
@@ -210,7 +219,7 @@ export default function GuestBill({
 
       <section style={{ position: 'relative', zIndex: 1 }}>
         <div style={sectionTitle}>Billing Details</div>
-        <table className="w-auto-table" style={{ width: '100%', borderCollapse: 'collapse', border: `1px solid ${LINE}` }}>
+        <table className="w-auto-table gb-billing-table" style={{ width: '100%', borderCollapse: 'collapse', border: `1px solid ${LINE}` }}>
           <thead>
             <tr>
               <th style={{ ...th, width: 70 }}>Date</th>
