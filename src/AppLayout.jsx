@@ -93,7 +93,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
   const location = useLocation()
   const [mobileNavOpen,  setMobileNavOpen]  = useState(false)
   const [openSystemMenu, setOpenSystemMenu] = useState(null)
-  const [openNavGroup,   setOpenNavGroup]   = useState(() => getActiveNavGroupTitle(window.location.pathname.split('/').filter(Boolean)[0] || 'front-office', window.location.pathname))
+  const [,               setOpenNavGroup]   = useState(() => getActiveNavGroupTitle(window.location.pathname.split('/').filter(Boolean)[0] || 'front-office', window.location.pathname))
   const [modulesEnabled, setModulesEnabled] = useState(null)
   const [sidebarHidden,  setSidebarHidden]  = useState(false)
 
