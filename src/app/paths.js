@@ -11,12 +11,14 @@ export const PATHS = {
   // Front Office
   FRONTOFFICE: '/frontoffice',
   DASHBOARD: '/dashboard',           // legacy alias → redirects to /frontoffice
+  FRONTOFFICE_RESERVATION_DETAIL: '/frontoffice/reservations/:id',
   NIGHTAUDIT: '/nightaudit',
   HOUSEKEEPING: '/housekeeping',
   FACILITIES: '/facilities',
 
   // Reservations
   RESERVATIONS: '/reservations',
+  RESERVATION_DETAIL: '/reservations/:id',
   RESERVATION_PAYMENTS: '/reservation-payments',
   CALENDAR: '/calendar',
   BOOKING_CALENDAR: '/booking-calendar',  // legacy alias → /calendar
@@ -24,10 +26,10 @@ export const PATHS = {
 
   // POS
   POS: '/pos',
-  GUEST_KIOSK: '/pos/kiosk',
+  GUEST_KIOSK: '/kiosk/pos',
   MENU_MANAGEMENT: '/menu-management',
   POS_PRINT_CENTER: '/pos/print-center',
-  VERIFY_BILL: '/verify-bill',
+  VERIFY_BILL: '/verify/pos/:id',
 
   // Inventory
   INVENTORY: '/inventory',
@@ -78,6 +80,9 @@ export const PATHS = {
 
   // Reports
   REPORTS: '/reports',
+  REPORTS_CASED_ALIAS: '/Reports',
+  TENANT_REPORTS: '/:slug/reports',
+  TENANT_REPORTS_CASED_ALIAS: '/:slug/Reports',
 
   // Tasks
   TASKS: '/tasks',
