@@ -247,12 +247,14 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                   } else if (n.id === 'reservations') {
                     const resTab = new URLSearchParams(location.search).get('tab')
                     const isResPath = location.pathname === PATHS.RESERVATIONS
+                    const validResTabs = new Set(['list', 'calendar', 'payments', 'crm'])
+                    const isListTab = !resTab || !validResTabs.has(resTab) || resTab === 'list'
                     nested = [
                       {
                         id: 'reservations-list',
                         label: 'Reservations',
                         path: `${PATHS.RESERVATIONS}?tab=list`,
-                        active: isResPath && (!resTab || resTab === 'list'),
+                        active: isResPath && isListTab,
                       },
                       {
                         id: 'calendar',

@@ -1,7 +1,6 @@
 /* ------------------------------------------------------------------ */
 /*  RESERVATIONS PAGE — AEDS v2 unified module page                    */
 /* ------------------------------------------------------------------ */
-import PageHeader from '../../components/layout/PageHeader'
 import ModuleTabs from '../../components/layout/ModuleTabs'
 import { useReservationsTabs } from './hooks/useReservationsTabs'
 import { RESERVATION_TABS } from './reservations.config'
@@ -21,16 +20,10 @@ export default function ReservationsPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Reservations"
-        breadcrumb={[{ label: 'Reservations', current: true }]}
-        tabs={
-          <ModuleTabs
-            tabs={RESERVATION_TABS}
-            activeTab={activeTab}
-            onChange={setActiveTab}
-          />
-        }
+      <ModuleTabs
+        tabs={RESERVATION_TABS}
+        activeTab={activeTab}
+        onChange={setActiveTab}
       />
 
       <div
