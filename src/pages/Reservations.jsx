@@ -388,7 +388,7 @@ function NewReservation({ close, openReservation, userName, prefill }) {
     if (prefill.room_id && prefill.from_date && prefill.to_date) {
       setRoomRows([{ room_id: prefill.room_id, from_date: prefill.from_date, to_date: prefill.to_date }])
     }
-  }, [])
+  }, [prefill])
 
   const writeAudit = async ({ action, entity, entityId, details = {} }) => {
     try {

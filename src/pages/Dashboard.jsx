@@ -64,13 +64,22 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
 
   const loadAllGuests = async () => {
     setGuestsBusy(true)
-    const { data } = await supabase
-      .from('reservations')
-      .select('id,res_no,reservation_name,check_in,check_out,status,source, guests:primary_guest_id(full_name,phone,customer_id), reservation_rooms(rooms(room_no,room_name))')
-      .order('check_in', { ascending: false })
-      .limit(300)
-    setAllGuests(data || [])
-    setGuestsBusy(false)
+    try {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id,res_no,reservation_name,check_in,check_out,status,source, guests:primary_guest_id(full_name,phone,customer_id), reservation_rooms(rooms(room_no,room_name))')
+        .order('check_in', { ascending: false })
+        .limit(300)
+      if (error) {
+        flashDay(error.message, 'error')
+        return
+      }
+      setAllGuests(data || [])
+    } catch (error) {
+      flashDay(error?.message || 'Failed to load guests.', 'error')
+    } finally {
+      setGuestsBusy(false)
+    }
   }
 
   const filteredGuests = useMemo(() => {
@@ -412,7 +421,15 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
                       <tr
                         key={r.id}
                         className="hover:bg-leaf/30 cursor-pointer"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => openReservation(r.id, 'Overview')}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openReservation(r.id, 'Overview')
+                          }
+                        }}
                       >
                         <td className="td money font-medium text-xs">{r.res_no}</td>
                         <td className="td">
