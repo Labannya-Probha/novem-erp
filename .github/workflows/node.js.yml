@@ -13,6 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history required for secret scanning
 
       - uses: actions/setup-node@v4
         with:
@@ -21,6 +23,27 @@ jobs:
 
       - run: npm ci
 
+      # ── Secret scanning ──────────────────────────────────────────────────────
+      # Fails the build if any committed file contains a high-confidence secret.
+      # Trufflehog scans git history since the base commit on PRs, or HEAD~1 on
+      # pushes to main, so it doesn't re-scan every historical commit every time.
+      - name: Secret scan (trufflehog)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD~1' }}
+          head: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'HEAD' }}
+          extra_args: --only-verified
+
+      # ── Lint ─────────────────────────────────────────────────────────────────
+      - name: Lint
+        run: npm run lint
+
+      # ── Tests ────────────────────────────────────────────────────────────────
+      - name: Unit tests
+        run: npm run test:run
+
+      # ── Build ────────────────────────────────────────────────────────────────
       - run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

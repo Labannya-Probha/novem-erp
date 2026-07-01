@@ -8,8 +8,9 @@ const FALLBACK_LOGO     = null
 const FALLBACK_NAME     = 'Aura Stay'
 const FALLBACK_SOFTWARE = 'Aura Stay ERP'
 
-// Default slug when accessing the root domain (www.erp.aurastay.bd with no path)
-const DEFAULT_SLUG = 'novemecoresort'
+// Default slug when accessing the root domain (www.erp.aurastay.bd with no path).
+// Set VITE_DEFAULT_SLUG in your .env (see .env.example) to override.
+const DEFAULT_SLUG = import.meta.env.VITE_DEFAULT_SLUG || 'novemecoresort'
 
 export default function Login({ slug }) {
   const [username,     setUsername]     = useState('')
