@@ -795,7 +795,7 @@ function NewReservation({ close, openReservation, userName, prefill }) {
       )}
 
       <div className="min-h-screen bg-paper py-6 px-3 sm:px-6">
-        <div className="card max-w-2xl w-full p-4 sm:p-6 mx-auto">
+        <div className="card max-w-4xl w-full p-4 sm:p-8 mx-auto">
           <h2 className="font-display text-lg font-bold text-pine mb-4">New reservation query</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
@@ -1122,7 +1122,33 @@ function NewReservation({ close, openReservation, userName, prefill }) {
           </div>
 
           {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
-          <div className="flex justify-end gap-2 mt-5">
+
+          {/* Signature Lines */}
+          <div className="mt-8 pt-6 border-t border-leaf/40">
+            <p className="text-xs text-pine/50 uppercase tracking-widest font-semibold mb-6">Authorisation &amp; Signatures</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+              <div className="flex flex-col gap-2">
+                <div className="h-10 border-b border-pine/30" />
+                <span className="text-xs text-pine/60">Guest / Representative Signature</span>
+                <div className="h-5 border-b border-pine/20 mt-1" />
+                <span className="text-xs text-pine/50">Date</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="h-10 border-b border-pine/30" />
+                <span className="text-xs text-pine/60">Received By (Front Desk)</span>
+                <div className="h-5 border-b border-pine/20 mt-1" />
+                <span className="text-xs text-pine/50">Date</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="h-10 border-b border-pine/30" />
+                <span className="text-xs text-pine/60">Authorised By (Management)</span>
+                <div className="h-5 border-b border-pine/20 mt-1" />
+                <span className="text-xs text-pine/50">Date</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-6">
             <button className="btn-ghost" onClick={close}>Cancel</button>
             <button className="btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Create query'}</button>
           </div>

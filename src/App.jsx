@@ -275,10 +275,9 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileNavOpen,  setMobileNavOpen]  = useState(false)
-  const [openGroup,      setOpenGroup]      = useState(null)
   const [openSystemMenu, setOpenSystemMenu] = useState(null)
   const [modulesEnabled, setModulesEnabled] = useState(null)
-  const toggleGroup = (title) => setOpenGroup((prev) => (prev === title ? null : title))
+  const [sidebarHidden,  setSidebarHidden]  = useState(false)
 
   const currentTopId = location.pathname.split('/').filter(Boolean)[0] || 'dashboard'
 
@@ -320,9 +319,8 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
 
   useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
   useEffect(() => {
-    const activeGroup = NAV_GROUPS.find((g) => g.items.some((n) => n.id === currentTopId))
-    setOpenGroup(activeGroup?.title || null)
-  }, [currentTopId])
+    setSidebarHidden(location.pathname === '/calendar')
+  }, [location.pathname])
   useEffect(() => {
     const isAccountingRoute = location.pathname.startsWith('/accounting') || location.pathname === '/vat'
     const isHrRoute = location.pathname.startsWith('/hr')
@@ -351,8 +349,8 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
         </button>
       </div>
 
-      <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
-        {NAV_GROUPS.map((g) => {
+      <nav className="flex-1 py-3 px-3 overflow-y-auto">
+        {NAV_GROUPS.map((g, gi) => {
           const items = g.items.filter((n) => {
             if (!isModuleEnabled(n.id, modulesEnabled, role)) return false
             if (n.superuserOnly)            return role === 'SUPERUSER'
@@ -365,139 +363,132 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
             return can(role, n.id, privileges)
           })
           if (items.length === 0) return null
-          const isOpenGroup = openGroup === g.title
           return (
-            <div key={g.title}>
-              <button
-                onClick={() => toggleGroup(g.title)}
-                className="w-full px-3 py-1.5 flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-semibold hover:text-white/85 transition-colors"
-              >
-                <span>{g.title}</span>
-                <ChevronDown size={11} className={`transition-transform duration-200 ${isOpenGroup ? '' : '-rotate-90'}`} />
-              </button>
+            <div key={g.title} className={gi > 0 ? 'mt-2 pt-2 border-t border-white/5' : ''}>
+              <div className="px-3 pb-1 text-[9.5px] uppercase tracking-widest text-white/25 font-bold">
+                {g.title}
+              </div>
 
-              {isOpenGroup && (
-                <div className="space-y-0.5 mb-1">
-                  {items.map((n) => {
-                    if (n.id === 'consumption' || n.id === 'vat') return null
+              <div className="space-y-0.5">
+                {items.map((n) => {
+                  if (n.id === 'consumption' || n.id === 'vat') return null
 
-                    const isExpandable = ['settings', 'cms', 'inventory', 'accounting', 'hr', 'reports', 'pos-print-center'].includes(n.id)
-                    if (!isExpandable) {
-                      return (
-                        <button key={n.id}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors min-w-0 ${
-                            currentTopId === n.id
-                              ? 'bg-white/14 text-white ring-1 ring-white/20'
-                              : 'text-white/75 hover:bg-white/10 hover:text-white'
-                          }`}
-                          onClick={() => navigate(`/${n.id}`)}>
+                  const isExpandable = ['settings', 'cms', 'inventory', 'accounting', 'hr', 'reports', 'pos-print-center'].includes(n.id)
+                  if (!isExpandable) {
+                    return (
+                      <button key={n.id}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors min-w-0 ${
+                          currentTopId === n.id
+                            ? 'bg-white/14 text-white ring-1 ring-white/20'
+                            : 'text-white/75 hover:bg-white/10 hover:text-white'
+                        }`}
+                        onClick={() => navigate(`/${n.id}`)}>
+                        <n.icon size={17} className="shrink-0" />
+                        <span className="min-w-0 truncate whitespace-nowrap">{n.label}</span>
+                      </button>
+                    )
+                  }
+
+                  const isOpen = openSystemMenu === n.id
+                  let nested = []
+                  if (n.id === 'settings') {
+                    nested = SIDEBAR_SETTINGS_SECTIONS.filter((s) => {
+                      if (!s.adminOnly && !s.superuserOnly) return true
+                      if (s.adminOnly) return isAdmin || role === 'SUPERUSER'
+                      return role === 'SUPERUSER'
+                    }).map((s) => ({ ...s, path: `/settings?section=${s.id}`, active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`) }))
+                  } else if (n.id === 'cms') {
+                    nested = SIDEBAR_CMS_ENTITY_TABS.map((s) => ({ ...s, path: `/cms?entity=${s.id}`, active: currentTopId === 'cms' && location.search.includes(`entity=${s.id}`) }))
+                  } else if (n.id === 'pos-print-center') {
+                    nested = SIDEBAR_POS_TABS.map((s) => ({
+                      ...s,
+                      active: s.path === '/pos'
+                        ? location.pathname === '/pos'
+                        : location.pathname === '/pos/print-center' && s.path.includes(new URLSearchParams(location.search).get('tab') || 'receipt-preview'),
+                    }))
+                  } else if (n.id === 'inventory') {
+                    nested = [
+                      ...SIDEBAR_INVENTORY_TABS.map((s) => ({ ...s, path: `/inventory?tab=${encodeURIComponent(s.id)}`, active: currentTopId === 'inventory' && location.search.includes(`tab=${encodeURIComponent(s.id)}`) })),
+                      { id: 'consumption', label: 'Consumption Entry', path: '/consumption', active: currentTopId === 'consumption' },
+                    ]
+                  } else if (n.id === 'accounting') {
+                    nested = SIDEBAR_ACCOUNTING_TABS
+                      .filter((s) => !s.adminOnly || isAdmin || role === 'SUPERUSER')
+                      .map((s) => ({
+                        ...s,
+                        active: s.id === 'vat'
+                          ? location.pathname === '/vat'
+                          : s.id === 'vat-return'
+                          ? location.pathname === '/vat-return'
+                          : location.pathname === s.path,
+                      }))
+                  } else if (n.id === 'hr') {
+                    nested = SIDEBAR_HR_TABS.map((s) => ({
+                      ...s,
+                      active: location.pathname === s.path,
+                    }))
+                  } else if (n.id === 'reports') {
+                    nested = REPORT_CATEGORIES
+                      .map((category) => ({
+                        id: category.code,
+                        label: category.name,
+                        icon: category.icon,
+                        active: currentTopId === 'reports' && sidebarReportCatalog.some((report) => report.category === category.code && report.code === activeReportCode),
+                        children: sidebarReportCatalog
+                          .filter((report) => report.category === category.code)
+                          .map((report) => ({
+                            id: report.code,
+                            label: report.name,
+                            path: `/reports?report=${encodeURIComponent(report.code)}`,
+                            active: currentTopId === 'reports' && activeReportCode === report.code,
+                          })),
+                      }))
+                      .filter((category) => category.children.length > 0)
+                  }
+
+                  return (
+                    <div key={n.id} className="space-y-1">
+                      <button
+                        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          isOpen ? 'bg-white/14 text-white ring-1 ring-white/20' : 'text-white/75 hover:bg-white/10 hover:text-white'
+                        }`}
+                        onClick={() => {
+                          setOpenSystemMenu(isOpen ? null : n.id)
+                          if (!isOpen && ['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
+                            navigate(`/${n.id}`)
+                          } else if (!['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
+                            navigate(n.id === 'pos-print-center' ? '/pos/print-center' : `/${n.id}`)
+                          }
+                        }}
+                      >
+                        <span className="flex items-center gap-3 min-w-0">
                           <n.icon size={17} className="shrink-0" />
                           <span className="min-w-0 truncate whitespace-nowrap">{n.label}</span>
-                        </button>
-                      )
-                    }
-
-                    const isOpen = openSystemMenu === n.id
-                    let nested = []
-                    if (n.id === 'settings') {
-                      nested = SIDEBAR_SETTINGS_SECTIONS.filter((s) => {
-                        if (!s.adminOnly && !s.superuserOnly) return true
-                        if (s.adminOnly) return isAdmin || role === 'SUPERUSER'
-                        return role === 'SUPERUSER'
-                      }).map((s) => ({ ...s, path: `/settings?section=${s.id}`, active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`) }))
-                    } else if (n.id === 'cms') {
-                      nested = SIDEBAR_CMS_ENTITY_TABS.map((s) => ({ ...s, path: `/cms?entity=${s.id}`, active: currentTopId === 'cms' && location.search.includes(`entity=${s.id}`) }))
-                    } else if (n.id === 'pos-print-center') {
-                      nested = SIDEBAR_POS_TABS.map((s) => ({
-                        ...s,
-                        active: s.path === '/pos'
-                          ? location.pathname === '/pos'
-                          : location.pathname === '/pos/print-center' && s.path.includes(new URLSearchParams(location.search).get('tab') || 'receipt-preview'),
-                      }))
-                    } else if (n.id === 'inventory') {
-                      nested = [
-                        ...SIDEBAR_INVENTORY_TABS.map((s) => ({ ...s, path: `/inventory?tab=${encodeURIComponent(s.id)}`, active: currentTopId === 'inventory' && location.search.includes(`tab=${encodeURIComponent(s.id)}`) })),
-                        { id: 'consumption', label: 'Consumption Entry', path: '/consumption', active: currentTopId === 'consumption' },
-                      ]
-                    } else if (n.id === 'accounting') {
-                      nested = SIDEBAR_ACCOUNTING_TABS
-                        .filter((s) => !s.adminOnly || isAdmin || role === 'SUPERUSER')
-                        .map((s) => ({
-                          ...s,
-                          active: s.id === 'vat'
-                            ? location.pathname === '/vat'
-                            : s.id === 'vat-return'
-                            ? location.pathname === '/vat-return'
-                            : location.pathname === s.path,
-                        }))
-                    } else if (n.id === 'hr') {
-                      nested = SIDEBAR_HR_TABS.map((s) => ({
-                        ...s,
-                        active: location.pathname === s.path,
-                      }))
-                    } else if (n.id === 'reports') {
-                      nested = REPORT_CATEGORIES
-                        .map((category) => ({
-                          id: category.code,
-                          label: category.name,
-                          icon: category.icon,
-                          active: currentTopId === 'reports' && sidebarReportCatalog.some((report) => report.category === category.code && report.code === activeReportCode),
-                          children: sidebarReportCatalog
-                            .filter((report) => report.category === category.code)
-                            .map((report) => ({
-                              id: report.code,
-                              label: report.name,
-                              path: `/reports?report=${encodeURIComponent(report.code)}`,
-                              active: currentTopId === 'reports' && activeReportCode === report.code,
-                            })),
-                        }))
-                        .filter((category) => category.children.length > 0)
-                    }
-
-                    return (
-                      <div key={n.id} className="space-y-1">
-                        <button
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            isOpen ? 'bg-white/14 text-white ring-1 ring-white/20' : 'text-white/75 hover:bg-white/10 hover:text-white'
-                          }`}
-                          onClick={() => {
-                            setOpenSystemMenu(isOpen ? null : n.id)
-                            if (!isOpen && ['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
-                              navigate(`/${n.id}`)
-                            } else if (!['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
-                              navigate(n.id === 'pos-print-center' ? '/pos/print-center' : `/${n.id}`)
-                            }
-                          }}
-                        >
-                          <span className="flex items-center gap-3 min-w-0">
-                            <n.icon size={17} className="shrink-0" />
-                            <span className="min-w-0 truncate whitespace-nowrap">{n.label}</span>
-                          </span>
-                          <ChevronDown size={13} className={`transition-transform ${isOpen ? '' : '-rotate-90'}`} />
-                        </button>
-                        {isOpen && (
-                          <div className="ml-6 space-y-0.5">
-                            {nested.map((child) => child.children ? (
-                              <HrSubGroup key={child.id} grp={child} navigate={navigate} location={location} />
-                            ) : (
-                              <button
-                                key={child.id}
-                                className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
-                                  child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
-                                }`}
-                                onClick={() => navigate(child.path)}
-                              >
-                                {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
-                                {child.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                        </span>
+                        <ChevronDown size={13} className={`transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+                      </button>
+                      {isOpen && (
+                        <div className="ml-6 space-y-0.5">
+                          {nested.map((child) => child.children ? (
+                            <HrSubGroup key={child.id} grp={child} navigate={navigate} location={location} />
+                          ) : (
+                            <button
+                              key={child.id}
+                              className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
+                                child.active ? 'bg-white/14 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white'
+                              }`}
+                              onClick={() => navigate(child.path)}
+                            >
+                              {child.icon && <child.icon size={13} aria-hidden="true" className="shrink-0 opacity-70" />}
+                              {child.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )
         })}
@@ -527,10 +518,23 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
 
   return (
     <div className="min-h-screen flex app-shell">
-      {/* Desktop sidebar */}
-      <aside style={sidebarThemeStyle} className="hidden lg:flex w-60 text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
-        {SidebarContent}
-      </aside>
+      {/* Desktop sidebar — hidden on Booking Calendar for full-page view */}
+      {!sidebarHidden && (
+        <aside style={sidebarThemeStyle} className="hidden lg:flex w-60 text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
+          {SidebarContent}
+        </aside>
+      )}
+
+      {/* Floating toggle to restore sidebar (desktop, Booking Calendar only) */}
+      {sidebarHidden && (
+        <button
+          onClick={() => setSidebarHidden(false)}
+          title="Show sidebar"
+          className="hidden lg:flex fixed top-4 left-4 z-40 items-center justify-center w-9 h-9 rounded-lg bg-pine/80 hover:bg-pine text-white shadow-lg transition-colors"
+        >
+          <Menu size={18} />
+        </button>
+      )}
 
       {/* Mobile drawer */}
       {mobileNavOpen && (
@@ -553,7 +557,7 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
         </div>
       </div>
 
-      <main className="app-shell-main">
+      <main className="app-shell-main" style={sidebarHidden ? { marginLeft: 0 } : undefined}>
         {company?.maintenance_mode && (
           <div className="no-print app-shell-banner" style={{ background:'#b91c1c',
             color:'#fff', textAlign:'center', padding:'6px', fontWeight:600, fontSize:13 }}>
