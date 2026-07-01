@@ -56,6 +56,7 @@ import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
 import RestaurantPage from './modules/restaurant/RestaurantPage.jsx'
+import PosPrintCenter from './pages/PosPrintCenter.jsx'
 import { RESERVATION_TABS, DEFAULT_RESERVATION_TAB } from './modules/reservations/reservations.config'
 
 const RESERVATION_NAV_BY_TAB = {
@@ -155,7 +156,7 @@ export default function AppRoutes({
       } />
       <Route path={PATHS.POS_PRINT_CENTER} element={
         <SaasModuleRoute moduleId="pos" role={role} navId="pos" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <Navigate to={`${PATHS.RESTAURANT}?tab=print`} replace />
+          <PosPrintCenter company={company} userName={userName} />
         </SaasModuleRoute>
       } />
       <Route path={PATHS.GUEST_KIOSK} element={<GuestPosKiosk />} />
