@@ -54,6 +54,7 @@ import ReportsCenterPage from './modules/reports/ReportsCenterPage.jsx'
 import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
+import TasksPage from './modules/tasks/TasksPage.jsx'
 import RestaurantPage from './modules/restaurant/RestaurantPage.jsx'
 import PosPrintCenter from './pages/PosPrintCenter.jsx'
 import { RESERVATION_TABS, DEFAULT_RESERVATION_TAB } from './modules/reservations/reservations.config'
@@ -272,17 +273,14 @@ export default function AppRoutes({
         </SaasModuleRoute>
       } />
 
-      {/* Tasks */}
+      {/* Tasks — unified module */}
       <Route path={PATHS.TASKS} element={
         <SaasModuleRoute moduleId="tasks" role={role} navId="tasks" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <TaskManagement userName={userName} role={role} isAdmin={isAdmin} />
+          <TasksPage userName={userName} role={role} isAdmin={isAdmin} />
         </SaasModuleRoute>
       } />
-      <Route path={PATHS.AI_TASKER} element={
-        <SaasModuleRoute moduleId="tasks" role={role} navId="tasks" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <TaskManagement userName={userName} role={role} isAdmin={isAdmin} aiTaskerMode />
-        </SaasModuleRoute>
-      } />
+      {/* /ai-tasker → redirect to /tasks?tab=ai (old URL still works) */}
+      <Route path={PATHS.AI_TASKER} element={<Navigate to={`${PATHS.TASKS}?tab=ai`} replace />} />
 
       {/* System — superuser only */}
       <Route path={PATHS.CMS} element={
