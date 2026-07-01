@@ -92,7 +92,16 @@ export default function RestaurantPOS({ userName, isAdmin, role }) {
       {tab === 'Orders' && !showOrderBuilder && <OrdersList company={company} flash={flash} resumeOrder={resumeOrder} setPrintDoc={setPrintDoc} isAdmin={isAdmin} userName={userName} onNewOrder={() => { setEditOrder(null); setShowOrderBuilder(true) }} />}
       {tab === 'Menu' && <MenuManager cats={cats} items={items} reload={loadMenu} isAdmin={isAdmin} />}
       {tab === 'Day Close' && <DayClose flash={flash} isAdmin={isAdmin} userName={userName} role={role} />}
-      {printDoc?.type === 'RECEIPT' && (<PrintPortal type="thermal-80" title={`Restaurant Bill — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}><PosReceipt order={printDoc.order} items={printDoc.items} company={company} mushakNo={printDoc.mushakNo} /></PrintPortal>)}
+      {printDoc?.type === 'RECEIPT' && printDoc?.phase !== 'RESORT' && (
+        <PrintPortal type="thermal-80" title={`Restaurant Bill — ${printDoc.order.order_no}`} onClose={() => { if (window.confirm('Resort copy print করবেন?')) { setPrintDoc((prev) => ({ ...prev, phase: 'RESORT' })) } else { setPrintDoc(null) } }} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent} autoPrint>
+          <PosReceipt order={printDoc.order} items={printDoc.items} company={company} mushakNo={printDoc.mushakNo} singleCopy copyLabel="CUSTOMER_COPY" />
+        </PrintPortal>
+      )}
+      {printDoc?.type === 'RECEIPT' && printDoc?.phase === 'RESORT' && (
+        <PrintPortal type="thermal-80" title={`Restaurant Bill (Resort Copy) — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent} autoPrint>
+          <PosReceipt order={printDoc.order} items={printDoc.items} company={company} mushakNo={printDoc.mushakNo} singleCopy copyLabel="RESORT_COPY" />
+        </PrintPortal>
+      )}
       {printDoc?.type === 'KOT' && (<PrintPortal type="thermal-80" title={`Kitchen Order — ${printDoc.order.order_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}><KitchenTicket order={printDoc.order} items={printDoc.items} company={company} /></PrintPortal>)}
       {printDoc?.type === 'MUSHAK' && (<PrintPortal title={`Mushak-6.3 — ${printDoc.invoice.invoice_no}`} onClose={() => setPrintDoc(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}><Mushak63 invoice={printDoc.invoice} res={null} company={company} refNo={printDoc.refNo} /></PrintPortal>)}
     </div>
