@@ -12,6 +12,16 @@ import { isModuleEnabled } from './lib/saasModules'
 import { REPORT_CATEGORIES } from './lib/reporting/reportConfig'
 import { getRoleDefaultReportCatalog } from './lib/reporting/tenantReporting'
 import { SaasModuleBlocked, SaasModuleFrame } from './components/saas/SaasModuleFrame.jsx'
+import { NAV_GROUPS, ALL_NAV_IDS } from './app/navigation/navGroups'
+import {
+  SIDEBAR_SETTINGS_SECTIONS,
+  SIDEBAR_CMS_ENTITY_TABS,
+  SIDEBAR_INVENTORY_TABS,
+  SIDEBAR_POS_TABS,
+  SIDEBAR_ACCOUNTING_TABS,
+  SIDEBAR_HR_TABS,
+} from './app/navigation/sidebarTabs'
+import { getActiveNavGroupTitle, firstAccessiblePath } from './app/navigation/helpers'
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
@@ -82,25 +92,6 @@ function BrandLogo({ url, softwareName }) {
   if (url && ok) return <img src={url} alt="logo" onError={() => setOk(false)} className="w-9 h-9 rounded-lg object-contain bg-white/90 p-0.5" />
   const abbr = (softwareName || 'AS').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
   return <div className="w-9 h-9 rounded-lg bg-amber-400 flex items-center justify-center shadow-sm flex-shrink-0"><span className="text-pine font-bold text-sm leading-none">{abbr}</span></div>
-}
-
-// Navigation configuration extracted to src/navigation.config.js
-import {
-  NAV_GROUPS, ALL_NAV_IDS, getActiveNavGroupTitle,
-  SIDEBAR_SETTINGS_SECTIONS, SIDEBAR_CMS_ENTITY_TABS,
-  SIDEBAR_INVENTORY_TABS, SIDEBAR_POS_TABS,
-  SIDEBAR_ACCOUNTING_TABS, SIDEBAR_HR_TABS,
-} from './navigation.config.js'
-
-function firstAccessiblePath(role, privileges, modulesEnabled = null) {
-  for (const id of ALL_NAV_IDS) {
-    if (!isModuleEnabled(id, modulesEnabled, role)) continue
-    if (id === 'dashboard' || can(role, id, privileges)) {
-      if (id === 'pos-print-center') return '/pos/print-center'
-      return `/${id}`
-    }
-  }
-  return '/dashboard'
 }
 
 /* ------------------------------------------------------------------ */
