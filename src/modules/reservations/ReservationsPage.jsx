@@ -1,9 +1,7 @@
 /* ------------------------------------------------------------------ */
 /*  RESERVATIONS PAGE — AEDS v2 unified module page                    */
 /* ------------------------------------------------------------------ */
-import ModuleTabs from '../../components/layout/ModuleTabs'
 import { useReservationsTabs } from './hooks/useReservationsTabs'
-import { RESERVATION_TABS } from './reservations.config'
 import ReservationsListTab from './tabs/ReservationsListTab'
 import BookingCalendarTab from './tabs/BookingCalendarTab'
 import ReservationPaymentsTab from './tabs/ReservationPaymentsTab'
@@ -16,37 +14,25 @@ export default function ReservationsPage({
   isAdmin,
   role,
 }) {
-  const { activeTab, setActiveTab } = useReservationsTabs()
+  const { activeTab } = useReservationsTabs()
 
   return (
-    <div className="space-y-4">
-      <ModuleTabs
-        tabs={RESERVATION_TABS}
-        activeTab={activeTab}
-        onChange={setActiveTab}
-      />
-
-      <div
-        id={`module-tab-panel-${activeTab}`}
-        role="tabpanel"
-        aria-labelledby={`module-tab-${activeTab}`}
-      >
-        {activeTab === 'list' && (
-          <ReservationsListTab openReservation={openReservation} userName={userName} />
-        )}
-        {activeTab === 'calendar' && (
-          <BookingCalendarTab
-            openReservation={openReservation}
-            onNewReservation={startReservation}
-          />
-        )}
-        {activeTab === 'payments' && (
-          <ReservationPaymentsTab userName={userName} isAdmin={isAdmin} />
-        )}
-        {activeTab === 'crm' && (
-          <GuestCrmTab userName={userName} isAdmin={isAdmin} role={role} />
-        )}
-      </div>
+    <div>
+      {activeTab === 'list' && (
+        <ReservationsListTab openReservation={openReservation} userName={userName} />
+      )}
+      {activeTab === 'calendar' && (
+        <BookingCalendarTab
+          openReservation={openReservation}
+          onNewReservation={startReservation}
+        />
+      )}
+      {activeTab === 'payments' && (
+        <ReservationPaymentsTab userName={userName} isAdmin={isAdmin} />
+      )}
+      {activeTab === 'crm' && (
+        <GuestCrmTab userName={userName} isAdmin={isAdmin} role={role} />
+      )}
     </div>
   )
 }

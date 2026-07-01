@@ -55,17 +55,27 @@ import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
 import RestaurantPage from './modules/restaurant/RestaurantPage.jsx'
+import { RESERVATION_TABS, DEFAULT_RESERVATION_TAB } from './modules/reservations/reservations.config'
+
+const RESERVATION_NAV_BY_TAB = {
+  list: 'reservations',
+  payments: 'reservations',
+  calendar: 'calendar',
+  crm: 'crm',
+}
+
+const VALID_RESERVATION_TABS = new Set(RESERVATION_TABS.map((tab) => tab.id))
+
 export default function AppRoutes({
   role, isAdmin, userName, userId, company, privileges, modulesEnabled, loadCompany,
   openReservation, openFrontOfficeReservation, startReservation, navigate,
 }) {
   const location = useLocation()
   const reservationTab = new URLSearchParams(location.search).get('tab')
-  const reservationNavId = reservationTab === 'calendar'
-    ? 'calendar'
-    : reservationTab === 'crm'
-      ? 'crm'
-      : 'reservations'
+  const safeReservationTab = VALID_RESERVATION_TABS.has(reservationTab)
+    ? reservationTab
+    : DEFAULT_RESERVATION_TAB
+  const reservationNavId = RESERVATION_NAV_BY_TAB[safeReservationTab]
 
   return (
     <Routes>
