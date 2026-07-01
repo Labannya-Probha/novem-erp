@@ -1,14 +1,14 @@
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../supabase'
-import { fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
-import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle, Search, Users } from 'lucide-react'
-import KPICards from '../components/KPICards.jsx'
+import { fmtDate, fmtBDT, todayISO, STATUS_COLORS } from '../lib/helpers'
+import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle, Search, Users, TrendingUp, Banknote, ChevronDown } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Separator } from '../components/ui/separator'
 import { useToast } from '../components/Toast'
 import { cn } from '../lib/utils'
+
 const HK_STYLE = {
   'Clean':        'bg-forest/15 text-forest border-forest/30',
   'Inspected':    'bg-sky-100 text-sky-700 border-sky-300',
@@ -44,7 +44,55 @@ function getHousekeepingBadgeVariant(hk) {
   return 'success'
 }
 
-export default function Dashboard({ openReservation, userName, role, isAdmin }) {
+function getGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function getUserInitials(name) {
+  return (name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase())
+    .slice(0, 2)
+    .join('')
+}
+
+function RevenueBarChart({ data }) {
+  const max = Math.max(...data.map((d) => d.revenue), 1)
+  return (
+    <div className="flex items-end justify-between gap-1.5 h-28 px-1 pt-2">
+      {data.map((d) => {
+        const pct = Math.max(6, Math.round((d.revenue / max) * 100))
+        return (
+          <div key={d.date} className="flex flex-col items-center gap-1.5 flex-1 min-w-0 h-full justify-end">
+            <div
+              className={`w-full rounded-t transition-all ${d.isToday ? 'bg-pine' : 'bg-leaf/35'}`}
+              style={{ height: `${pct}%` }}
+            />
+            <span className={`text-[9px] leading-none whitespace-nowrap ${d.isToday ? 'text-pine font-bold' : 'text-pine/45'}`}>
+              {d.day}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function HeroKPICard({ label, value, sub, valueClassName }) {
+  return (
+    <Card className="p-4 !rounded-xl hover:transform-none">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-pine/50 mb-2">{label}</p>
+      <p className={`text-2xl font-bold leading-none mb-1.5 ${valueClassName || 'text-ink'}`}>{value ?? '—'}</p>
+      {sub && <p className="text-xs text-pine/55 leading-snug">{sub}</p>}
+    </Card>
+  )
+}
+
+export default function Dashboard({ openReservation, userName, role, isAdmin, company }) {
   const [arrivals, setArrivals] = useState([])
   const [departures, setDepartures] = useState([])
   const [rooms, setRooms] = useState([])
@@ -56,11 +104,57 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
   const [guestsBusy, setGuestsBusy] = useState(false)
   const [guestSearch, setGuestSearch] = useState('')
   const [guestStatusFilter, setGuestStatusFilter] = useState('ALL')
+  const [heroKPIs, setHeroKPIs] = useState(null)
+  const [revenueChartData, setRevenueChartData] = useState([])
   const toast = useToast()
   const today = todayISO()
   const canCloseFrontDay = isAdmin || role === 'MANAGER' || role === 'FRONT_OFFICE' || role === 'ACCOUNTS'
   const canOpenDay = role === 'SUPERUSER'
   const flashDay = (m, type = 'info') => { toast(m, type) }
+
+  const loadHeroData = async () => {
+    try {
+      const monthStart = today.slice(0, 7) + '-01'
+      const last7 = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(today + 'T00:00:00')
+        d.setDate(d.getDate() - (6 - i))
+        return d.toISOString().slice(0, 10)
+      })
+      const weekStart = last7[0]
+
+      const [{ data: roomsData }, { data: resData }, { data: fcData }, { data: vatSales }, { data: vatPurch }] = await Promise.all([
+        supabase.from('rooms').select('id').eq('is_active', true),
+        supabase.from('reservations').select('status, room_rate').eq('status', 'CHECKED_IN'),
+        supabase.from('folio_charges').select('charge_date, total').gte('charge_date', weekStart),
+        supabase.from('vat_sales_register').select('vat, sd').gte('issue_date', monthStart).eq('is_void', false),
+        supabase.from('vat_purchase_register').select('vat_amount').gte('entry_date', monthStart),
+      ])
+
+      const totalRooms = (roomsData || []).length
+      const inhouse = (resData || []).length
+      const occupancyPct = totalRooms ? (inhouse / totalRooms) * 100 : 0
+      const adr = inhouse > 0 ? (resData || []).reduce((s, r) => s + Number(r.room_rate || 0), 0) / inhouse : 0
+      const revpar = adr * (occupancyPct / 100)
+
+      const todayRevenue = (fcData || []).filter((r) => r.charge_date === today).reduce((s, r) => s + Number(r.total), 0)
+
+      const outVat = (vatSales || []).reduce((s, r) => s + Number(r.vat || 0) + Number(r.sd || 0), 0)
+      const inVat = (vatPurch || []).reduce((s, r) => s + Number(r.vat_amount || 0), 0)
+      const vatPayable = Math.max(0, outVat - inVat)
+
+      const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      const chartData = last7.map((dateStr) => {
+        const dayRevenue = (fcData || []).filter((r) => r.charge_date === dateStr).reduce((s, r) => s + Number(r.total), 0)
+        const dow = new Date(dateStr + 'T00:00:00').getDay()
+        return { date: dateStr, day: DAYS[dow], revenue: dayRevenue, isToday: dateStr === today }
+      })
+
+      setHeroKPIs({ occupancyPct, revpar, todayRevenue, vatPayable, totalRooms, inhouse })
+      setRevenueChartData(chartData)
+    } catch (_) {
+      // silently ignore hero KPI errors
+    }
+  }
 
   const loadAllGuests = async () => {
     setGuestsBusy(true)
@@ -127,7 +221,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
   useEffect(() => {
     const load = async () => {
       const { data: arr } = await supabase.from('reservations')
-        .select('id,res_no,reservation_name,check_in,check_out,status, guests:primary_guest_id(full_name)')
+        .select('id,res_no,reservation_name,check_in,check_out,status, guests:primary_guest_id(full_name), reservation_rooms(rooms(room_no,room_name))')
         .eq('check_in', today).in('status', ['QUERY', 'QUOTED', 'CONFIRMED'])
       setArrivals(arr || [])
       const { data: dep } = await supabase.from('reservations')
@@ -139,6 +233,7 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
     loadBoard()
     loadFrontOfficeClose()
     loadAllGuests()
+    loadHeroData()
   }, [])
 
   const loadFrontOfficeClose = async () => {
@@ -217,38 +312,125 @@ export default function Dashboard({ openReservation, userName, role, isAdmin }) 
 
   const occCount = (s) => rooms.filter((r) => (occ[r.id] && occ[r.id].st) === s).length
   const hkAttn = rooms.filter((r) => ['Dirty', 'Out of Order'].includes(r.hk_status || 'Clean')).length
-  const totalRooms = rooms.length
+  const totalRoomsCount = rooms.length
   const occupiedRooms = occCount('OCCUPIED')
   const arrivalRooms = occCount('ARRIVAL')
   const departureRooms = occCount('DEPARTURE')
   const readyRooms = rooms.filter((r) => !occ[r.id] && (r.hk_status || 'Clean') === 'Clean').length
 
+  const initials = getUserInitials(userName)
+  const occupancyDisplay = heroKPIs ? `${Math.round(heroKPIs.occupancyPct)}%` : '—'
+  const revparDisplay = heroKPIs ? fmtBDT(heroKPIs.revpar) : '—'
+  const revenueDisplay = heroKPIs ? fmtBDT(heroKPIs.todayRevenue) : '—'
+  const vatDisplay = heroKPIs ? fmtBDT(heroKPIs.vatPayable) : '—'
+
   return (
     <div className="front-office-page">
-      <Card className="erp-page-header-card no-print">
-        <CardContent className="p-0">
-          <div className="erp-page-header">
-            <div className="min-w-0">
-              <p className="erp-page-kicker">Front Office</p>
-              <div>
-                <h1>
-                  Operational Desk
-                </h1>
-                <p className="erp-page-subtitle">{fmtDate(today)} - {userName || 'Current user'}</p>
+
+      {/* ── Hero greeting section ─────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 mb-5 no-print">
+        <div>
+          <h1 className="text-2xl font-bold text-ink leading-tight">
+            {getGreeting()}, {(userName || '').split(' ')[0] || userName}
+          </h1>
+          <p className="text-sm text-pine/55 mt-0.5">
+            {company?.name || 'Your Property'} · {fmtDate(today)}
+          </p>
+        </div>
+        <div className="w-10 h-10 rounded-full bg-pine flex items-center justify-center flex-shrink-0 shadow-sm">
+          <span className="text-white text-sm font-bold leading-none">{initials || '?'}</span>
+        </div>
+      </div>
+
+      {/* ── 4 Hero KPI cards ─────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5 no-print">
+        <HeroKPICard
+          label="Occupancy"
+          value={occupancyDisplay}
+          sub={heroKPIs ? `${heroKPIs.inhouse} of ${heroKPIs.totalRooms} rooms` : 'Loading…'}
+        />
+        <HeroKPICard
+          label="RevPAR"
+          value={revparDisplay}
+          sub="Revenue per available room"
+        />
+        <HeroKPICard
+          label="Today's Revenue"
+          value={revenueDisplay}
+          sub="Rooms and F&B"
+        />
+        <HeroKPICard
+          label="VAT Payable"
+          value={vatDisplay}
+          sub="Due this month"
+          valueClassName="text-red-600"
+        />
+      </div>
+
+      {/* ── Arrivals + Revenue chart ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5 no-print">
+        {/* Today's arrivals */}
+        <Card>
+          <CardHeader className="pt-4 pb-2">
+            <CardTitle className="text-base">Today&apos;s arrivals</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {arrivals.length === 0 ? (
+              <p className="text-sm text-pine/45 py-2">No arrivals expected today.</p>
+            ) : (
+              <div className="space-y-2">
+                {arrivals.slice(0, 6).map((r) => {
+                  const roomInfo = (r.reservation_rooms || []).map((rr) => rr.rooms).filter(Boolean)[0]
+                  const guestName = r.reservation_name || r.guests?.full_name || '-'
+                  const roomLabel = roomInfo ? `Room ${roomInfo.room_no} · ${roomInfo.room_name}` : r.res_no
+                  const isPending = ['QUERY', 'QUOTED'].includes(r.status)
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => openReservation(r.id)}
+                      className="w-full flex items-center justify-between gap-3 py-2.5 px-1 rounded-lg hover:bg-leaf/10 text-left transition-colors border-b border-leaf/20 last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm truncate text-ink">{guestName}</div>
+                        <div className="text-xs text-pine/50 truncate mt-0.5">{roomLabel}</div>
+                      </div>
+                      <Badge
+                        variant={isPending ? 'warning' : 'success'}
+                        className="shrink-0 whitespace-nowrap text-[11px]"
+                      >
+                        {isPending ? 'Pending' : 'Confirmed'}
+                      </Badge>
+                    </button>
+                  )
+                })}
               </div>
-            </div>
-            <div className="erp-header-metrics" aria-label="Front office room metrics">
-              <div><span>Rooms</span><strong>{totalRooms}</strong></div>
-              <div><span>In-house</span><strong>{occupiedRooms}</strong></div>
-              <div><span>Ready</span><strong>{readyRooms}</strong></div>
-              <div><span>HK Issues</span><strong>{hkAttn}</strong></div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
 
-      <KPICards module="dashboard" />
+        {/* Revenue last 7 days */}
+        <Card>
+          <CardHeader className="pt-4 pb-2">
+            <CardTitle className="text-base">Revenue, last 7 days</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {revenueChartData.length > 0 ? (
+              <RevenueBarChart data={revenueChartData} />
+            ) : (
+              <div className="h-28 flex items-center justify-center text-sm text-pine/40">Loading…</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
+      {/* ── Scroll hint ──────────────────────────────────────────── */}
+      <div className="flex justify-center mb-5 no-print">
+        <div className="flex flex-col items-center gap-1 text-pine/30">
+          <ChevronDown size={18} />
+        </div>
+      </div>
+
+      {/* ── Day close control ────────────────────────────────────── */}
       <Card className="erp-control-strip mb-5">
         <CardContent className="p-4">
           <div className="flex items-center justify-between flex-wrap gap-3">

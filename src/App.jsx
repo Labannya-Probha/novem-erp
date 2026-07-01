@@ -78,10 +78,11 @@ import {
   Printer, UserSearch,
 } from 'lucide-react'
 
-function BrandLogo({ url }) {
+function BrandLogo({ url, softwareName }) {
   const [ok, setOk] = useState(true)
   if (url && ok) return <img src={url} alt="logo" onError={() => setOk(false)} className="w-9 h-9 rounded-lg object-contain bg-white/90 p-0.5" />
-  return <div className="w-9 h-9 rounded-lg bg-forest flex items-center justify-center shadow-sm ring-1 ring-forest/15"><Leaf size={18} /></div>
+  const abbr = (softwareName || 'AS').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+  return <div className="w-9 h-9 rounded-lg bg-amber-400 flex items-center justify-center shadow-sm flex-shrink-0"><span className="text-pine font-bold text-sm leading-none">{abbr}</span></div>
 }
 
 /* ------------------------------------------------------------------ */
@@ -353,7 +354,7 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
     const SidebarContent = (
     <>
       <div className="px-5 py-5 flex items-center gap-3 border-b border-white/10">
-        <BrandLogo url={company?.logo_url} />
+        <BrandLogo url={company?.logo_url} softwareName={softwareName} />
         <div className="min-w-0 flex-1">
           <div className="font-display font-bold leading-tight truncate text-white">{softwareName}</div>
           <div className="text-[11px] text-white/60 truncate">{company?.name || ''}</div>
@@ -377,22 +378,9 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
             return can(role, n.id, privileges)
           })
           if (items.length === 0) return null
-          const isGroupOpen = openNavGroup === g.title
           return (
-            <div key={g.title} className={gi > 0 ? 'mt-2 pt-2 border-t border-white/5' : ''}>
-              <button
-                type="button"
-                className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  isGroupOpen ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'
-                }`}
-                onClick={() => setOpenNavGroup((current) => current === g.title ? null : g.title)}
-              >
-                <span className="text-[9.5px] uppercase tracking-widest font-bold">{g.title}</span>
-                <ChevronDown size={12} className={`transition-transform ${isGroupOpen ? '' : '-rotate-90'}`} />
-              </button>
-
-              {isGroupOpen && (
-                <div className="space-y-0.5 mt-1">
+            <div key={g.title} className={gi > 0 ? 'mt-1 pt-1 border-t border-white/[0.08]' : ''}>
+              <div className="space-y-0.5">
                   {items.map((n) => {
                     if (n.id === 'consumption' || n.id === 'vat') return null
 
@@ -512,10 +500,9 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
                     )
                   })}
                 </div>
-              )}
-            </div>
-          )
-        })}
+              </div>
+            )
+          })}
       </nav>
 
       <div className="px-5 py-4 border-t border-white/10 text-xs text-white/65">
@@ -575,7 +562,7 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
         <button onClick={() => setMobileNavOpen(true)} className="text-pine/70 hover:text-forest">
           <Menu size={22} />
         </button>
-        <BrandLogo url={company?.logo_url} />
+        <BrandLogo url={company?.logo_url} softwareName={softwareName} />
         <div className="min-w-0 flex-1">
           <div className="font-display font-bold leading-tight truncate text-sm">{softwareName}</div>
         </div>
@@ -595,12 +582,12 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
           {/* Dashboard */}
           <Route path="/dashboard" element={
             <SaasModuleRoute moduleId="dashboard" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-              <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} />
+              <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
             </SaasModuleRoute>
           } />
           <Route path="/frontoffice" element={
             <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-              <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} />
+              <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
             </SaasModuleRoute>
           } />
 
