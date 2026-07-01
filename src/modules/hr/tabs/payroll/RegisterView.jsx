@@ -90,7 +90,7 @@ export default function RegisterView() {
             <div>
               <div className="px-4 pb-2 flex justify-end">
                 <button className="btn-ghost text-xs flex items-center gap-1"
-                  onClick={() => PayslipPrint(run, slips[run.id])}>
+                  onClick={() => PayslipPrint({ run, slips: slips[run.id] })}>
                   <Printer size={13} /> Print Register
                 </button>
               </div>
