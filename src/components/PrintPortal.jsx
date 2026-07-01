@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Printer, Download } from 'lucide-react'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
 export default function PrintPortal({ title, onClose, children, type = 'A4', primaryColor, accentColor, autoPrint = false }) {
   const [portalNode, setPortalNode] = useState(null)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const printRootRef = useRef(null)
 
   // Tenant brand colors — falls back to the original hardcoded Novem pine/forest
   // if no company-specific colors are passed in (so nothing breaks for callers
@@ -345,12 +349,43 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
 
   useEffect(() => {
     if (!portalNode || !autoPrint) return undefined
-    const timer = setTimeout(() => { window.print() }, 300)
+    const timer = setTimeout(() => { handlePrint() }, 300)
     return () => clearTimeout(timer)
   }, [portalNode, autoPrint])
 
-  const handleExportPDF = () => {
-    window.print()
+  const handleExportPDF = async () => {
+    const el = printRootRef.current
+    if (!el) return
+    setPdfBusy(true)
+    try {
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+      const imgData = canvas.toDataURL('image/png')
+      const isTherm = isThermal
+      const orientation = isTherm ? 'portrait' : (normalizedType.includes('landscape') ? 'landscape' : 'portrait')
+      const format = isTherm ? [80, (canvas.height / canvas.width) * 80] : (normalizedType === 'a3' || normalizedType === 'a3-landscape' ? 'a3' : 'a4')
+      const pdf = new jsPDF({ orientation, unit: 'mm', format })
+      const pdfW = pdf.internal.pageSize.getWidth()
+      const pdfH = (canvas.height / canvas.width) * pdfW
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH)
+      const safeName = (title || 'document').replace(/[^a-zA-Z0-9_\-. ]/g, '_').slice(0, 80)
+      pdf.save(`${safeName}.pdf`)
+    } catch (e) {
+      console.error('PDF export failed:', e)
+    }
+    setPdfBusy(false)
+  }
+
+  const handlePrint = () => {
+    const el = printRootRef.current
+    if (!el) return
+    const printWin = window.open('', '_blank', 'width=900,height=700')
+    if (!printWin) { window.print(); return }
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map((s) => s.outerHTML).join('\n')
+    printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">${styles}</head><body style="margin:0;padding:0">${el.outerHTML}</body></html>`)
+    printWin.document.close()
+    printWin.focus()
+    printWin.print()
+    printWin.close()
   }
 
   const handleBackdropMouseDown = (event) => {
@@ -379,10 +414,10 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         >
           <h3 className="font-semibold font-sans min-w-0 flex-1 truncate" style={{ color: brandPrimary }}>{title}</h3>
           <div className="flex flex-wrap gap-2 justify-end">
-            <button type="button" className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandPrimary }} onClick={handleExportPDF}>
-              <Download size={14} /> Export PDF
+            <button type="button" className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandPrimary }} onClick={handleExportPDF} disabled={pdfBusy}>
+              <Download size={14} /> {pdfBusy ? 'Generating…' : 'Download PDF'}
             </button>
-            <button type="button" className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandAccent }} onClick={() => window.print()}>
+            <button type="button" className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandAccent }} onClick={handlePrint}>
               <Printer size={14} /> Print
             </button>
             <button type="button" className="px-3 py-1.5 rounded text-sm border hover:bg-gray-100" style={{ borderColor: `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.24)`, color: brandPrimary }} onClick={onClose}>
@@ -392,6 +427,7 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         </div>
         {/* Print Content Wrapper */}
         <div
+          ref={printRootRef}
           id="print-root"
           className={`p-4 sm:p-8 overflow-auto ${
             isThermal

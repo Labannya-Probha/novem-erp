@@ -110,9 +110,10 @@ export function getCopyProfile(copyLabel) {
 
 export function resolvePosBrand(company = {}, order = {}) {
   const tenantName = company?.name || company?.company_name || company?.tenant_name || order?.tenant_name || 'Tenant'
+  const restaurantName = company?.is_restaurant_available && company?.restaurant_name ? company.restaurant_name : tenantName
   return {
     tenantName,
-    outletName: order?.outlet || order?.outlet_name || company?.outlet_name || tenantName,
+    outletName: order?.outlet || order?.outlet_name || company?.outlet_name || restaurantName,
     branchName: order?.property_name || company?.property_name || company?.branch_name || '',
     address: order?.outlet_address || company?.address || '',
     phone: order?.outlet_phone || company?.phone || '',

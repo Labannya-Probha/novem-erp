@@ -11,7 +11,6 @@ import {
   qrCodeUrl,
   resolvePosBrand,
   resolvePosPrintSettings,
-  documentHash,
   splitKotBotItems,
 } from '../../lib/posPrintEngine'
 
@@ -48,19 +47,17 @@ function ReceiptHeader({ order, company, profile, settings, invoiceNo }) {
   const issuedAt = safeDate(order)
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginBottom: 4 }}>
         {settings.showLogo && brand.logoUrl && (
-          <img src={brand.logoUrl} alt="" style={{ width: 34, height: 34, objectFit: 'contain', filter: 'grayscale(1) saturate(0) contrast(2)', mixBlendMode: 'multiply' }} />
+          <img src={brand.logoUrl} alt="" style={{ width: 40, height: 40, objectFit: 'contain', filter: 'grayscale(1) saturate(0) contrast(2)', marginBottom: 3 }} />
         )}
-        <div>
-          <div style={{ fontSize: 15, lineHeight: 1.1, fontWeight: 900 }}>{brand.outletName}</div>
-          {brand.branchName && <div style={{ fontSize: 9 }}>{brand.branchName}</div>}
-          {brand.address && <div style={{ fontSize: 8.5 }}>{brand.address}</div>}
-          {(brand.phone || brand.email) && <div style={{ fontSize: 8.5 }}>{[brand.phone, brand.email].filter(Boolean).join(' | ')}</div>}
-          {settings.showTaxInfo && (brand.bin || brand.vatRegNo) && (
-            <div style={{ fontSize: 8.5 }}>{[brand.bin && `BIN: ${brand.bin}`, brand.vatRegNo && `VAT: ${brand.vatRegNo}`].filter(Boolean).join(' | ')}</div>
-          )}
-        </div>
+        <div style={{ fontSize: 15, lineHeight: 1.1, fontWeight: 900 }}>{brand.outletName}</div>
+        {brand.branchName && <div style={{ fontSize: 9 }}>{brand.branchName}</div>}
+        {brand.address && <div style={{ fontSize: 8.5 }}>{brand.address}</div>}
+        {(brand.phone || brand.email) && <div style={{ fontSize: 8.5 }}>{[brand.phone, brand.email].filter(Boolean).join(' | ')}</div>}
+        {settings.showTaxInfo && (brand.bin || brand.vatRegNo) && (
+          <div style={{ fontSize: 8.5 }}>{[brand.bin && `BIN: ${brand.bin}`, brand.vatRegNo && `VAT: ${brand.vatRegNo}`].filter(Boolean).join(' | ')}</div>
+        )}
       </div>
       <div style={line} />
       <CopyBadge profile={profile} />
@@ -70,6 +67,7 @@ function ReceiptHeader({ order, company, profile, settings, invoiceNo }) {
           <tr><td style={labelCell}>Order</td><td style={amountCell}>{order?.order_no || '-'}</td></tr>
           {order?.bill_no && <tr><td style={labelCell}>Bill</td><td style={amountCell}>{order.bill_no}</td></tr>}
           <tr><td style={labelCell}>Type</td><td style={amountCell}>{formatOrderType(order?.order_type)}</td></tr>
+          {(order?.guest_name) && <tr><td style={labelCell}>Guest</td><td style={amountCell}>{order.guest_name}</td></tr>}
           {(order?.table_no || order?.room_no || order?.token_no) && (
             <tr>
               <td style={labelCell}>Reference</td>
@@ -186,7 +184,7 @@ function PaymentSummary({ order, settings, profile }) {
   )
 }
 
-function AuditBlock({ order, profile, hash }) {
+function AuditBlock({ order, profile }) {
   if (!profile.showAudit) return null
   return (
     <div style={{ marginTop: 6, borderTop: '1px dashed #000', paddingTop: 4, fontSize: 8.5 }}>
@@ -197,7 +195,6 @@ function AuditBlock({ order, profile, hash }) {
       {order?.void_reason && <div>Void Reason: {order.void_reason}</div>}
       {order?.approved_by && <div>Approved By: {order.approved_by}</div>}
       {order?.reprint_count > 0 && <div>Reprint Count: {order.reprint_count}</div>}
-      <div>Document Hash: {hash}</div>
     </div>
   )
 }
@@ -213,7 +210,7 @@ function SignatureBlock({ lines = [] }) {
   )
 }
 
-function ThermalFooter({ order, company, settings, profile, verifyUrl, hash }) {
+function ThermalFooter({ order, company, settings, profile, verifyUrl }) {
   const brand = resolvePosBrand(company, order)
   const printedAt = new Date().toISOString()
   return (
@@ -228,7 +225,6 @@ function ThermalFooter({ order, company, settings, profile, verifyUrl, hash }) {
       {brand.website && <div>{brand.website}</div>}
       <div>Printed by {order?.printed_by || order?.created_by || 'System'} | {formatPosDate(printedAt, settings.timezone)} | {formatPosTime(printedAt, settings.timezone)}</div>
       {profile.code === 'REPRINT_COPY' && <div>Original print: {order?.original_print_time ? `${formatPosDate(order.original_print_time, settings.timezone)} ${formatPosTime(order.original_print_time, settings.timezone)}` : '-'}</div>}
-      <div>Powered by Aura ERP | {hash}</div>
     </div>
   )
 }
@@ -237,8 +233,8 @@ export function ThermalReceiptLayout({ order = {}, items = [], company, copyType
   const profile = getCopyProfile(copyType)
   const settings = resolvePosPrintSettings(company)
   const invoiceNo = mushakNo || order.invoice_no || order.order_no || '-'
-  const hash = documentHash([invoiceNo, order.order_no, order.total, profile.code])
   const verifyUrl = posVerifyUrl(settings, order, invoiceNo)
+  const signatureLines = profile.signatureLines && profile.signatureLines.length ? profile.signatureLines : ['Guest Signature']
   return (
     <div
       className={`print-copy ${profile.code !== 'CUSTOMER_COPY' ? 'print-copy-break' : ''}`}
@@ -248,9 +244,9 @@ export function ThermalReceiptLayout({ order = {}, items = [], company, copyType
       <ReceiptItemTable items={items} settings={settings} />
       <ReceiptSummary order={order} settings={settings} />
       <PaymentSummary order={order} settings={settings} profile={profile} />
-      <AuditBlock order={order} profile={profile} hash={hash} />
-      <SignatureBlock lines={profile.signatureLines} />
-      <ThermalFooter order={order} company={company} settings={settings} profile={profile} verifyUrl={verifyUrl} hash={hash} />
+      <AuditBlock order={order} profile={profile} />
+      <SignatureBlock lines={signatureLines} />
+      <ThermalFooter order={order} company={company} settings={settings} profile={profile} verifyUrl={verifyUrl} />
     </div>
   )
 }
@@ -327,7 +323,6 @@ export function KOTPrintLayout({ order = {}, items = [], company, stationName = 
   const brand = resolvePosBrand(company, order)
   const profile = getCopyProfile(copyType)
   const issuedAt = order.created_at || new Date().toISOString()
-  const hash = documentHash([order.order_no, stationName, issuedAt])
   return (
     <div className="print-copy" style={{ ...mono, boxSizing: 'border-box', maxWidth: '100%', width: '100%', margin: '0 auto', color: '#000', overflowWrap: 'anywhere' }}>
       <CopyBadge profile={profile} />
@@ -341,6 +336,7 @@ export function KOTPrintLayout({ order = {}, items = [], company, stationName = 
           <tr><td style={cell}>KOT No</td><td style={amountCell}>{order.kot_no || order.order_no || '-'}</td></tr>
           <tr><td style={cell}>Type</td><td style={amountCell}>{formatOrderType(order.order_type)}</td></tr>
           {(order.table_no || order.room_no || order.token_no) && <tr><td style={cell}>Ref</td><td style={amountCell}>{[order.table_no && `Table ${order.table_no}`, order.room_no && `Room ${order.room_no}`, order.token_no && `Token ${order.token_no}`].filter(Boolean).join(' | ')}</td></tr>}
+          {order.guest_name && <tr><td style={cell}>Guest</td><td style={amountCell}>{order.guest_name}</td></tr>}
           {order.waiter && <tr><td style={cell}>Waiter</td><td style={amountCell}>{order.waiter}</td></tr>}
           {order.guest_count && <tr><td style={cell}>Covers</td><td style={amountCell}>{order.guest_count}</td></tr>}
           <tr><td style={cell}>Priority</td><td style={{ ...amountCell, fontWeight: 900 }}>{order.priority || 'Normal'}</td></tr>
@@ -352,7 +348,7 @@ export function KOTPrintLayout({ order = {}, items = [], company, stationName = 
       {order.notes && <div style={{ marginTop: 6, border: '1px solid #000', padding: 4, fontSize: 12, fontWeight: 900 }}>NOTE: {order.notes}</div>}
       {order.allergy_info && <div style={{ marginTop: 4, border: '1px solid #000', padding: 4, fontSize: 12, fontWeight: 900 }}>ALLERGY: {order.allergy_info}</div>}
       <SignatureBlock lines={['Chef Signature', 'Prepared Time', 'Served Time']} />
-      <div style={{ textAlign: 'center', marginTop: 6, fontSize: 8.5 }}>Status: {status} | Hash: {hash}</div>
+      <div style={{ textAlign: 'center', marginTop: 6, fontSize: 8.5 }}>Status: {status}</div>
     </div>
   )
 }

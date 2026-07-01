@@ -794,8 +794,8 @@ function NewReservation({ close, openReservation, userName, prefill }) {
         />
       )}
 
-      <div className="fixed inset-0 bg-ink/60 z-40 flex items-start justify-center overflow-auto p-3 sm:p-6">
-        <div className="card max-w-2xl w-full p-4 sm:p-6 my-3 sm:my-6">
+      <div className="min-h-screen bg-paper py-6 px-3 sm:px-6">
+        <div className="card max-w-2xl w-full p-4 sm:p-6 mx-auto">
           <h2 className="font-display text-lg font-bold text-pine mb-4">New reservation query</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
