@@ -13,15 +13,27 @@ import { ListChecks, Clock, CheckCircle2 } from 'lucide-react'
 function useTaskKpi(userName) {
   const [kpi, setKpi] = useState({ open: null, mine: null, done: null })
   useEffect(() => {
+    let cancelled = false
     const load = async () => {
-      const [{ count: open }, { count: mine }, { count: done }] = await Promise.all([
+      const queries = [
         supabase.from('tasks').select('id', { count: 'exact', head: true }).in('status', ['OPEN', 'IN_PROGRESS']),
-        supabase.from('tasks').select('id', { count: 'exact', head: true }).in('status', ['OPEN', 'IN_PROGRESS']).eq('created_by', userName),
         supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('status', 'DONE'),
-      ])
+      ]
+      if (userName) {
+        queries.push(
+          supabase.from('tasks').select('id', { count: 'exact', head: true })
+            .in('status', ['OPEN', 'IN_PROGRESS']).eq('created_by', userName)
+        )
+      }
+      const results = await Promise.all(queries)
+      if (cancelled) return
+      const open = results[0].count
+      const done = results[1].count
+      const mine = userName ? results[2].count : null
       setKpi({ open, mine, done })
     }
     load()
+    return () => { cancelled = true }
   }, [userName])
   return kpi
 }
