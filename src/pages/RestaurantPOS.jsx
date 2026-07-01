@@ -118,6 +118,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
   const [staffDueName, setStaffDueName] = useState('')
   const [busy, setBusy] = useState(false)
   const [itemSearch, setItemSearch] = useState('')
+  const [changeConfirmation, setChangeConfirmation] = useState(null)
   const rate = rateFor(taxConfig, 'RESTAURANT', todayISO())
   const subtotal = cart.reduce((a, c) => a + c.qty * c.unit_price, 0)
   
@@ -177,13 +178,7 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
     setPrintDoc({ type: 'KOT', order: { order_no: 'TEMP-' + Date.now(), table_no: meta.table_no, order_type: meta.order_type, guest_name: link.guest_name }, items: cart })
   }
 
-  const payNow = async () => {
-    if (!guard()) return
-    const paidMethods = Object.entries(payments).filter(([m, a]) => Number(a) > 0)
-    if (paidMethods.length === 0) { flash('Add at least one payment method.'); return }
-    const totalPaid = paidMethods.reduce((a, [m, amt]) => a + Number(amt), 0)
-    if (totalPaid < t.total) { flash(`Total payment (${fmtBDT(totalPaid)}) less than bill (${fmtBDT(t.total)})`); return }
-    if (totalPaid > t.total) { flash(`Change: ${fmtBDT(totalPaid - t.total)}`); return }
+  const settlePaidOrder = async (paidMethods, totalPaid) => {
     setBusy(true)
     try {
       const settled = { status: 'SETTLED', payment_method: paidMethods.map(([m]) => m).join(', '), settled_at: new Date().toISOString() }
@@ -196,10 +191,35 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
         if (pe) throw pe
         await supabase.from('pos_orders').update({ folio_charge_id: fc.id }).eq('id', order.id)
       }
-      onDone({ type: 'RECEIPT', order: { ...order, status: 'SETTLED', payment_method: paidMethods.map(([m]) => m).join(', ') }, items: oi, mushakNo })
+      onDone({
+        type: 'RECEIPT',
+        order: {
+          ...order,
+          status: 'SETTLED',
+          payment_method: paidMethods.map(([m]) => m).join(', '),
+          received_amount: totalPaid,
+          change_amount: Math.max(0, totalPaid - t.total),
+        },
+        items: oi,
+        mushakNo,
+      })
       flash(`${order.order_no} settled — ${paidMethods.map(([m, a]) => `${m}:${fmtBDT(a)}`).join(', ')}`)
     } catch (e) { flash(e.message) }
+    setChangeConfirmation(null)
     setBusy(false)
+  }
+
+  const payNow = async () => {
+    if (!guard()) return
+    const paidMethods = Object.entries(payments).filter(([m, a]) => Number(a) > 0)
+    if (paidMethods.length === 0) { flash('Add at least one payment method.'); return }
+    const totalPaid = paidMethods.reduce((a, [m, amt]) => a + Number(amt), 0)
+    if (totalPaid < t.total) { flash(`Total payment (${fmtBDT(totalPaid)}) less than bill (${fmtBDT(t.total)})`); return }
+    if (totalPaid > t.total) {
+      setChangeConfirmation({ paidMethods, totalPaid, change: totalPaid - t.total })
+      return
+    }
+    await settlePaidOrder(paidMethods, totalPaid)
   }
 
   const chargeToRoom = async () => {
@@ -368,6 +388,25 @@ function OrderBuilder({ cats, items, taxConfig, userName, existing, flash, setPr
         </div>
       </div>
       {showPicker && <GuestPicker close={() => setShowPicker(false)} pick={(g) => { setLink(g); setShowPicker(false) }} />}
+      {changeConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl border border-leaf">
+            <h4 className="font-display text-base font-semibold text-pine">Change confirmation</h4>
+            <p className="text-xs text-pine/70 mt-1">Change দেওয়া হয়েছে কি?</p>
+            <div className="mt-4 space-y-1.5 text-sm">
+              <div className="flex justify-between"><span>Bill amount</span><span className="money font-semibold">{fmtBDT(t.total)}</span></div>
+              <div className="flex justify-between"><span>Paid amount</span><span className="money font-semibold">{fmtBDT(changeConfirmation.totalPaid)}</span></div>
+              <div className="flex justify-between text-amber font-semibold"><span>Change</span><span className="money">{fmtBDT(changeConfirmation.change)}</span></div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn-ghost !py-1.5" onClick={() => setChangeConfirmation(null)} disabled={busy}>Cancel</button>
+              <button className="btn-primary !py-1.5" onClick={() => settlePaidOrder(changeConfirmation.paidMethods, changeConfirmation.totalPaid)} disabled={busy}>
+                {busy ? 'Processing…' : 'Confirm & Print Bill'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
