@@ -103,6 +103,8 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
     ? 'nightaudit'
     : currentTopSegment === 'consumption'
       ? 'inventory'
+      : currentTopSegment === 'night-audit-reports'
+        ? 'reports'
       : currentTopSegment === 'restaurant'
         ? 'pos'
         : currentTopSegment
@@ -186,6 +188,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
     const isReportsRoute = (
       location.pathname === PATHS.REPORTS ||
       location.pathname === PATHS.REPORTS_CASED_ALIAS ||
+      location.pathname === PATHS.NIGHT_AUDIT_REPORTS ||
       location.pathname.endsWith('/reports') ||
       location.pathname.endsWith('/Reports')
     )

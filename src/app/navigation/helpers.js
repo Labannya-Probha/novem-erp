@@ -17,6 +17,7 @@ function pathForNavId(id) {
 export function getActiveNavGroupTitle(currentTopId, pathname) {
   if (pathname.startsWith('/accounting') || pathname === '/vat' || pathname === '/vat-return') return 'Modules'
   if (pathname.startsWith('/hr')) return 'Modules'
+  if (pathname === PATHS.NIGHT_AUDIT_REPORTS) return 'Modules'
   if (
     pathname.startsWith('/frontoffice') ||
     pathname.startsWith('/front-office') ||

@@ -50,7 +50,7 @@ import {
   HrCompliancePage,
 } from './pages/HrOffice.jsx'
 import NightAudit from './pages/NightAudit.jsx'
-import Reportmodule from './pages/Reportmodule.jsx'
+import ReportsCenterPage from './modules/reports/ReportsCenterPage.jsx'
 import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
@@ -260,14 +260,15 @@ export default function AppRoutes({
       {/* Reports */}
       <Route path={PATHS.REPORTS_CASED_ALIAS} caseSensitive element={<Navigate to={PATHS.REPORTS} replace />} />
       <Route path={PATHS.TENANT_REPORTS_CASED_ALIAS} caseSensitive element={<TenantReportsRedirect />} />
+      <Route path={PATHS.NIGHT_AUDIT_REPORTS} element={<Navigate to={`${PATHS.REPORTS}?category=hotel-operations&report=NIGHT-AUDIT`} replace />} />
       <Route path={PATHS.TENANT_REPORTS} element={
         <SaasModuleRoute moduleId="reports" role={role} navId="reports" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <Reportmodule userName={userName} userId={userId} role={role} company={company} />
+          <ReportsCenterPage userName={userName} userId={userId} role={role} company={company} />
         </SaasModuleRoute>
       } />
       <Route path={PATHS.REPORTS} element={
         <SaasModuleRoute moduleId="reports" role={role} navId="reports" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <Reportmodule userName={userName} userId={userId} role={role} company={company} />
+          <ReportsCenterPage userName={userName} userId={userId} role={role} company={company} />
         </SaasModuleRoute>
       } />
 

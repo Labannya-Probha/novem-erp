@@ -85,6 +85,7 @@ export const PATHS = {
   REPORTS_CASED_ALIAS: '/Reports',
   TENANT_REPORTS: '/:slug/reports',
   TENANT_REPORTS_CASED_ALIAS: '/:slug/Reports',
+  NIGHT_AUDIT_REPORTS: '/night-audit-reports',
 
   // Tasks
   TASKS: '/tasks',
