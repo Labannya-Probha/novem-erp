@@ -25,6 +25,7 @@ const NAV_ACCESS_FALLBACK = {
   reports:      ['MANAGER', 'FRONT_OFFICE', 'RESTAURANT', 'STORE', 'ACCOUNTS', 'HR', 'HOUSEKEEPING'],
   settings:     ['ADMIN', 'SUPERUSER'],
   cms:          ['ADMIN', 'SUPERUSER'],
+  crm:          ['MANAGER', 'FRONT_OFFICE', 'ACCOUNTS'],
 }
 
 // can(role, pageId, privileges?)

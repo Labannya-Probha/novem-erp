@@ -19,6 +19,7 @@ export const MODULE_ENTITLEMENT_BY_NAV = {
   calendar: 'reservations',
   reservations: 'reservations',
   'reservation-payments': 'reservations',
+  crm: 'reservations',
   frontoffice: 'frontOffice',
   nightaudit: 'frontOffice',
   housekeeping: 'housekeeping',

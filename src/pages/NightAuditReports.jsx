@@ -103,6 +103,7 @@ export default function NightAuditReports() {
         </table>
         </div>
       </div>
+      {selectedReport && (
         <PrintPortal title={`Daily Revenue Statement — ${selectedReport.date}`} onClose={() => setSelectedReport(null)}>
           <DailyStatementReport report={selectedReport} />
         </PrintPortal>

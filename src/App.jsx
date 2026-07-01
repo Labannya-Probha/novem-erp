@@ -61,6 +61,7 @@ import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
 import VendorPaymentTab from './components/VendorPaymentTab.jsx'
+import GuestCRM from './pages/GuestCRM.jsx'
 import { WelcomePopover } from './components/WelcomePopover.jsx'
 import { PopoverDisplay } from './components/PopoverDisplay.jsx'
 import { useWelcomePopover } from './hooks/useWelcomePopover'
@@ -73,7 +74,7 @@ import {
   PartyPopper, FileText, FileCheck, LogIn, CheckCircle, TrendingUp, ArrowUpCircle,
   AlertTriangle, MessageSquareWarning, AlertOctagon, ShieldCheck, Award, Briefcase,
   Banknote, UsersRound, Siren,
-  Printer,
+  Printer, UserSearch,
 } from 'lucide-react'
 
 function BrandLogo({ url }) {
@@ -90,6 +91,7 @@ const NAV_GROUPS = [
     { id: 'calendar',     label: 'Booking Calendar', icon: CalendarDays },
     { id: 'reservations', label: 'Reservations',     icon: BedDouble },
     { id: 'reservation-payments', label: 'Reservation Payments', icon: Wallet },
+    { id: 'crm',          label: 'Guest CRM',        icon: UserSearch },
   ]},
   { title: 'Tasks', items: [
     { id: 'tasks',     label: 'Task Management', icon: ListChecks },
@@ -592,6 +594,13 @@ function firstAccessiblePath(role, privileges, modulesEnabled = null) {
           <Route path="/reservation-payments" element={
             <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ReservationPayments userName={userName} isAdmin={isAdmin} />
+            </SaasModuleRoute>
+          } />
+
+          {/* Guest CRM */}
+          <Route path="/crm" element={
+            <SaasModuleRoute moduleId="reservations" role={role} navId="crm" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
+              <GuestCRM userName={userName} isAdmin={isAdmin} role={role} />
             </SaasModuleRoute>
           } />
 
