@@ -1,4 +1,5 @@
 import { ArrowDownUp } from 'lucide-react'
+import { isValidElement } from 'react'
 import { Button } from 'src/components/ui/button'
 import EmptyState from './EmptyState'
 import SkeletonRow from './SkeletonRow'
@@ -131,7 +132,7 @@ export default function DataTable({
             ) : (
               <tr>
                 <td colSpan={columnCount} className="px-3 py-10">
-                  {emptyState && typeof emptyState !== 'object' ? (
+                  {isValidElement(emptyState) ? (
                     emptyState
                   ) : (
                     <EmptyState
