@@ -18,6 +18,7 @@ import { getVisibleSettingsSections } from './app/navigation/settingsSections'
 import { PATHS } from './app/paths'
 import { getTenantId } from './lib/tenant'
 import { firstAccessiblePath } from './app/navigation/helpers'
+import { RESERVATION_TABS, DEFAULT_RESERVATION_TAB } from './modules/reservations/reservations.config'
 import { WelcomePopover } from './components/WelcomePopover.jsx'
 import { PopoverDisplay } from './components/PopoverDisplay.jsx'
 import { useWelcomePopover } from './hooks/useWelcomePopover'
@@ -252,8 +253,9 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                   } else if (n.id === 'reservations') {
                     const resTab = new URLSearchParams(location.search).get('tab')
                     const isResPath = location.pathname === PATHS.RESERVATIONS
-                    const validResTabs = new Set(['list', 'calendar', 'payments', 'crm'])
-                    const isListTab = !resTab || !validResTabs.has(resTab) || resTab === 'list'
+                    const validResTabs = new Set(RESERVATION_TABS.map((tab) => tab.id))
+                    const safeResTab = validResTabs.has(resTab) ? resTab : DEFAULT_RESERVATION_TAB
+                    const isListTab = safeResTab === DEFAULT_RESERVATION_TAB
                     nested = [
                       {
                         id: 'reservations-list',
