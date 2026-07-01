@@ -326,13 +326,38 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
     }
   }, [type, brandPrimary, brandAccent, isThermal, thermalPaperWidth, thermalContentMaxWidth, pageSize, printRootMaxWidth, isA3Landscape, isA3Portrait, isA4Landscape])
 
+  useEffect(() => {
+    if (!portalNode) return undefined
+
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') onClose?.()
+    }
+    const closeAfterPrint = () => onClose?.()
+
+    window.addEventListener('keydown', closeOnEscape)
+    window.addEventListener('afterprint', closeAfterPrint)
+
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape)
+      window.removeEventListener('afterprint', closeAfterPrint)
+    }
+  }, [portalNode, onClose])
+
   const handleExportPDF = () => {
-    window.print();
+    window.print()
+  }
+
+  const handleBackdropMouseDown = (event) => {
+    if (event.target === event.currentTarget) onClose?.()
   }
 
   if (!portalNode) return null
   return createPortal(
-    <div id="print-modal-overlay" className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto overscroll-contain p-3 sm:p-6">
+    <div
+      id="print-modal-overlay"
+      className="fixed inset-0 bg-black/60 z-[9999] flex items-start justify-center overflow-auto overscroll-contain p-3 sm:p-6"
+      onMouseDown={handleBackdropMouseDown}
+    >
       <div
         className="bg-white w-full my-0 sm:my-4 relative overflow-visible rounded-xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col"
         style={{
@@ -348,13 +373,13 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
         >
           <h3 className="font-semibold font-sans min-w-0 flex-1 truncate" style={{ color: brandPrimary }}>{title}</h3>
           <div className="flex flex-wrap gap-2 justify-end">
-            <button className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandPrimary }} onClick={handleExportPDF}>
+            <button type="button" className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandPrimary }} onClick={handleExportPDF}>
               <Download size={14} /> Export PDF
             </button>
-            <button className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandAccent }} onClick={() => window.print()}>
+            <button type="button" className="flex items-center gap-1 text-white px-3 py-1.5 rounded text-sm" style={{ background: brandAccent }} onClick={() => window.print()}>
               <Printer size={14} /> Print
             </button>
-            <button className="px-3 py-1.5 rounded text-sm border hover:bg-gray-100" style={{ borderColor: `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.24)`, color: brandPrimary }} onClick={onClose}>
+            <button type="button" className="px-3 py-1.5 rounded text-sm border hover:bg-gray-100" style={{ borderColor: `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.24)`, color: brandPrimary }} onClick={onClose}>
               <X size={14} /> Close
             </button>
           </div>
