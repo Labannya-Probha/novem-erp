@@ -43,3 +43,27 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 - **Disable public sign-ups** — Authentication → Providers → Email → disable "Enable email sign-ups". All accounts are created by admins through the Settings → Staff Management screen.
 - **Enable Leaked password protection** — Authentication → Providers → Email → enable "Leaked password protection".
 
+### 4. SSH & GPG key setup (Git)
+
+Add your SSH key to GitHub:
+
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com"
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub
+```
+
+Then add the printed public key in GitHub → Settings → SSH and GPG keys.
+
+Add your GPG key for signed commits:
+
+```bash
+gpg --full-generate-key
+gpg --list-secret-keys --keyid-format=long
+gpg --armor --export <YOUR_KEY_ID>
+git config --global user.signingkey <YOUR_KEY_ID>
+git config --global commit.gpgsign true
+```
+
+Then add the exported public key in GitHub → Settings → SSH and GPG keys.
