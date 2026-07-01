@@ -4,7 +4,8 @@ import { isModuleEnabled } from '../../lib/saasModules'
 import { PATHS } from '../paths'
 
 const NAV_ID_PATHS = {
-  dashboard: PATHS.FRONTOFFICE,
+  dashboard:          PATHS.FRONTOFFICE,
+  nightaudit:         `${PATHS.FRONT_OFFICE}?tab=in-house`,
   'pos-print-center': PATHS.POS_PRINT_CENTER,
 }
 
@@ -17,8 +18,8 @@ export function getActiveNavGroupTitle(currentTopId, pathname) {
   if (pathname.startsWith('/hr')) return 'Modules'
   if (
     pathname.startsWith('/frontoffice') ||
+    pathname.startsWith('/front-office') ||
     pathname.startsWith('/verify/pos/') ||
-    currentTopId === 'dashboard' ||
     currentTopId === 'nightaudit' ||
     currentTopId === 'housekeeping' ||
     currentTopId === 'facilities'
@@ -31,9 +32,9 @@ export function getActiveNavGroupTitle(currentTopId, pathname) {
 export function firstAccessiblePath(role, privileges, modulesEnabled = null) {
   for (const id of ALL_NAV_IDS) {
     if (!isModuleEnabled(id, modulesEnabled, role)) continue
-    if (id === 'dashboard' || can(role, id, privileges)) {
+    if (id === 'dashboard' || id === 'nightaudit' || can(role, id, privileges)) {
       return pathForNavId(id)
     }
   }
-  return PATHS.FRONTOFFICE
+  return `${PATHS.FRONT_OFFICE}?tab=in-house`
 }

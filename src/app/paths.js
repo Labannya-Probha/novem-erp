@@ -9,6 +9,7 @@ export const PATHS = {
   LOGIN: '/login',
 
   // Front Office
+  FRONT_OFFICE: '/front-office',     // unified AEDS v2 module page
   FRONTOFFICE: '/frontoffice',
   DASHBOARD: '/dashboard',           // legacy alias → redirects to /frontoffice
   FRONTOFFICE_RESERVATION_DETAIL: '/frontoffice/reservations/:id',
