@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase'
 import {
   ChevronDown, ShieldCheck, KeyRound, Image, Printer, FileText,
@@ -16,20 +15,8 @@ import TaxPolicyCard from '../components/settings/TaxPolicyCard'
 import AdminFeatureAccessCard from '../components/settings/AdminFeatureAccessCard'
 import DataWipeCard from '../components/settings/DataWipeCard'
 import ReservationPolicyCard from '../components/settings/ReservationPolicyCard'
-
-export const SETTINGS_SECTIONS = [
-  { id: 'my-account', label: 'My Account' },
-  { id: 'saas-admin', label: 'SaaS Tenants', superuserOnly: true },
-  { id: 'branding', label: 'Branding', adminOnly: true },
-  { id: 'pos-print', label: 'POS Print Settings', adminOnly: true },
-  { id: 'tax-policy', label: 'Tax Policy' },
-  { id: 'allowance', label: 'Allowance Configuration', superuserOnly: true },
-  { id: 'role-permissions', label: 'Role Permissions', superuserOnly: true },
-  { id: 'admin-feature-access', label: 'Admin Feature Access', superuserOnly: true },
-  { id: 'staff', label: 'Staff Management' },
-  { id: 'accounting-integrations', label: 'Accounting Integrations', adminOnly: true },
-  { id: 'data-system', label: 'Data & System', superuserOnly: true },
-]
+import { getVisibleSettingsSections, SETTINGS_SECTIONS } from '../app/navigation/settingsSections'
+import { useSettingsSection } from '../hooks/useSettingsSection'
 
 /* ------------------------------------------------------------------ */
 /*  COLLAPSIBLE SECTION wrapper — click header to expand/collapse       */
@@ -56,12 +43,9 @@ function CollapsibleSection({ title, icon: Icon, children, open, onToggle }) {
 /*  ROOT — role-gated entry point                                       */
 /* ------------------------------------------------------------------ */
 export default function Settings({ userName, role, isAdmin, reloadCompany }) {
-  const location = useLocation()
-  const navigate = useNavigate()
   const isSuperuser = role === 'SUPERUSER'
   const isAdminPlus = isSuperuser || isAdmin          // Admin or above
   const canManage   = isAdminPlus || role === 'MANAGER'
-  const [activeSection, setActiveSection] = useState(null)
   const [myTenantId, setMyTenantId]       = useState(null)
     useEffect(() => {
     supabase.auth.getUser().then(({ data: u }) => {
@@ -73,6 +57,43 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
         .then(({ data }) => { if (data?.tenant_id) setMyTenantId(data.tenant_id) })
     })
   }, [])
+  const sectionContents = useMemo(() => ({
+    'my-account': <MyAccountCard userName={userName} />,
+    'saas-admin': <SaasTenantAdminCard />,
+    'branding': <BrandingCard reloadCompany={reloadCompany} />,
+    'pos-print': <PosPrintSettingsCard tenantId={myTenantId} />,
+    'tax-policy': <TaxPolicyCard tenantId={myTenantId} isAdmin={isAdminPlus} />,
+    'allowance': <AllowanceCard />,
+    'role-permissions': <RolePrivilegesCard />,
+    'admin-feature-access': <AdminFeatureAccessCard />,
+    'staff': <StaffCard isAdminPlus={isAdminPlus} isSuperuser={isSuperuser} currentUserName={userName} />,
+    'reservation-policy': <ReservationPolicyCard />,
+    'data-system': <DataWipeCard />,
+  }), [isAdminPlus, isSuperuser, myTenantId, reloadCompany, userName])
+
+  const sectionIcons = {
+    'my-account': KeyRound,
+    'saas-admin': Building2,
+    'branding': Image,
+    'pos-print': Printer,
+    'tax-policy': FileText,
+    'allowance': Percent,
+    'role-permissions': ShieldCheck,
+    'admin-feature-access': Lock,
+    'staff': Users,
+    'reservation-policy': Calendar,
+    'data-system': AlertTriangle,
+  }
+
+  const sections = getVisibleSettingsSections({ role, isAdmin }).map((section) => ({
+    ...section,
+    title: section.label,
+    icon: sectionIcons[section.id],
+    content: sectionContents[section.id],
+  }))
+
+  const { activeSection, openSection } = useSettingsSection(sections)
+
   if (!canManage) {
     return (
       <div className="card p-8 max-w-xl">
@@ -82,36 +103,6 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
         <p className="text-sm text-pine/60">Settings can only be accessed by managers or administrators.</p>
       </div>
     )
-  }
-
-  const sections = [
-    { id: 'my-account', title: 'My Account', icon: KeyRound, visible: true, content: <MyAccountCard userName={userName} /> },
-    { id: 'saas-admin', title: 'SaaS Tenants', icon: Building2, visible: isSuperuser, content: <SaasTenantAdminCard /> },
-    { id: 'branding', title: 'Branding', icon: Image, visible: isAdminPlus, content: <BrandingCard reloadCompany={reloadCompany} /> },
-    { id: 'pos-print', title: 'POS Print Settings', icon: Printer, visible: isAdminPlus, content: <PosPrintSettingsCard tenantId={myTenantId} /> },
-    { id: 'tax-policy', title: 'Tax Policy', icon: FileText, visible: true, content: <TaxPolicyCard tenantId={myTenantId} isAdmin={isAdminPlus} /> },
-    { id: 'allowance', title: 'Allowance Configuration', icon: Percent, visible: isSuperuser, content: <AllowanceCard /> },
-    { id: 'role-permissions', title: 'Role Permissions', icon: ShieldCheck, visible: isSuperuser, content: <RolePrivilegesCard /> },
-    { id: 'admin-feature-access', title: 'Admin Feature Access', icon: Lock, visible: isSuperuser, content: <AdminFeatureAccessCard /> },
-    { id: 'staff', title: 'Staff Management', icon: Users, visible: true, content: <StaffCard isAdminPlus={isAdminPlus} isSuperuser={isSuperuser} currentUserName={userName} /> },
-    { id: 'reservation-policy', title: 'Reservation Policy', icon: Calendar, visible: isAdminPlus, content: <ReservationPolicyCard /> },
-    { id: 'data-system', title: 'Data & System', icon: AlertTriangle, visible: isSuperuser, content: <DataWipeCard /> },
-  ].filter((s) => s.visible)
-
-  useEffect(() => {
-    const requested = new URLSearchParams(location.search).get('section')
-    if (requested && sections.some((s) => s.id === requested)) {
-      setActiveSection(requested)
-      return
-    }
-    if (!activeSection || !sections.some((s) => s.id === activeSection)) {
-      setActiveSection(sections[0]?.id || null)
-    }
-  }, [location.search, activeSection, isSuperuser, isAdminPlus])
-
-  const openSection = (sectionId) => {
-    setActiveSection(sectionId)
-    navigate(`/settings?section=${sectionId}`, { replace: true })
   }
 
   return (
@@ -134,3 +125,5 @@ export default function Settings({ userName, role, isAdmin, reloadCompany }) {
     </div>
   )
 }
+
+export { SETTINGS_SECTIONS }

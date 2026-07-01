@@ -7,24 +7,13 @@ import {
   FileCheck, BookMarked as BookMarkedAlt,
 } from 'lucide-react'
 import { PATHS } from '../paths'
+import { SETTINGS_SECTIONS } from './settingsSections'
 
 /* ------------------------------------------------------------------ */
 /*  SIDEBAR NESTED MENU CONFIGURATIONS                                  */
 /* ------------------------------------------------------------------ */
 
-export const SIDEBAR_SETTINGS_SECTIONS = [
-  { id: 'my-account',           label: 'My Account',              adminOnly: false, superuserOnly: false },
-  { id: 'saas-admin',           label: 'SaaS Tenants',            adminOnly: false, superuserOnly: true  },
-  { id: 'branding',             label: 'Branding',                adminOnly: true,  superuserOnly: false },
-  { id: 'pos-print',            label: 'POS Print Settings',      adminOnly: true,  superuserOnly: false },
-  { id: 'tax-policy',           label: 'Tax Policy',              adminOnly: false, superuserOnly: false },
-  { id: 'allowance',            label: 'Allowance Configuration', adminOnly: false, superuserOnly: true  },
-  { id: 'role-permissions',     label: 'Role Permissions',        adminOnly: false, superuserOnly: true  },
-  { id: 'admin-feature-access', label: 'Admin Feature Access',    adminOnly: false, superuserOnly: true  },
-  { id: 'staff',                label: 'Staff Management',        adminOnly: false, superuserOnly: false },
-  { id: 'reservation-policy',   label: 'Reservation Policy',      adminOnly: true,  superuserOnly: false },
-  { id: 'data-system',          label: 'Data & System',           adminOnly: false, superuserOnly: true  },
-]
+export const SIDEBAR_SETTINGS_SECTIONS = SETTINGS_SECTIONS
 
 export const SIDEBAR_CMS_ENTITY_TABS = [
   { id: 'companies',            label: 'Companies' },

@@ -1,6 +1,16 @@
 import { NAV_GROUPS, ALL_NAV_IDS } from './navGroups'
 import { can } from '../../lib/roles'
 import { isModuleEnabled } from '../../lib/saasModules'
+import { PATHS } from '../paths'
+
+const NAV_ID_PATHS = {
+  dashboard: PATHS.FRONTOFFICE,
+  'pos-print-center': PATHS.POS_PRINT_CENTER,
+}
+
+function pathForNavId(id) {
+  return NAV_ID_PATHS[id] || `/${id}`
+}
 
 export function getActiveNavGroupTitle(currentTopId, pathname) {
   if (pathname.startsWith('/accounting') || pathname === '/vat' || pathname === '/vat-return') return 'Accounting'
@@ -21,9 +31,8 @@ export function firstAccessiblePath(role, privileges, modulesEnabled = null) {
   for (const id of ALL_NAV_IDS) {
     if (!isModuleEnabled(id, modulesEnabled, role)) continue
     if (id === 'dashboard' || can(role, id, privileges)) {
-      if (id === 'pos-print-center') return '/pos/print-center'
-      return `/${id}`
+      return pathForNavId(id)
     }
   }
-  return '/dashboard'
+  return PATHS.FRONTOFFICE
 }

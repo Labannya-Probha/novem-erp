@@ -14,7 +14,6 @@ import { getRoleDefaultReportCatalog } from './lib/reporting/tenantReporting'
 import { SaasModuleBlocked, SaasModuleFrame } from './components/saas/SaasModuleFrame.jsx'
 import { NAV_GROUPS } from './app/navigation/navGroups'
 import {
-  SIDEBAR_SETTINGS_SECTIONS,
   SIDEBAR_CMS_ENTITY_TABS,
   SIDEBAR_INVENTORY_TABS,
   SIDEBAR_POS_TABS,
@@ -22,6 +21,8 @@ import {
   SIDEBAR_HR_TABS,
 } from './app/navigation/sidebarTabs'
 import { getActiveNavGroupTitle, firstAccessiblePath } from './app/navigation/helpers'
+import { PATHS } from './app/paths'
+import { getVisibleSettingsSections } from './app/navigation/settingsSections'
 import Login from './components/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Reservations from './pages/Reservations.jsx'
@@ -138,17 +139,24 @@ function BrandLogo({ url, softwareName }) {
   const [modulesEnabled, setModulesEnabled] = useState(null)
   const [sidebarHidden,  setSidebarHidden]  = useState(false)
 
-  const currentTopId = location.pathname.split('/').filter(Boolean)[0] || 'dashboard'
+  const currentTopSegment = location.pathname.split('/').filter(Boolean)[0] || 'dashboard'
+  const currentTopId = currentTopSegment === 'frontoffice' ? 'dashboard' : currentTopSegment
+  const navPathById = (id) => {
+    if (id === 'dashboard') return PATHS.FRONTOFFICE
+    if (id === 'pos-print-center') return PATHS.POS_PRINT_CENTER
+    return `/${id}`
+  }
+  const withId = (template, id) => template.replace(':id', encodeURIComponent(id))
 
   const openReservation  = (id, tab) => {
     const q = tab ? `?tab=${encodeURIComponent(tab)}` : ''
-    navigate(`/reservations/${id}${q}`)
+    navigate(`${withId(PATHS.RESERVATION_DETAIL, id)}${q}`)
   }
   const openFrontOfficeReservation = (id, tab) => {
     const q = tab ? `?tab=${encodeURIComponent(tab)}` : ''
-    navigate(`/frontoffice/reservations/${id}${q}`)
+    navigate(`${withId(PATHS.FRONTOFFICE_RESERVATION_DETAIL, id)}${q}`)
   }
-  const startReservation = (prefill = {}) => navigate('/reservations', { state: { prefill } })
+  const startReservation = (prefill = {}) => navigate(PATHS.RESERVATIONS, { state: { prefill } })
 
   const softwareName    = company?.software_name || 'Aura Stay'
   const sidebarThemeStyle = { background: 'var(--sidebar-bg)' }
@@ -178,7 +186,7 @@ function BrandLogo({ url, softwareName }) {
 
   useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
   useEffect(() => {
-    setSidebarHidden(location.pathname === '/calendar')
+    setSidebarHidden(location.pathname === PATHS.CALENDAR)
   }, [location.pathname])
   useEffect(() => {
     const activeNavGroup = getActiveNavGroupTitle(currentTopId, location.pathname)
@@ -241,7 +249,7 @@ function BrandLogo({ url, softwareName }) {
                               ? 'bg-white/14 text-white ring-1 ring-white/20'
                               : 'text-white/75 hover:bg-white/10 hover:text-white'
                           }`}
-                          onClick={() => navigate(`/${n.id}`)}>
+                          onClick={() => navigate(navPathById(n.id))}>
                           <n.icon size={17} className="shrink-0" />
                           <span className="min-w-0 truncate whitespace-nowrap">{n.label}</span>
                         </button>
@@ -251,13 +259,13 @@ function BrandLogo({ url, softwareName }) {
                     const isOpen = openSystemMenu === n.id
                     let nested = []
                     if (n.id === 'settings') {
-                      nested = SIDEBAR_SETTINGS_SECTIONS.filter((s) => {
-                        if (!s.adminOnly && !s.superuserOnly) return true
-                        if (s.adminOnly) return isAdmin || role === 'SUPERUSER'
-                        return role === 'SUPERUSER'
-                      }).map((s) => ({ ...s, path: `/settings?section=${s.id}`, active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`) }))
+                      nested = getVisibleSettingsSections({ role, isAdmin }).map((s) => ({
+                        ...s,
+                        path: `${PATHS.SETTINGS}?section=${s.id}`,
+                        active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`),
+                      }))
                     } else if (n.id === 'cms') {
-                      nested = SIDEBAR_CMS_ENTITY_TABS.map((s) => ({ ...s, path: `/cms?entity=${s.id}`, active: currentTopId === 'cms' && location.search.includes(`entity=${s.id}`) }))
+                      nested = SIDEBAR_CMS_ENTITY_TABS.map((s) => ({ ...s, path: `${PATHS.CMS}?entity=${s.id}`, active: currentTopId === 'cms' && location.search.includes(`entity=${s.id}`) }))
                     } else if (n.id === 'pos-print-center') {
                       nested = SIDEBAR_POS_TABS.map((s) => ({
                         ...s,
@@ -268,7 +276,7 @@ function BrandLogo({ url, softwareName }) {
                     } else if (n.id === 'inventory') {
                       nested = [
                         ...SIDEBAR_INVENTORY_TABS.map((s) => ({ ...s, path: `/inventory?tab=${encodeURIComponent(s.id)}`, active: currentTopId === 'inventory' && location.search.includes(`tab=${encodeURIComponent(s.id)}`) })),
-                        { id: 'consumption', label: 'Consumption Entry', path: '/consumption', active: currentTopId === 'consumption' },
+                        { id: 'consumption', label: 'Consumption Entry', path: PATHS.CONSUMPTION, active: currentTopId === 'consumption' },
                       ]
                     } else if (n.id === 'accounting') {
                       nested = SIDEBAR_ACCOUNTING_TABS
@@ -314,9 +322,9 @@ function BrandLogo({ url, softwareName }) {
                           onClick={() => {
                             setOpenSystemMenu(isOpen ? null : n.id)
                             if (!isOpen && ['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
-                              navigate(`/${n.id}`)
+                              navigate(navPathById(n.id))
                             } else if (!['inventory', 'accounting', 'hr', 'reports'].includes(n.id)) {
-                              navigate(n.id === 'pos-print-center' ? '/pos/print-center' : `/${n.id}`)
+                              navigate(navPathById(n.id))
                             }
                           }}
                         >
@@ -425,151 +433,147 @@ function BrandLogo({ url, softwareName }) {
         )}
 
         <Routes>
-          <Route path="/" element={<Navigate to="/frontoffice" replace />} />
+          <Route path={PATHS.ROOT} element={<Navigate to={PATHS.FRONTOFFICE} replace />} />
 
           {/* Dashboard */}
-          <Route path="/dashboard" element={
-            <SaasModuleRoute moduleId="dashboard" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-              <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
-            </SaasModuleRoute>
-          } />
-          <Route path="/frontoffice" element={
+          <Route path={PATHS.DASHBOARD} element={<Navigate to={PATHS.FRONTOFFICE} replace />} />
+          <Route path={PATHS.FRONTOFFICE} element={
             <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
             </SaasModuleRoute>
           } />
 
           {/* Reservations */}
-          <Route path="/reservations" element={
+          <Route path={PATHS.RESERVATIONS} element={
             <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ReservationsRoute openReservation={openReservation} userName={userName} />
             </SaasModuleRoute>
           } />
-          <Route path="/reservations/:id" element={
+          <Route path={PATHS.RESERVATION_DETAIL} element={
             <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ReservationModuleRoute userName={userName} role={role} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
-          <Route path="/frontoffice/reservations/:id" element={
+          <Route path={PATHS.FRONTOFFICE_RESERVATION_DETAIL} element={
             <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <FrontOfficeReservationRoute userName={userName} role={role} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
-          <Route path="/reservation-payments" element={
+          <Route path={PATHS.RESERVATION_PAYMENTS} element={
             <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ReservationPayments userName={userName} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
 
           {/* Guest CRM */}
-          <Route path="/crm" element={
+          <Route path={PATHS.CRM} element={
             <SaasModuleRoute moduleId="reservations" role={role} navId="crm" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <GuestCRM userName={userName} isAdmin={isAdmin} role={role} />
             </SaasModuleRoute>
           } />
 
           {/* Booking Calendar */}
-          <Route path="/calendar" element={
+          <Route path={PATHS.CALENDAR} element={
             <SaasModuleRoute moduleId="reservations" role={role} navId="calendar" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <BookingCalendar
                 openReservation={openReservation}
                 onNewReservation={startReservation}
-                onOpenReservations={() => navigate('/reservations')}
+                onOpenReservations={() => navigate(PATHS.RESERVATIONS)}
               />
             </SaasModuleRoute>
           } />
 
           {/* Front Office */}
-          <Route path="/nightaudit" element={
+          <Route path={PATHS.NIGHTAUDIT} element={
             <SaasModuleRoute moduleId="nightaudit" role={role} navId="nightaudit" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <NightAudit userName={userName} isAdmin={isAdmin} role={role} />
             </SaasModuleRoute>
           } />
-          <Route path="/housekeeping" element={
+          <Route path={PATHS.HOUSEKEEPING} element={
             <SaasModuleRoute moduleId="housekeeping" role={role} navId="housekeeping" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <HousekeepingHub userName={userName} role={role} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
-          <Route path="/facilities" element={
+          <Route path={PATHS.FACILITIES} element={
             <SaasModuleRoute moduleId="facilities" role={role} navId="facilities" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Facilities userName={userName} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
 
           {/* Restaurant */}
-          <Route path="/pos" element={
+          <Route path={PATHS.POS} element={
             <SaasModuleRoute moduleId="pos" role={role} navId="pos" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <RestaurantPOS userName={userName} role={role} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
-          <Route path="/pos/print-center" element={
+          <Route path={PATHS.POS_PRINT_CENTER} element={
             <SaasModuleRoute moduleId="pos" role={role} navId="pos" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <PosPrintCenter company={company} userName={userName} />
             </SaasModuleRoute>
           } />
-          <Route path="/kiosk/pos" element={<GuestPosKiosk />} />
-          <Route path="/verify/pos/:id" element={<VerifyBill />} />
-          <Route path="/menu-management" element={
+          <Route path={PATHS.GUEST_KIOSK} element={<GuestPosKiosk />} />
+          <Route path={PATHS.VERIFY_BILL} element={<VerifyBill />} />
+          <Route path={PATHS.MENU_MANAGEMENT} element={
             (isModuleEnabled('menu-management', modulesEnabled, role) && (isAdmin || role === 'SUPERUSER' || role === 'RESTAURANT'))
               ? <SaasModuleFrame moduleId="pos" company={company} role={role} userName={userName}><MenuManagement isAdmin={isAdmin} /></SaasModuleFrame>
               : <Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />
           } />
 
           {/* Inventory */}
-          <Route path="/inventory" element={
+          <Route path={PATHS.INVENTORY} element={
             <SaasModuleRoute moduleId="inventory" role={role} navId="inventory" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <InventoryHub userName={userName} role={role} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
-          <Route path="/consumption" element={
+          <Route path={PATHS.CONSUMPTION} element={
             <SaasModuleRoute moduleId="consumption" role={role} navId="inventory" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ConsumptionEntry userName={userName} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
 
          {/* Accounting — separate routes per section */}
-          <Route path="/vat" element={
+          <Route path={PATHS.VAT} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="vat" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <VatCenter userName={userName} company={company} />
             </SaasModuleRoute>
           } />
-          <Route path="/vat-return" element={
+          <Route path={PATHS.VAT_RETURN} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <VATReturn />
             </SaasModuleRoute>
           } />
-          <Route path="/accounting" element={<Navigate to="/accounting/voucher-entry" replace />} />
-          <Route path="/accounting/voucher-entry" element={
+          <Route path={PATHS.ACCOUNTING} element={<Navigate to={PATHS.ACCOUNTING_VOUCHER} replace />} />
+          <Route path={PATHS.ACCOUNTING_VOUCHER} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <VoucherEntryPage userName={userName} isAdmin={isAdmin} role={role} />
             </SaasModuleRoute>
           } />
-          <Route path="/accounting/trial-balance" element={
+          <Route path={PATHS.ACCOUNTING_TRIAL} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <TrialBalancePage />
             </SaasModuleRoute>
           } />
-          <Route path="/accounting/chart-of-accounts" element={
+          <Route path={PATHS.ACCOUNTING_COA} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <ChartOfAccountsPage isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
-          <Route path="/accounting/fixed-assets" element={
+          <Route path={PATHS.ACCOUNTING_ASSETS} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <FixedAssetsPage userName={userName} />
             </SaasModuleRoute>
           } />
-          <Route path="/accounting/opening-balance" element={
+          <Route path={PATHS.ACCOUNTING_OPENING} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <OpeningBalancePage userName={userName} />
             </SaasModuleRoute>
           } />
-          <Route path="/accounting/transaction-mapping" element={
+          <Route path={PATHS.ACCOUNTING_TX_MAP} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <TransactionMappingPage userName={userName} />
             </SaasModuleRoute>
           } />
-          <Route path="/accounting/vendor-payments" element={
+          <Route path={PATHS.ACCOUNTING_VENDOR_PAYMENTS} element={
             <SaasModuleRoute moduleId="accounting" role={role} navId="accounting" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
              <VendorPaymentPage role={role} />
             </SaasModuleRoute>
@@ -607,38 +611,38 @@ function BrandLogo({ url, softwareName }) {
           <Route path="/hr/compliance"          element={<SaasModuleRoute moduleId="hr" role={role} navId="hr" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}><HrCompliancePage          role={role} /></SaasModuleRoute>} />
 
           {/* Reports */}
-          <Route path="/Reports" caseSensitive element={<Navigate to="/reports" replace />} />
-          <Route path="/:slug/Reports" caseSensitive element={<TenantReportsRedirect />} />
-          <Route path="/:slug/reports" element={
+          <Route path={PATHS.REPORTS_CASED_ALIAS} caseSensitive element={<Navigate to={PATHS.REPORTS} replace />} />
+          <Route path={PATHS.TENANT_REPORTS_CASED_ALIAS} caseSensitive element={<TenantReportsRedirect />} />
+          <Route path={PATHS.TENANT_REPORTS} element={
             <SaasModuleRoute moduleId="reports" role={role} navId="reports" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Reportmodule userName={userName} userId={userId} role={role} company={company} />
             </SaasModuleRoute>
           } />
-          <Route path="/reports" element={
+          <Route path={PATHS.REPORTS} element={
             <SaasModuleRoute moduleId="reports" role={role} navId="reports" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Reportmodule userName={userName} userId={userId} role={role} company={company} />
             </SaasModuleRoute>
           } />
 
           {/* Tasks */}
-          <Route path="/tasks" element={
+          <Route path={PATHS.TASKS} element={
             <SaasModuleRoute moduleId="tasks" role={role} navId="tasks" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} />
             </SaasModuleRoute>
           } />
-          <Route path="/ai-tasker" element={
+          <Route path={PATHS.AI_TASKER} element={
             <SaasModuleRoute moduleId="tasks" role={role} navId="tasks" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <TaskManagement userName={userName} role={role} isAdmin={isAdmin} aiTaskerMode />
             </SaasModuleRoute>
           } />
 
           {/* System — superuser only */}
-          <Route path="/cms" element={
+          <Route path={PATHS.CMS} element={
             role === 'SUPERUSER'
               ? <SaasModuleFrame moduleId="settings" company={company} role={role} userName={userName}><CmsPortal role={role} isAdmin={isAdmin} /></SaasModuleFrame>
               : <Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />
           } />
-          <Route path="/settings" element={
+          <Route path={PATHS.SETTINGS} element={
             <SaasModuleRoute moduleId="settings" role={role} navId="settings" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
               <Settings userName={userName} role={role} isAdmin={isAdmin} reloadCompany={loadCompany} />
             </SaasModuleRoute>
@@ -700,7 +704,7 @@ function SaasModuleRoute({ moduleId, role, navId, privileges, modulesEnabled, co
 
 function TenantReportsRedirect() {
   const { slug } = useParams()
-  return <Navigate to={`/${slug}/reports`} replace />
+  return <Navigate to={PATHS.TENANT_REPORTS.replace(':slug', slug)} replace />
 }
 
 /* ------------------------------------------------------------------ */
@@ -717,13 +721,13 @@ function ReservationsRoute({ openReservation, userName }) {
 function ReservationModuleRoute({ userName, role, isAdmin }) {
   const { id }   = useParams()
   const navigate = useNavigate()
-  return <Reservationmodule id={id} back={() => navigate('/reservations')} userName={userName} role={role} isAdmin={isAdmin} />
+  return <Reservationmodule id={id} back={() => navigate(PATHS.RESERVATIONS)} userName={userName} role={role} isAdmin={isAdmin} />
 }
 
 function FrontOfficeReservationRoute({ userName, role, isAdmin }) {
   const { id }   = useParams()
   const navigate = useNavigate()
-  return <Frontofficemodule id={id} back={() => navigate('/frontoffice')} userName={userName} role={role} isAdmin={isAdmin} />
+  return <Frontofficemodule id={id} back={() => navigate(PATHS.FRONTOFFICE)} userName={userName} role={role} isAdmin={isAdmin} />
 }
 
 /* ------------------------------------------------------------------ */
@@ -758,7 +762,10 @@ function AppRoot() {
     let tenantId = forceTenantId || getTenantId()
     if (!tenantId) {
       const firstPathPart = location.pathname.split('/').filter(Boolean)[0]
-      const reservedPaths = new Set(['login', 'frontoffice', 'dashboard', 'calendar', 'reservations', 'reservation-payments', 'tasks', 'ai-tasker', 'nightaudit', 'housekeeping', 'facilities', 'pos', 'menu-management', 'accounting', 'inventory', 'consumption', 'hr', 'reports', 'cms', 'settings', 'vat', 'vat-return', 'kiosk'])
+      const reservedPaths = new Set(Object.values(PATHS)
+        .filter((path) => typeof path === 'string' && path.startsWith('/') && !path.startsWith('/:'))
+        .map((path) => path.split('/').filter(Boolean)[0])
+        .filter(Boolean))
       if (firstPathPart && !reservedPaths.has(firstPathPart.toLowerCase())) {
         const { data: slugProperty } = await supabase.from('properties').select('id').eq('slug', firstPathPart).maybeSingle()
         tenantId = slugProperty?.id || null
@@ -886,15 +893,15 @@ function AppRoot() {
     <div className="min-h-screen flex items-center justify-center text-pine/60">Loading…</div>
   )
 
-  if (location.pathname.endsWith('/login')) {
+  if (location.pathname.endsWith(PATHS.LOGIN)) {
     const pathParts = location.pathname.split('/').filter(Boolean)
     const slug = pathParts.length > 1 ? pathParts[0] : undefined
     if (!session) return <Login slug={slug} />
-    return <Navigate to="/frontoffice" replace />
+    return <Navigate to={PATHS.FRONTOFFICE} replace />
   }
 
-  if (!session && location.pathname.startsWith('/kiosk/pos')) return <GuestPosKiosk />
-  if (!session && location.pathname.startsWith('/verify/pos/')) return <VerifyBill />
+  if (!session && location.pathname.startsWith(PATHS.GUEST_KIOSK)) return <GuestPosKiosk />
+  if (!session && location.pathname.startsWith(PATHS.VERIFY_BILL.replace(':id', ''))) return <VerifyBill />
   if (!session) return <Login />
   if (!profile) return (
     <div className="min-h-screen flex items-center justify-center text-pine/60">Loading profile...</div>
