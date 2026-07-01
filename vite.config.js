@@ -24,4 +24,21 @@ export default defineConfig({
       },
     },
   },
+
+  test: {
+    globals: true,
+    environment: "node",
+    include: ["src/**/*.{vitest,}.test.{js,jsx,ts,tsx}", "src/**/*.test.{js,jsx,ts,tsx}"],
+    exclude: [
+      "node_modules",
+      "dist",
+      "src/lib/noShowAutomation.test.js",  // uses node:test, not vitest — run via `node --test`
+    ],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      include: ["src/lib/**/*.{js,ts}"],
+      exclude: ["src/lib/**/*.test.{js,ts}", "node_modules"],
+    },
+  },
 });
