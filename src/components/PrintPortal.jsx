@@ -381,11 +381,17 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
     const printWin = window.open('', '_blank', 'width=900,height=700')
     if (!printWin) { window.print(); return }
     const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map((s) => s.outerHTML).join('\n')
-    printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">${styles}</head><body style="margin:0;padding:0">${el.outerHTML}</body></html>`)
+    // Wrap in #print-portal-container so the @media print rule
+    // `body > div:not(#print-portal-container) { display:none }` does NOT hide
+    // the content in the popup window — which was the cause of blank pages.
+    // Register onload BEFORE document.write to avoid missing the event.
+    printWin.onload = () => {
+      printWin.focus()
+      printWin.print()
+      printWin.addEventListener('afterprint', () => printWin.close())
+    }
+    printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">${styles}</head><body style="margin:0;padding:0"><div id="print-portal-container">${el.outerHTML}</div></body></html>`)
     printWin.document.close()
-    printWin.focus()
-    printWin.print()
-    printWin.close()
   }
 
   const handleBackdropMouseDown = (event) => {
