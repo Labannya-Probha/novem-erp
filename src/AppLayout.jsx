@@ -406,9 +406,15 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                       }))
                       .filter((category) => category.children.length > 0)
                   } else if (n.id === 'tasks') {
+                    const VALID_TASK_TABS = new Set(['my', 'all', 'ai'])
+                    const taskSearch = new URLSearchParams(location.search)
+                    const rawTab = taskSearch.get('tab') || 'my'
+                    const taskTab = VALID_TASK_TABS.has(rawTab) ? rawTab : 'my'
+                    const onTasksPath = location.pathname === PATHS.TASKS
                     nested = [
-                      { id: 'tasks', label: 'Task Management', path: PATHS.TASKS, active: location.pathname === PATHS.TASKS },
-                      { id: 'ai-tasker', label: 'AI Tasker', path: PATHS.AI_TASKER, active: location.pathname === PATHS.AI_TASKER },
+                      { id: 'tasks-my',  label: 'My Tasks',  path: `${PATHS.TASKS}?tab=my`,  active: onTasksPath && taskTab === 'my'  },
+                      { id: 'tasks-all', label: 'All Tasks', path: `${PATHS.TASKS}?tab=all`, active: onTasksPath && taskTab === 'all' },
+                      { id: 'tasks-ai',  label: 'AI Tasker', path: `${PATHS.TASKS}?tab=ai`,  active: (onTasksPath && taskTab === 'ai') || location.pathname === PATHS.AI_TASKER },
                     ]
                   }
 
