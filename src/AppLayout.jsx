@@ -248,30 +248,32 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                       active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`),
                     }))
                   } else if (n.id === 'reservations') {
+                    const resTab = new URLSearchParams(location.search).get('tab')
+                    const isResPath = location.pathname === PATHS.RESERVATIONS
                     nested = [
+                      {
+                        id: 'reservations-list',
+                        label: 'Reservations',
+                        path: `${PATHS.RESERVATIONS}?tab=list`,
+                        active: isResPath && (!resTab || resTab === 'list'),
+                      },
                       {
                         id: 'calendar',
                         label: 'Booking Calendar',
-                        path: PATHS.CALENDAR,
-                        active: location.pathname === PATHS.CALENDAR || location.pathname === PATHS.BOOKING_CALENDAR,
-                      },
-                      {
-                        id: 'reservations',
-                        label: 'Reservations',
-                        path: PATHS.RESERVATIONS,
-                        active: location.pathname.startsWith('/reservations'),
+                        path: `${PATHS.RESERVATIONS}?tab=calendar`,
+                        active: (isResPath && resTab === 'calendar') || location.pathname === PATHS.CALENDAR || location.pathname === PATHS.BOOKING_CALENDAR,
                       },
                       {
                         id: 'reservation-payments',
                         label: 'Reservation Payments',
-                        path: PATHS.RESERVATION_PAYMENTS,
-                        active: location.pathname === PATHS.RESERVATION_PAYMENTS,
+                        path: `${PATHS.RESERVATIONS}?tab=payments`,
+                        active: (isResPath && resTab === 'payments') || location.pathname === PATHS.RESERVATION_PAYMENTS,
                       },
                       {
                         id: 'crm',
                         label: 'Guest CRM',
-                        path: PATHS.CRM,
-                        active: location.pathname === PATHS.CRM,
+                        path: `${PATHS.RESERVATIONS}?tab=crm`,
+                        active: (isResPath && resTab === 'crm') || location.pathname === PATHS.CRM,
                       },
                     ]
                   } else if (n.id === 'nightaudit') {

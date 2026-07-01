@@ -9,14 +9,12 @@ import { SaasModuleFrame } from './components/saas/SaasModuleFrame.jsx'
 import {
   SaasModuleRoute,
   TenantReportsRedirect,
-  ReservationsRoute,
   ReservationModuleRoute,
   FrontOfficeReservationRoute,
 } from './routeGuards.jsx'
 
 import Dashboard from './pages/Dashboard.jsx'
-import ReservationPayments from './pages/ReservationPayments.jsx'
-import BookingCalendar from './pages/BookingCalendar.jsx'
+import ReservationsPage from './modules/reservations/ReservationsPage.jsx'
 import HousekeepingHub from './pages/HousekeepingHub.jsx'
 import { GuestPosKiosk } from './pages/RestaurantPOS.jsx'
 import VerifyBill from './pages/VerifyBill.jsx'
@@ -56,9 +54,7 @@ import Reportmodule from './pages/Reportmodule.jsx'
 import Settings from './pages/Settings.jsx'
 import CmsPortal from './pages/CmsPortal.jsx'
 import TaskManagement from './pages/TaskManagement.jsx'
-import GuestCRM from './pages/GuestCRM.jsx'
 import RestaurantPage from './modules/restaurant/RestaurantPage.jsx'
-
 export default function AppRoutes({
   role, isAdmin, userName, userId, company, privileges, modulesEnabled, loadCompany,
   openReservation, openFrontOfficeReservation, startReservation, navigate,
@@ -75,10 +71,16 @@ export default function AppRoutes({
         </SaasModuleRoute>
       } />
 
-      {/* Reservations */}
+      {/* Reservations — unified tab page */}
       <Route path={PATHS.RESERVATIONS} element={
         <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <ReservationsRoute openReservation={openReservation} userName={userName} />
+          <ReservationsPage
+            openReservation={openReservation}
+            startReservation={startReservation}
+            userName={userName}
+            isAdmin={isAdmin}
+            role={role}
+          />
         </SaasModuleRoute>
       } />
       <Route path={PATHS.RESERVATION_DETAIL} element={
@@ -91,29 +93,11 @@ export default function AppRoutes({
           <FrontOfficeReservationRoute userName={userName} role={role} isAdmin={isAdmin} />
         </SaasModuleRoute>
       } />
-      <Route path={PATHS.RESERVATION_PAYMENTS} element={
-        <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <ReservationPayments userName={userName} isAdmin={isAdmin} />
-        </SaasModuleRoute>
-      } />
 
-      {/* Guest CRM */}
-      <Route path={PATHS.CRM} element={
-        <SaasModuleRoute moduleId="reservations" role={role} navId="crm" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <GuestCRM userName={userName} isAdmin={isAdmin} role={role} />
-        </SaasModuleRoute>
-      } />
-
-      {/* Booking Calendar */}
-      <Route path={PATHS.CALENDAR} element={
-        <SaasModuleRoute moduleId="reservations" role={role} navId="calendar" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <BookingCalendar
-            openReservation={openReservation}
-            onNewReservation={startReservation}
-            onOpenReservations={() => navigate(PATHS.RESERVATIONS)}
-          />
-        </SaasModuleRoute>
-      } />
+      {/* Legacy routes — redirect to unified tab page for backward compatibility */}
+      <Route path={PATHS.RESERVATION_PAYMENTS} element={<Navigate to={`${PATHS.RESERVATIONS}?tab=payments`} replace />} />
+      <Route path={PATHS.CRM} element={<Navigate to={`${PATHS.RESERVATIONS}?tab=crm`} replace />} />
+      <Route path={PATHS.CALENDAR} element={<Navigate to={`${PATHS.RESERVATIONS}?tab=calendar`} replace />} />
 
       {/* Front Office */}
       <Route path={PATHS.NIGHTAUDIT} element={
