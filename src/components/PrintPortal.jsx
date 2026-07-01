@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Printer, Download } from 'lucide-react'
 
-export default function PrintPortal({ title, onClose, children, type = 'A4', primaryColor, accentColor }) {
+export default function PrintPortal({ title, onClose, children, type = 'A4', primaryColor, accentColor, autoPrint = false }) {
   const [portalNode, setPortalNode] = useState(null)
 
   // Tenant brand colors — falls back to the original hardcoded Novem pine/forest
@@ -342,6 +342,12 @@ export default function PrintPortal({ title, onClose, children, type = 'A4', pri
       window.removeEventListener('afterprint', closeAfterPrint)
     }
   }, [portalNode, onClose])
+
+  useEffect(() => {
+    if (!portalNode || !autoPrint) return undefined
+    const timer = setTimeout(() => { window.print() }, 300)
+    return () => clearTimeout(timer)
+  }, [portalNode, autoPrint])
 
   const handleExportPDF = () => {
     window.print()
