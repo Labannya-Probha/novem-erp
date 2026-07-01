@@ -41,15 +41,7 @@ export const SIDEBAR_INVENTORY_TABS = [
 ]
 
 export const SIDEBAR_POS_TABS = [
-  { id: 'orders',           label: 'POS Orders',       path: PATHS.POS },
-  { id: 'receipt-preview',  label: 'Receipt Preview',  path: `${PATHS.POS_PRINT_CENTER}?tab=receipt-preview` },
-  { id: 'kot-bot-preview',  label: 'KOT/BOT Preview',  path: `${PATHS.POS_PRINT_CENTER}?tab=kot-bot-preview` },
-  { id: 'profiles',         label: 'Print Profiles',   path: `${PATHS.POS_PRINT_CENTER}?tab=profiles` },
-  { id: 'routing',          label: 'Printer Routing',  path: `${PATHS.POS_PRINT_CENTER}?tab=routing` },
-  { id: 'designer',         label: 'Receipt Designer', path: `${PATHS.POS_PRINT_CENTER}?tab=designer` },
-  { id: 'thermal-test',     label: 'Thermal Test',     path: `${PATHS.POS_PRINT_CENTER}?tab=thermal-test` },
-  { id: 'logs',             label: 'Print Logs',       path: `${PATHS.POS_PRINT_CENTER}?tab=logs` },
-  { id: 'menu-management',  label: 'Menu Management',  path: PATHS.MENU_MANAGEMENT },
+  { id: 'restaurant', label: 'Restaurant', path: PATHS.RESTAURANT },
 ]
 
 export const SIDEBAR_ACCOUNTING_TABS = [
