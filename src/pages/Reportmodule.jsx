@@ -129,13 +129,18 @@ export default function Reports({ userName, userId, role, company }) {
       ) : null}
       {activeReport && printReport && (
         <PrintPortal
-          title={`${printReport.name} - ${printSize} portrait`}
+          title={`${printReport.name} - ${printSize}`}
           onClose={() => setPrintReport(null)}
           primaryColor={reportTheme.printPrimary}
           accentColor={reportTheme.printAccent}
-          type={printSize === 'A3' ? 'A3' : 'A4'}
+          type={printSize.startsWith('A3') ? 'A3' : 'A4'}
         >
-          <div className={printSize === 'A3' ? 'print-a3-portrait' : 'print-a4-portrait'}>
+          <div className={
+            printSize === 'A3L' ? 'print-a3-landscape' :
+            printSize === 'A4L' ? 'print-a4-landscape' :
+            printSize === 'A3'  ? 'print-a3-portrait'  :
+                                  'print-a4-portrait'
+          }>
             <ReportPrintDocument company={company} report={printReport} filters={filters} rows={rows} generatedBy={userName} />
           </div>
         </PrintPortal>
@@ -149,7 +154,9 @@ export default function Reports({ userName, userId, role, company }) {
         <div className="erp-top-actions">
           <select className="input" value={printSize} onChange={(e) => setPrintSize(e.target.value)}>
             <option value="A4">A4 Portrait</option>
+            <option value="A4L">A4 Landscape</option>
             <option value="A3">A3 Portrait</option>
+            <option value="A3L">A3 Landscape</option>
           </select>
           <Button variant="outline" disabled={!activeReport?.exportPermission} onClick={() => exportAndLog('CSV')}>
             <Download size={15} /> CSV

@@ -65,6 +65,8 @@ export const STANDARD_COLUMNS = [
   { key: 'credit', label: 'Credit', type: 'currency', align: 'right', width: 120, total: true },
   { key: 'balance', label: 'Balance', type: 'currency', align: 'right', width: 130, total: true },
   { key: 'paymentMethod', label: 'Payment Method', type: 'text', align: 'left', width: 145 },
+  { key: 'reservationSource', label: 'Reservation Source', type: 'text', align: 'left', width: 160 },
+  { key: 'guestType', label: 'Guest Type', type: 'text', align: 'left', width: 130 },
   { key: 'createdBy', label: 'Created By', type: 'text', align: 'left', width: 130 },
   { key: 'approvedBy', label: 'Approved By', type: 'text', align: 'left', width: 130 },
   { key: 'status', label: 'Status', type: 'status', align: 'center', width: 110 },

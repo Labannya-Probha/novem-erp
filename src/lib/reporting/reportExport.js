@@ -56,7 +56,7 @@ export function exportReportPdf(report, rows, totals, meta) {
   const columns = report.columns
   const amount = (v) => fmtBDT(v)
   const tableHead = columns.map((col) => `<th style="text-align:${col.align || 'left'}">${col.label}</th>`).join('')
-  const tableBody = rows.map((row, i) => `<tr>${columns.map((col) => {
+  const tableBody = rows.map((row) => `<tr>${columns.map((col) => {
     const val = col.type === 'currency' ? amount(row[col.key]) : formatCell(row[col.key], col)
     return `<td style="text-align:${col.align || 'left'}">${val}</td>`
   }).join('')}</tr>`).join('')
@@ -64,20 +64,20 @@ export function exportReportPdf(report, rows, totals, meta) {
     const val = index === 0 ? 'Grand Total' : col.total ? amount(totals[col.key]) : ''
     return `<td style="text-align:${col.align || 'left'}">${val}</td>`
   }).join('')}</tr>`
-  const win = window.open('', '_blank', 'width=1280,height=900')
+  const win = window.open('', '_blank', 'width=1440,height=900')
   if (!win) return
   win.document.write(`
     <html>
       <head>
         <title>${report.name}</title>
         <style>
-          @page { size: A4 portrait; margin: 9mm; }
+          @page { size: A4 landscape; margin: 10mm; }
           body { font-family: Arial, sans-serif; color: #0f172a; margin:0; font-size: 10px; }
           .top { border: 1px solid #0f3a5f; border-bottom: 2px solid #0f3a5f; padding: 8px; margin-bottom: 6px; }
           .brand { text-align:center; color:#0f3a5f; }
           .brand h2 { margin:0 0 2px; font-size:13px; }
           .brand h1 { margin:3px 0; font-size:16px; }
-          .meta { display:grid; grid-template-columns: repeat(2, 1fr); gap: 4px; font-size: 8px; margin-top: 6px; background:#eaf4ff; padding: 5px; }
+          .meta { display:grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 8px; margin-top: 6px; background:#eaf4ff; padding: 5px; }
           table { width:100%; border-collapse: collapse; table-layout: fixed; font-size: 7px; line-height:1.2; }
           thead { display: table-header-group; }
           tfoot { display: table-row-group; }
@@ -106,7 +106,7 @@ export function exportReportPdf(report, rows, totals, meta) {
           </div>
         </section>
         <table><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}${totalRow}</tbody></table>
-        <section class="sign"><div>Prepared by</div><div>Checked by</div><div>Approved by</div><div>Printed by</div></section>
+        <section class="sign"><div>Prepared by</div><div>Checked by</div><div>Approved by</div><div>Printed by: ${meta.generatedBy || ''}</div></section>
         <footer>This report is system generated and intended for internal use only.</footer>
         <script>window.onload = () => window.print()</script>
       </body>
