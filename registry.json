@@ -1,0 +1,61 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "aura-stay-erp",
+  "homepage": "https://github.com/Labannya-Probha/aura-stay-erp",
+  "items": [
+    {
+      "name": "booking-calendar",
+      "type": "registry:item",
+      "title": "Booking Calendar",
+      "description": "Multi-room booking calendar with tap-to-move room shift, guest name/source display, colSpan bars, and mobile scroll. Includes ReservationDetail with room-shift dropdown.",
+      "files": [
+        {
+          "path": "src/pages/BookingCalendar.jsx",
+          "type": "registry:file",
+          "target": "~/src/pages/BookingCalendar.jsx"
+        },
+        {
+          "path": "src/pages/ReservationDetail.jsx",
+          "type": "registry:file",
+          "target": "~/src/pages/ReservationDetail.jsx"
+        }
+      ]
+    },
+    {
+      "name": "settings-module",
+      "type": "registry:item",
+      "title": "Settings Module",
+      "description": "Hospitality settings panel with searchable VAT circle dropdown (Bangladesh NBR data), tenant logo upload/branding card, and tax configuration.",
+      "files": [
+        {
+          "path": "src/pages/Settings.jsx",
+          "type": "registry:file",
+          "target": "~/src/pages/Settings.jsx"
+        },
+        {
+          "path": "src/components/settings/BrandingCard.jsx",
+          "type": "registry:file",
+          "target": "~/src/components/settings/BrandingCard.jsx"
+        },
+        {
+          "path": "src/components/settings/TaxCard.jsx",
+          "type": "registry:file",
+          "target": "~/src/components/settings/TaxCard.jsx"
+        }
+      ]
+    },
+    {
+      "name": "supabase-rls-helpers",
+      "type": "registry:item",
+      "title": "Supabase RLS Helpers",
+      "description": "SQL migration patterns for multi-tenant RLS policies using current_tenant_id() and is_admin() helper functions. Includes FK index setup.",
+      "files": [
+        {
+          "path": "supabase/migrations/20240101000000_rls_policies.sql",
+          "type": "registry:file",
+          "target": "~/supabase/migrations/rls_policies.sql"
+        }
+      ]
+    }
+  ]
+}

@@ -9,6 +9,7 @@
 // half-written or out of balance.
 // ────────────────────────────────────────────────────────────────────────────
 import { supabase } from '../supabase'
+import { getTenantId } from './tenant'
 
 /**
  * Post a balanced journal entry to the ledger.
@@ -53,8 +54,12 @@ export async function postJournal({ jv_date = null, source, posted_by, narration
 
 /** Convenience: read the live maintenance-mode flag (for banners / guards). */
 export async function isLocked() {
-  const { data, error } = await supabase
-    .from('company_settings').select('maintenance_mode').order('id').limit(1).single()
+  const tid = getTenantId()
+  const { data, error } = await (
+    tid
+      ? supabase.from('company_settings').select('maintenance_mode').eq('tenant_id', tid).limit(1).single()
+      : supabase.from('company_settings').select('maintenance_mode').limit(1).single()
+  )
   if (error) return false
   return !!data?.maintenance_mode
 }

@@ -1,6 +1,6 @@
 import { fmtBDT, fmtDate, nightsBetween } from '../../lib/helpers'
+import { normalizeInvoiceItems, normalizeInvoiceTotals, resolveBuyerInfo } from '../../lib/invoiceFormat'
 
-/* ---------- Amount-in-words (Bangladeshi / Indian numbering) ---------- */
 const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
   'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
 const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
@@ -30,196 +30,300 @@ function takaInWords(amount) {
   return s + ' Only'
 }
 
-/* ---------- palette ---------- */
-const FOREST = '#2E7D32'
-const PINE = '#1B4D2E'
+const FOREST = 'var(--print-accent, #2E7D32)'
+const PINE = 'var(--print-primary, #1B4D2E)'
 const GOLD = '#D4A017'
 const INK = '#1f2937'
 const MUTE = '#6b7280'
-const LINE = 'rgba(27,77,46,0.18)'
+const LINE = 'var(--print-line, rgba(27,77,46,0.18))'
+
+function stableHash(value) {
+  let hash = 0
+  String(value || '').split('').forEach((char) => { hash = ((hash << 5) - hash) + char.charCodeAt(0) })
+  return Math.abs(hash).toString(16).toUpperCase().padStart(8, '0').slice(0, 12)
+}
+
+function compactDate(value) {
+  return value ? fmtDate(value).replace(/,/g, '') : '---'
+}
+
+function valueOf(...values) {
+  return values.find((value) => value !== undefined && value !== null && value !== '') || '---'
+}
 
 export default function GuestBill({
-  charges = [], totals = {}, paid = 0, due = 0,
-  res, guest, company, invoice_no, issued_at,
+  charges = [], line_snapshot = [], totals = {}, paid = 0, due = 0,
+  res, guest, company, guestCompany, invoice_no, issued_at,
+  buyer_name, buyer_address, buyer_bin, copyLabel, singleCopy = false,
 }) {
   const co = {
-    name: company?.name || 'Novem Eco Resort',
-    address: company?.address || 'Bishamoni, Radhanagar, Sreemangal, Moulvibazar, Bangladesh',
+    name: company?.name || company?.company_name || '',
+    address: company?.address || '',
     phone: company?.phone || '',
     email: company?.email || '',
     website: company?.website || '',
     bin: company?.bin || company?.bin_no || company?.vat_reg || company?.vat_bin || '',
+    tin: company?.tin || company?.tin_no || company?.etin || '',
     logo: company?.logo_url || '',
-    software: company?.software_name || 'Aura Stay',
+    software: company?.software_name || 'Aura Stay ERP',
   }
 
-  const isDraft = !invoice_no
+  const { items: chargeItems, isLegacy } = normalizeInvoiceItems(charges, line_snapshot)
+  const chargeTotals = normalizeInvoiceTotals(totals)
+  const buyer = resolveBuyerInfo({ res, guest, guestCompany, buyer_name, buyer_address, buyer_bin })
   const invoiceNumber = invoice_no || `INV-${res?.res_no || 'DRAFT'}`
-  const issueDate = fmtDate(issued_at || new Date().toISOString())
+  const issued = new Date(issued_at || new Date())
+  const issueDate = fmtDate(issued)
+  const printTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Dhaka' })
   const nights = res?.check_in && res?.check_out ? nightsBetween(res.check_in, res.check_out) : 0
   const pax = (Number(res?.pax_adults) || 0) + (Number(res?.pax_children) || 0)
-
-  const subtotal = Number(totals.base || 0)
-  const discount = Number(totals.discount || 0)
-  const serviceCharge = Number(totals.service_charge || 0)
-  const vat = Number(totals.vat || 0)
-  const rounding = Number(totals.rounding || 0)
-  const grandTotal = Number(totals.grand_total ?? subtotal - discount + serviceCharge + vat + rounding)
+  const grandTotal = chargeTotals.grand_total
   const balanceDue = Number(due ?? grandTotal - paid)
   const statusLabel = balanceDue <= 0 ? 'PAID' : Number(paid) > 0 ? 'PARTIALLY PAID' : 'UNPAID'
   const statusColor = balanceDue <= 0 ? FOREST : '#b91c1c'
+  const folioNo = valueOf(res?.folio_no, res?.folio, res?.res_no, 'FOL-DRAFT')
+  const roomNo = valueOf(res?.room_no, res?.room_numbers, res?.rooms, res?.room)
+  const roomType = valueOf(res?.room_type, res?.roomType, res?.rate_plan)
+  const cashier = valueOf(res?.cashier, res?.created_by, res?.created_by_name, 'System')
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const verifyUrl = `${origin}/verify/invoice/${encodeURIComponent(invoiceNumber)}`
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=92x92&margin=1&data=${encodeURIComponent(verifyUrl)}`
 
-  const sectionTitle = { fontSize: 9.5, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: FOREST, marginBottom: 4 }
-  const th = { textAlign: 'left', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: '#fff', padding: '6px 9px', background: PINE }
-  const td = { fontSize: 11.5, padding: '5px 9px', borderBottom: `1px solid ${LINE}`, color: INK, verticalAlign: 'top' }
-  const sumRow = { display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2.5px 0', color: INK }
+  const th = { textAlign: 'left', fontSize: 8.6, fontWeight: 900, textTransform: 'uppercase', color: '#fff', padding: '4px 5px', background: PINE }
+  const td = { fontSize: 9.6, padding: '3.5px 5px', borderBottom: `1px solid ${LINE}`, color: INK, verticalAlign: 'top' }
+  const sectionTitle = { fontSize: 9.4, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: FOREST, marginBottom: 4 }
+  const sumRow = { display: 'flex', justifyContent: 'space-between', fontSize: 10.3, padding: '2px 0', color: INK, gap: 12 }
+  const cell = (item, field) => item._legacy && ['discount', 'service_charge', 'vat'].includes(field) ? '-' : Number(item[field] || 0).toFixed(2)
+
+  if (!singleCopy) {
+    return (
+      <div className="guest-bill-copy-stack">
+        {['Guest Copy', 'Resort Copy'].map((label) => (
+          <GuestBill
+            key={label}
+            charges={charges}
+            line_snapshot={line_snapshot}
+            totals={totals}
+            paid={paid}
+            due={due}
+            res={res}
+            guest={guest}
+            company={company}
+            guestCompany={guestCompany}
+            invoice_no={invoice_no}
+            issued_at={issued_at}
+            buyer_name={buyer_name}
+            buyer_address={buyer_address}
+            buyer_bin={buyer_bin}
+            copyLabel={label}
+            singleCopy
+          />
+        ))}
+      </div>
+    )
+  }
 
   return (
-    <div className="gb-wrap" style={{
-      fontFamily: "'Inter', sans-serif", color: INK, background: '#fff',
-      maxWidth: 794, margin: '0 auto', padding: '16px 22px', lineHeight: 1.35,
+    <div className={`gb-wrap print-copy print-a4-doc ${copyLabel !== 'Guest Copy' ? 'print-copy-break' : ''}`} style={{
+      fontFamily: "'Inter', sans-serif",
+      color: INK,
+      background: '#fff',
+      maxWidth: '186mm',
+      margin: '0 auto',
+      padding: '2mm 3mm 4mm',
+      lineHeight: 1.22,
+      position: 'relative',
     }}>
       <style>{`
         .gb-wrap, .gb-wrap * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
-        @media print { .gb-wrap { padding: 0 !important; max-width: 100% !important; } }
+        .gb-wrap table { table-layout: auto; }
+        .gb-wrap td, .gb-wrap th { overflow-wrap: anywhere; }
+        @media print {
+          .gb-wrap { padding: 0 !important; max-width: 100% !important; }
+          .gb-wrap .break-avoid { page-break-inside: avoid; break-inside: avoid; }
+          .gb-wrap .w-auto-table { table-layout: fixed !important; width: 100% !important; }
+          .gb-wrap .gb-billing-table th,
+          .gb-wrap .gb-billing-table td {
+            font-size: 7.5px !important;
+            padding: 2px 3px !important;
+            width: auto !important;
+            min-width: 0 !important;
+          }
+          .gb-wrap .gb-billing-table th:nth-child(4),
+          .gb-wrap .gb-billing-table td:nth-child(4) { width: 28% !important; }
+        }
       `}</style>
 
-      {/* ═══ 1. COMPANY HEADER ═══ */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, paddingBottom: 9, borderBottom: `3px solid ${FOREST}` }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {co.logo
-            ? <img src={co.logo} alt="logo" style={{ width: 50, height: 50, objectFit: 'contain' }} />
-            : <div style={{ width: 50, height: 50, borderRadius: 10, background: FOREST, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700 }}>N</div>}
+      <header className="break-avoid" style={{ position: 'relative', zIndex: 1, border: `1px solid ${LINE}`, borderRadius: 6, overflow: 'hidden', marginBottom: 7 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '58px 1fr 82px', gap: 10, alignItems: 'center', padding: '7px 9px' }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: PINE, lineHeight: 1.05 }}>{co.name}</div>
-            <div style={{ fontSize: 11, color: MUTE, marginTop: 2, maxWidth: 320 }}>{co.address}</div>
+            {co.logo
+              ? <img src={co.logo} alt="logo" style={{ width: 50, height: 50, objectFit: 'contain', display: 'block' }} />
+              : <div style={{ width: 50, height: 50, borderRadius: 8, background: FOREST, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, fontWeight: 800 }}>A</div>}
           </div>
-        </div>
-        <div style={{ textAlign: 'right', fontSize: 11, color: MUTE, lineHeight: 1.55 }}>
-          {co.phone && <div>📞 {co.phone}</div>}
-          {co.email && <div>✉ {co.email}</div>}
-          {co.website && <div>🌐 {co.website}</div>}
-          {co.bin && <div style={{ fontWeight: 600, color: INK }}>BIN: {co.bin}</div>}
+          <div style={{ minWidth: 0 }}>
+            <div className="copy-badge" style={{ display: 'inline-block', border: `1px solid ${PINE}`, borderRadius: 999, padding: '2px 12px', fontSize: 9, fontWeight: 900, color: PINE, letterSpacing: '0.14em', textTransform: 'uppercase', background: 'rgba(46,125,50,0.045)', marginBottom: 3 }}>{copyLabel}</div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: PINE, lineHeight: 1.05, textTransform: 'uppercase' }}>{co.name}</div>
+            <div style={{ fontSize: 9.3, color: MUTE, marginTop: 3 }}>{co.address}</div>
+            <div style={{ fontSize: 8.5, color: MUTE, marginTop: 2 }}>
+              {co.bin && <>BIN: {co.bin}</>}
+              {co.tin && <><span style={{ color: LINE }}> | </span>TIN: {co.tin}</>}
+              {co.phone && <><span style={{ color: LINE }}> | </span>Phone: {co.phone}</>}
+              {co.email && <><span style={{ color: LINE }}> | </span>Email: {co.email}</>}
+            </div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <img src={qrUrl} alt="Invoice verification QR" style={{ width: 70, height: 70, border: `1px solid ${LINE}`, padding: 2 }} />
+            <div style={{ fontSize: 7.4, color: MUTE, marginTop: 2, fontWeight: 700 }}>QR VERIFY</div>
+          </div>
         </div>
       </header>
 
-      {/* ═══ 2. CENTERED TITLE ═══ */}
-      <section style={{ textAlign: 'center', margin: '12px 0 10px' }}>
-        <div style={{ display: 'inline-block', fontSize: 18, fontWeight: 700, letterSpacing: '0.12em', color: PINE, padding: '3px 20px', borderTop: `2px solid ${GOLD}`, borderBottom: `2px solid ${GOLD}` }}>GUEST BILL</div>
-        <div style={{ fontSize: 10, color: MUTE, letterSpacing: '0.18em', marginTop: 4 }}></div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 8, fontSize: 11.5 }}>
-          <div>
-            <span style={{ color: MUTE }}>Invoice No: </span>
-            <span style={{ fontWeight: 700, color: INK }}>{invoiceNumber}</span>
-            {isDraft && <span style={{ marginLeft: 7, fontSize: 8.5, fontWeight: 700, color: GOLD, border: `1px solid ${GOLD}`, borderRadius: 4, padding: '1px 5px', letterSpacing: '0.08em' }}>DRAFT</span>}
-          </div>
-          <div><span style={{ color: MUTE }}>Date: </span><span style={{ fontWeight: 600 }}>{issueDate}</span></div>
-          <div><span style={{ color: MUTE }}>Status: </span><span style={{ fontWeight: 700, color: statusColor }}>{statusLabel}</span></div>
+      <section className="break-avoid" style={{ position: 'relative', zIndex: 1, border: `1px solid ${LINE}`, borderRadius: 6, overflow: 'hidden', marginBottom: 7 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '6px 9px', borderBottom: `1px solid ${LINE}` }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: PINE, letterSpacing: '0.05em' }}>GUEST INVOICE</div>
+          <div style={{ fontSize: 10, fontWeight: 900, color: statusColor }}>Status: {statusLabel}</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '3px 10px', padding: '6px 9px', fontSize: 9.5 }}>
+          <Meta label="Invoice No" value={invoiceNumber} strong />
+          <Meta label="Folio" value={folioNo} />
+          <Meta label="Page" value="1 of 1" />
+          <Meta label="Date" value={issueDate} />
+          <Meta label="Cashier" value={cashier} />
+          <Meta label="Print" value={printTime} />
         </div>
       </section>
 
-      {/* ═══ 3. GUEST INFO — 2-COLUMN BOX ═══ */}
-      <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: `1px solid ${LINE}`, borderRadius: 8, overflow: 'hidden', marginBottom: 11 }}>
-        <div style={{ padding: '9px 14px', borderRight: `1px solid ${LINE}`, background: 'rgba(46,125,50,0.03)' }}>
-          <div style={sectionTitle}>Billed To</div>
-          <Field k="Guest" v={guest?.full_name || res?.reservation_name || '—'} strong />
-          <Field k="Phone" v={guest?.phone || '—'} />
+      <section className="break-avoid" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', border: `1px solid ${LINE}`, borderRadius: 6, overflow: 'hidden', marginBottom: 7 }}>
+        <div style={{ padding: '7px 11px', borderRight: `1px solid ${LINE}`, background: 'rgba(46,125,50,0.03)', minWidth: 0 }}>
+          <div style={sectionTitle}>Guest Information</div>
+          <Field k="Guest Name" v={buyer.isCompany ? guest?.full_name || res?.reservation_name || buyer.name : buyer.name} strong />
+          <Field k="Mobile" v={guest?.phone || '---'} />
+          <Field k="Guest ID" v={guest?.guest_code || guest?.id || res?.guest_id || '---'} />
           {guest?.email && <Field k="Email" v={guest.email} />}
-          {guest?.address && <Field k="Address" v={guest.address} />}
-          {guest?.id_number && <Field k={guest?.id_type || 'ID'} v={guest.id_number} />}
+          <Field k="Address" v={buyer.address || '---'} />
+          {buyer.bin && <Field k="BIN" v={buyer.bin} />}
+          {!buyer.isCompany && guest?.id_number && <Field k={guest?.id_type || 'ID'} v={guest.id_number} />}
         </div>
-        <div style={{ padding: '9px 14px', background: 'rgba(46,125,50,0.03)' }}>
-          <div style={sectionTitle}>Stay Details</div>
-          <Field k="Reservation" v={res?.res_no || '—'} strong />
-          <Field k="Check-in" v={res?.check_in ? fmtDate(res.check_in) : '—'} />
-          <Field k="Check-out" v={res?.check_out ? fmtDate(res.check_out) : '—'} />
+        <div style={{ padding: '7px 11px', background: 'rgba(46,125,50,0.03)', minWidth: 0 }}>
+          <div style={sectionTitle}>Stay Information</div>
+          <Field k="Reservation" v={res?.res_no || '---'} strong />
+          <Field k="Room No" v={roomNo} />
+          <Field k="Room Type" v={roomType} />
+          <Field k="Check-in" v={res?.check_in ? fmtDate(res.check_in) : '---'} />
+          <Field k="Check-out" v={res?.check_out ? fmtDate(res.check_out) : '---'} />
           <Field k="Nights" v={`${nights} night${nights !== 1 ? 's' : ''}`} />
           <Field k="Guests" v={`${pax} pax`} />
         </div>
       </section>
 
-      {/* ═══ 4. CHARGES TABLE ═══ */}
-      <section>
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: `1px solid ${LINE}` }}>
+      <section style={{ position: 'relative', zIndex: 1 }}>
+        <div style={sectionTitle}>Billing Details</div>
+        <table className="w-auto-table gb-billing-table" style={{ width: '100%', borderCollapse: 'collapse', border: `1px solid ${LINE}` }}>
           <thead>
             <tr>
-              <th style={{ ...th, width: 30, textAlign: 'center' }}>#</th>
-              <th style={{ ...th, width: 88 }}>Date</th>
+              <th style={{ ...th, width: 70 }}>Date</th>
+              <th style={{ ...th, width: 48 }}>Dept</th>
+              <th style={{ ...th, width: 58 }}>Ref</th>
               <th style={th}>Description</th>
-              <th style={{ ...th, width: 110, textAlign: 'right' }}>Amount</th>
+              <th style={{ ...th, width: 28, textAlign: 'right' }}>Qty</th>
+              <th style={{ ...th, width: 54, textAlign: 'right' }}>Rate</th>
+              <th style={{ ...th, width: 46, textAlign: 'right' }}>Disc</th>
+              <th style={{ ...th, width: 46, textAlign: 'right' }}>VAT</th>
+              <th style={{ ...th, width: 60, textAlign: 'right' }}>Amount</th>
             </tr>
           </thead>
           <tbody>
-            {charges.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: MUTE }} colSpan={4}>No charges recorded.</td></tr>}
-            {charges.map((ch, i) => (
+            {chargeItems.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: MUTE }} colSpan={9}>No charges recorded.</td></tr>}
+            {chargeItems.map((ch, i) => (
               <tr key={ch.id || i}>
-                <td style={{ ...td, textAlign: 'center', color: MUTE }}>{i + 1}</td>
-                <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 10.5 }}>{fmtDate(ch.charge_date)}</td>
+                <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 9 }}>{compactDate(ch.charge_date)}</td>
+                <td style={{ ...td, fontSize: 9 }}>{ch.charge_type || '---'}</td>
+                <td style={{ ...td, fontSize: 9 }}>{ch.ref_no || ch.document_no || `RC-${String(i + 1).padStart(3, '0')}`}</td>
                 <td style={td}>{ch.description}</td>
-                <td style={{ ...td, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{Number(ch.total).toFixed(2)}</td>
+                <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Number(ch.quantity || ch.qty || 1).toFixed(0)}</td>
+                <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Number(ch.rate || ch.base_amount || 0).toFixed(2)}</td>
+                <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cell(ch, 'discount')}</td>
+                <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cell(ch, 'vat')}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{Number(ch.total || 0).toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
+          {chargeItems.length > 0 && (
+            <tfoot>
+              <tr style={{ background: 'rgba(46,125,50,0.07)' }}>
+                <td style={{ ...td, fontWeight: 800, borderBottom: 'none', textAlign: 'right' }} colSpan={5}>TOTAL</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 800, borderBottom: 'none' }}>{chargeTotals.base.toFixed(2)}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 800, borderBottom: 'none' }}>{chargeTotals.discount.toFixed(2)}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 800, borderBottom: 'none' }}>{chargeTotals.vat.toFixed(2)}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 800, borderBottom: 'none' }}>{chargeTotals.grand_total_raw.toFixed(2)}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
+        {isLegacy && <div style={{ fontSize: 9, color: MUTE, marginTop: 4, fontStyle: 'italic' }}>This invoice was issued before line-level breakdown was recorded. The totals remain accurate.</div>}
       </section>
 
-      {/* ═══ 5. FINANCIAL SUMMARY ═══ */}
-      <section style={{ display: 'flex', justifyContent: 'flex-end', margin: '10px 0' }}>
-        <div style={{ width: 310, fontVariantNumeric: 'tabular-nums' }}>
-          <div style={sumRow}><span style={{ color: MUTE }}>Subtotal</span><span>{fmtBDT(subtotal)}</span></div>
-          {discount > 0 && <div style={sumRow}><span style={{ color: MUTE }}>Discount</span><span>− {fmtBDT(discount)}</span></div>}
-          <div style={sumRow}><span style={{ color: MUTE }}>Service Charge</span><span>{fmtBDT(serviceCharge)}</span></div>
-          <div style={sumRow}><span style={{ color: MUTE }}>VAT</span><span>{fmtBDT(vat)}</span></div>
-          {Math.abs(rounding) > 0.0001 && <div style={sumRow}><span style={{ color: MUTE }}>Rounding</span><span>{rounding > 0 ? '+ ' : '− '}{fmtBDT(Math.abs(rounding))}</span></div>}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#fff', background: FOREST, padding: '7px 11px', borderRadius: 6, margin: '6px 0' }}>
+      <section className="break-avoid" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', border: `1px solid ${LINE}`, borderRadius: 6, overflow: 'hidden', margin: '8px 0' }}>
+        <div style={{ padding: '7px 11px', borderRight: `1px solid ${LINE}` }}>
+          <div style={sectionTitle}>Amount Summary</div>
+          <div style={sumRow}><span style={{ color: MUTE }}>Subtotal</span><span>{fmtBDT(chargeTotals.base)}</span></div>
+          <div style={sumRow}><span style={{ color: MUTE }}>Discount</span><span>{fmtBDT(chargeTotals.discount)}</span></div>
+          <div style={sumRow}><span style={{ color: MUTE }}>VAT</span><span>{fmtBDT(chargeTotals.vat)}</span></div>
+          <div style={{ ...sumRow, fontSize: 12.4, fontWeight: 900, color: PINE, borderTop: `1px solid ${LINE}`, marginTop: 4, paddingTop: 5 }}>
             <span>Grand Total</span><span>{fmtBDT(grandTotal)}</span>
           </div>
-          <div style={sumRow}><span style={{ color: MUTE }}>Paid</span><span style={{ color: FOREST }}>{fmtBDT(paid)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, fontWeight: 700, color: statusColor, borderTop: `2px solid ${LINE}`, paddingTop: 5, marginTop: 2 }}>
+        </div>
+        <div style={{ padding: '7px 11px' }}>
+          <div style={sectionTitle}>Payment History</div>
+          <div style={sumRow}><span style={{ color: MUTE }}>Paid Amount</span><span style={{ color: FOREST }}>{fmtBDT(paid)}</span></div>
+          <div style={sumRow}><span style={{ color: MUTE }}>Paid Date</span><span>{paid > 0 ? issueDate : '---'}</span></div>
+          <div style={sumRow}><span style={{ color: MUTE }}>Method</span><span>{res?.payment_method || totals?.payment_method || 'Cash / Card'}</span></div>
+          <div style={{ ...sumRow, fontSize: 12.4, fontWeight: 900, color: statusColor, borderTop: `1px solid ${LINE}`, marginTop: 4, paddingTop: 5 }}>
             <span>Balance Due</span><span>{fmtBDT(balanceDue)}</span>
           </div>
         </div>
       </section>
 
-      {/* ═══ 6. AMOUNT IN WORDS ═══ */}
-      <section style={{ border: `1px solid ${LINE}`, borderLeft: `4px solid ${GOLD}`, borderRadius: 6, padding: '7px 12px', marginBottom: 22, background: 'rgba(212,160,23,0.05)' }}>
-        <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>Amount in words:&nbsp;</span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: INK }}>{takaInWords(grandTotal)}</span>
+      <section style={{ position: 'relative', zIndex: 1, border: `1px solid ${LINE}`, borderLeft: `4px solid ${GOLD}`, borderRadius: 6, padding: '6px 10px', marginBottom: 12, background: 'rgba(212,160,23,0.05)' }}>
+        <span style={{ fontSize: 9.2, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>Amount in words:&nbsp;</span>
+        <span style={{ fontSize: 11.4, fontWeight: 600, color: INK }}>{takaInWords(grandTotal)}</span>
       </section>
 
-      {/* ═══ 7. SIGNATURE LINES ═══ */}
-      <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 36, marginBottom: 18, pageBreakInside: 'avoid' }}>
-        {['Prepared By', 'Authorized By', 'Guest Signature'].map((label) => (
+      <section className="print-signature-grid" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '10px', marginBottom: 10, pageBreakInside: 'avoid' }}>
+        {['Prepared By', 'Cashier', 'Checked By', 'Duty Manager', 'Guest Signature'].map((label) => (
           <div key={label} style={{ textAlign: 'center' }}>
-            <div style={{ 
-              borderTop: `1px solid ${INK}`, 
-              marginTop: '50px', 
-              paddingTop: 5, 
-              fontSize: 10.5, 
-              color: MUTE 
-            }}>
-              {label}
-            </div>
+            <div style={{ borderTop: `1px solid ${INK}`, marginTop: '60px', paddingTop: 4, fontSize: 9, color: MUTE }}>{label}</div>
           </div>
         ))}
       </section>
 
-      {/* ═══ 8. FOOTER ═══ */}
-      <footer id="print-footer" style={{ borderTop: `1px solid ${LINE}`, paddingTop: 9, textAlign: 'center', pageBreakInside: 'avoid' }}>
-        <div style={{ fontSize: 11.5, fontWeight: 600, color: FOREST }}>Thank you for staying with {co.name}.</div>
-        <div style={{ fontSize: 9, color: MUTE, marginTop: 5, letterSpacing: '0.04em' }}>
-          Powered by <span style={{ fontWeight: 700, color: PINE }}>{co.software || 'Aura Stay'}</span>
+      <footer id="print-footer" className="print-avoid-break" style={{ position: 'relative', zIndex: 1, borderTop: `1px solid ${LINE}`, paddingTop: 7, textAlign: 'center', pageBreakInside: 'avoid' }}>
+        <div style={{ fontSize: 9.2, fontWeight: 600, color: MUTE }}>This is a system generated invoice. VAT included as per regulation.</div>
+        <div style={{ fontSize: 8, color: MUTE, marginTop: 4, letterSpacing: '0.02em' }}>
+          Powered by <span style={{ fontWeight: 800, color: PINE }}>{co.software || 'Aura Stay ERP'}</span>
+          <span> | Printed By: {cashier}</span>
+          <span> | Terminal: WEB</span>
         </div>
       </footer>
     </div>
   )
 }
 
+function Meta({ label, value, strong }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <span style={{ color: '#6b7280', fontWeight: 600 }}>{label}: </span>
+      <b style={{ color: '#1f2937', fontWeight: strong ? 900 : 700, overflowWrap: 'anywhere' }}>{value || '---'}</b>
+    </div>
+  )
+}
+
 function Field({ k, v, strong }) {
   return (
-    <div style={{ display: 'flex', fontSize: 11.5, margin: '2px 0' }}>
-      <span style={{ width: 88, color: '#6b7280', flexShrink: 0 }}>{k}</span>
-      <span style={{ fontWeight: strong ? 700 : 500, color: '#1f2937' }}>{v}</span>
+    <div style={{ display: 'flex', fontSize: 10.3, margin: '2px 0', minWidth: 0 }}>
+      <span style={{ width: 82, color: '#6b7280', flexShrink: 0 }}>{k}</span>
+      <span style={{ fontWeight: strong ? 800 : 500, color: '#1f2937', minWidth: 0, overflowWrap: 'anywhere' }}>{v || '---'}</span>
     </div>
   )
 }

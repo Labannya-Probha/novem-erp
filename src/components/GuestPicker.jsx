@@ -16,14 +16,14 @@ export default function GuestPicker({ close, pick }) {
     return !q || [r.res_no, r.reservation_name, r.guests?.full_name, roomStr].join(' ').toLowerCase().includes(q.toLowerCase())
   })
   return (
-    <div className="fixed inset-0 bg-ink/60 z-40 flex items-start justify-center p-6 overflow-auto">
-      <div className="card max-w-lg w-full p-5 my-10">
+    <div className="fixed inset-0 bg-ink/60 z-40 flex items-start justify-center p-3 sm:p-6 overflow-auto overscroll-contain">
+      <div className="card max-w-lg w-full p-5 my-0 sm:my-10 max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-5rem)] flex flex-col">
         <h3 className="font-display font-semibold text-pine mb-3">In-house guests (checked-in)</h3>
         <div className="relative mb-3">
           <Search size={15} className="absolute left-3 top-2.5 text-pine/40" />
           <input className="input pl-9" autoFocus placeholder="Search guest or room no…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <div className="max-h-72 overflow-auto space-y-2">
+        <div className="min-h-0 flex-1 overflow-auto space-y-2">
           {filtered.map((r) => {
             const roomStr = (r.reservation_rooms || []).map((x) => x.rooms?.room_no).join(', ')
             const name = r.guests?.full_name || r.reservation_name

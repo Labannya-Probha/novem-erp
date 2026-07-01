@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO, exportXLSX } from '../lib/helpers'
+import KPICards from '../components/KPICards.jsx'
 import { FileSpreadsheet, Plus, FileDown, Printer, Trash2, Pencil } from 'lucide-react'
 import PrintPortal from '../components/PrintPortal.jsx'
 import VdsCertificate from '../components/print/VdsCertificate.jsx'
@@ -19,17 +20,17 @@ export default function VatCenter({ userName, company }) {
   return (
     <div className="space-y-5">
       {printCert && (
-        <PrintPortal title={`Mushak-6.6 — ${printCert.cert_no || 'VDS'}`} onClose={() => setPrintCert(null)}>
+        <PrintPortal title={`Mushak-6.6 — ${printCert.cert_no || 'VDS'}`} onClose={() => setPrintCert(null)} primaryColor={company?.primary_color || company?.brand_primary} accentColor={company?.accent_color || company?.brand_accent}>
           <VdsCertificate cert={printCert} company={company} />
         </PrintPortal>
       )}      
-    <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><FileSpreadsheet className="text-forest" /> VAT Center</h1>
-          <p className="text-sm text-pine/60">NBR Mushak registers: 6.2 sales, 6.1 purchase, 6.6 VDS, and the 9.1 monthly position.</p>
         </div>
         <div className="flex items-center gap-2"><span className="label !mb-0">Month</span><input type="month" className="input !w-44" value={ym} onChange={(e) => setYm(e.target.value)} /></div>
       </div>
+      <KPICards module="vat" />
       {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
       <div className="flex gap-1 border-b border-leaf flex-wrap">
         {TABS.map((t) => (<button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-semibold rounded-t-lg ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>{t}</button>))}
@@ -51,7 +52,8 @@ function SalesReg({ ym, company }) {
   const xls = () => exportXLSX(`Mushak_6.2_${ym}.xlsx`, [{ name: '6.2 Sales', rows: [[`${company?.name || ''} — Mushak-6.2 Sales Register`], [`Month: ${ym}`, `BIN: ${company?.bin || ''}`], [], ['Date', 'Invoice', 'Buyer', 'Buyer BIN', 'Taxable Value', 'SD', 'VAT', 'Total'], ...rows.map((r) => [r.issue_date, r.invoice_no, r.buyer_name, r.buyer_bin, +r.taxable_value, +r.sd, +r.vat, +r.total]), [], ['', '', '', 'TOTAL', tot.tv, tot.sd, tot.vat, tot.total]] }])
   return (
     <div className="card overflow-hidden">
-      <div className="px-4 py-3 border-b border-leaf flex items-center justify-between"><span className="font-display font-semibold text-pine">Sales Register (Mushak-6.2) — voided invoices excluded</span><button className="btn-ghost !py-1" onClick={xls}><FileDown size={14} /> Excel</button></div>
+      <div className="px-4 py-3 border-b border-leaf flex items-center justify-between"><span className="font-display font-semibold text-pine">Sales Register (Mushak-6.2)</span><button className="btn-ghost !py-1" onClick={xls}><FileDown size={14} /> Excel</button></div>
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead><tr><th className="th">Date</th><th className="th">Invoice</th><th className="th">Buyer</th><th className="th text-right">Taxable</th><th className="th text-right">SD</th><th className="th text-right">VAT</th><th className="th text-right">Total</th></tr></thead>
         <tbody>
@@ -60,6 +62,7 @@ function SalesReg({ ym, company }) {
         </tbody>
         <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={3}>TOTAL</td><td className="td text-right">{tot.tv.toFixed(2)}</td><td className="td text-right">{tot.sd.toFixed(2)}</td><td className="td text-right">{tot.vat.toFixed(2)}</td><td className="td text-right">{tot.total.toFixed(2)}</td></tr></tfoot>
       </table>
+      </div>
     </div>
   )
 }
@@ -72,6 +75,7 @@ function PurchaseReg({ ym, company }) {
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-leaf flex items-center justify-between"><span className="font-display font-semibold text-pine">Purchase Register (Mushak-6.1)</span><button className="btn-ghost !py-1" onClick={xls}><FileDown size={14} /> Excel</button></div>
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead><tr><th className="th">Date</th><th className="th">Vendor</th><th className="th">Invoice</th><th className="th text-right">Taxable</th><th className="th text-right">VAT</th><th className="th">Rebate</th><th className="th text-right">Total</th></tr></thead>
         <tbody>
@@ -80,6 +84,7 @@ function PurchaseReg({ ym, company }) {
         </tbody>
         <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={3}>TOTAL · Rebateable VAT {tot.reb.toFixed(2)}</td><td className="td text-right">{tot.tv.toFixed(2)}</td><td className="td text-right">{tot.vat.toFixed(2)}</td><td className="td"></td><td className="td text-right">{tot.total.toFixed(2)}</td></tr></tfoot>
       </table>
+      </div>
     </div>
   )
 }
@@ -129,6 +134,7 @@ function VdsTab({ ym, userName, flash, onPrint }) {
         {editId && <button className="btn-ghost justify-center" onClick={() => { setF(blank); setEditId(null) }}>Cancel edit</button>}
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Date</th><th className="th">Dir</th><th className="th">Cert</th><th className="th">Party</th><th className="th text-right">Base</th><th className="th text-right">Rate</th><th className="th text-right">VDS</th><th className="th">Challan</th><th className="th text-right">Actions</th></tr></thead>
           <tbody>
@@ -154,6 +160,7 @@ function VdsTab({ ym, userName, flash, onPrint }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={9}>No VDS certificates this month.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -196,6 +203,7 @@ function Mushak610({ company }) {
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-leaf font-display font-semibold text-pine">Over-threshold tax invoices (Mushak-6.10 trigger) — ≥ {fmtBDT(threshold)}</div>
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead><tr><th className="th">Date</th><th className="th">Invoice</th><th className="th">Buyer</th><th className="th">Buyer BIN</th><th className="th text-right">Grand total</th></tr></thead>
         <tbody>
@@ -203,6 +211,7 @@ function Mushak610({ company }) {
           {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={5}>No invoices over the threshold.</td></tr>}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

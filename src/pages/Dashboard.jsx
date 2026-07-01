@@ -1,35 +1,197 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../supabase'
-import { fmtBDT, fmtDate, todayISO, STATUS_COLORS } from '../lib/helpers'
-import { LogIn, LogOut, BedDouble, Wallet, Sparkles, Brush, Wrench, DoorOpen, RefreshCw } from 'lucide-react'
+import { fmtDate, fmtBDT, todayISO, STATUS_COLORS } from '../lib/helpers'
+import { BedDouble, Sparkles, Brush, Wrench, DoorOpen, RefreshCw, Clock, XCircle, Search, Users, TrendingUp, Banknote, ChevronDown } from 'lucide-react'
+import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+import { Separator } from '../components/ui/separator'
+import { useToast } from '../components/Toast'
+import { cn } from '../lib/utils'
 
-const HK_STATES = ['Clean', 'Dirty', 'Inspected', 'Out of Order']
 const HK_STYLE = {
-  'Clean': 'bg-forest/15 text-forest border-forest/30',
-  'Inspected': 'bg-sky-100 text-sky-700 border-sky-300',
-  'Dirty': 'bg-amber/20 text-amber-700 border-amber/40',
+  'Clean':        'bg-forest/15 text-forest border-forest/30',
+  'Inspected':    'bg-sky-100 text-sky-700 border-sky-300',
+  'Dirty':        'bg-amber/20 text-amber-700 border-amber/40',
   'Out of Order': 'bg-red-100 text-red-700 border-red-300',
 }
 const HK_ICON = { 'Clean': Sparkles, 'Inspected': BedDouble, 'Dirty': Brush, 'Out of Order': Wrench }
-const OCC_STYLE = { OCCUPIED: 'bg-pine text-white', ARRIVAL: 'bg-amber text-white', DEPARTURE: 'bg-sky-600 text-white', VACANT: 'bg-leaf/50 text-pine' }
+const OCC_STYLE = {
+  OCCUPIED:   'bg-pine text-white',
+  ARRIVAL:    'bg-amber text-white',
+  DEPARTURE:  'bg-sky-600 text-white',
+  VACANT:     'bg-leaf/50 text-pine',
+}
 const OCC_LABEL = { OCCUPIED: 'In-house', ARRIVAL: 'Arrival', DEPARTURE: 'Departure', VACANT: 'Vacant' }
+const STATUS_BADGE_VARIANTS = {
+  QUERY: 'warning',
+  QUOTED: 'info',
+  CONFIRMED: 'success',
+  CHECKED_IN: 'default',
+  CANCELLED: 'destructive',
+  NO_SHOW: 'destructive',
+  COMPLETED: 'secondary',
+}
 
-export default function Dashboard({ openReservation }) {
+function getStatusBadgeVariant(status) {
+  return STATUS_BADGE_VARIANTS[status] || 'outline'
+}
+
+function getHousekeepingBadgeVariant(hk) {
+  if (hk === 'Dirty') return 'warning'
+  if (hk === 'Out of Order') return 'destructive'
+  if (hk === 'Inspected') return 'info'
+  return 'success'
+}
+
+function getGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function getUserInitials(name) {
+  return (name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase())
+    .slice(0, 2)
+    .join('')
+}
+
+function RevenueBarChart({ data }) {
+  const max = Math.max(...data.map((d) => d.revenue), 1)
+  return (
+    <div className="flex items-end justify-between gap-1.5 h-28 px-1 pt-2">
+      {data.map((d) => {
+        const pct = Math.max(6, Math.round((d.revenue / max) * 100))
+        return (
+          <div key={d.date} className="flex flex-col items-center gap-1.5 flex-1 min-w-0 h-full justify-end">
+            <div
+              className={`w-full rounded-t transition-all ${d.isToday ? 'bg-pine' : 'bg-leaf/35'}`}
+              style={{ height: `${pct}%` }}
+            />
+            <span className={`text-[9px] leading-none whitespace-nowrap ${d.isToday ? 'text-pine font-bold' : 'text-pine/45'}`}>
+              {d.day}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function HeroKPICard({ label, value, sub, valueClassName }) {
+  return (
+    <Card className="p-4 !rounded-xl hover:transform-none">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-pine/50 mb-2">{label}</p>
+      <p className={`text-2xl font-bold leading-none mb-1.5 ${valueClassName || 'text-ink'}`}>{value ?? '—'}</p>
+      {sub && <p className="text-xs text-pine/55 leading-snug">{sub}</p>}
+    </Card>
+  )
+}
+
+export default function Dashboard({ openReservation, userName, role, isAdmin, company }) {
   const [arrivals, setArrivals] = useState([])
   const [departures, setDepartures] = useState([])
-  const [inHouse, setInHouse] = useState(0)
-  const [dues, setDues] = useState(0)
   const [rooms, setRooms] = useState([])
   const [occ, setOcc] = useState({})
   const [boardBusy, setBoardBusy] = useState(false)
+  const [dayBusy, setDayBusy] = useState(false)
+  const [foCloseRow, setFoCloseRow] = useState(null)
+  const [allGuests, setAllGuests] = useState([])
+  const [guestsBusy, setGuestsBusy] = useState(false)
+  const [guestSearch, setGuestSearch] = useState('')
+  const [guestStatusFilter, setGuestStatusFilter] = useState('ALL')
+  const [heroKPIs, setHeroKPIs] = useState(null)
+  const [revenueChartData, setRevenueChartData] = useState([])
+  const toast = useToast()
   const today = todayISO()
+  const canCloseFrontDay = isAdmin || role === 'MANAGER' || role === 'FRONT_OFFICE' || role === 'ACCOUNTS'
+  const canOpenDay = role === 'SUPERUSER'
+  const flashDay = (m, type = 'info') => { toast(m, type) }
+
+  const loadHeroData = async () => {
+    try {
+      const monthStart = today.slice(0, 7) + '-01'
+      const last7 = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(today + 'T00:00:00')
+        d.setDate(d.getDate() - (6 - i))
+        return d.toISOString().slice(0, 10)
+      })
+      const weekStart = last7[0]
+
+      const [{ data: roomsData }, { data: resData }, { data: fcData }, { data: vatSales }, { data: vatPurch }] = await Promise.all([
+        supabase.from('rooms').select('id').eq('is_active', true),
+        supabase.from('reservations').select('status, room_rate').eq('status', 'CHECKED_IN'),
+        supabase.from('folio_charges').select('charge_date, total').gte('charge_date', weekStart),
+        supabase.from('vat_sales_register').select('vat, sd').gte('issue_date', monthStart).eq('is_void', false),
+        supabase.from('vat_purchase_register').select('vat_amount').gte('entry_date', monthStart),
+      ])
+
+      const totalRooms = (roomsData || []).length
+      const inhouse = (resData || []).length
+      const occupancyPct = totalRooms ? (inhouse / totalRooms) * 100 : 0
+      const adr = inhouse > 0 ? (resData || []).reduce((s, r) => s + Number(r.room_rate || 0), 0) / inhouse : 0
+      const revpar = adr * (occupancyPct / 100)
+
+      const todayRevenue = (fcData || []).filter((r) => r.charge_date === today).reduce((s, r) => s + Number(r.total), 0)
+
+      const outVat = (vatSales || []).reduce((s, r) => s + Number(r.vat || 0) + Number(r.sd || 0), 0)
+      const inVat = (vatPurch || []).reduce((s, r) => s + Number(r.vat_amount || 0), 0)
+      const vatPayable = Math.max(0, outVat - inVat)
+
+      const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      const chartData = last7.map((dateStr) => {
+        const dayRevenue = (fcData || []).filter((r) => r.charge_date === dateStr).reduce((s, r) => s + Number(r.total), 0)
+        const dow = new Date(dateStr + 'T00:00:00').getDay()
+        return { date: dateStr, day: DAYS[dow], revenue: dayRevenue, isToday: dateStr === today }
+      })
+
+      setHeroKPIs({ occupancyPct, revpar, todayRevenue, vatPayable, totalRooms, inhouse })
+      setRevenueChartData(chartData)
+    } catch (_) {
+      // silently ignore hero KPI errors
+    }
+  }
+
+  const loadAllGuests = async () => {
+    setGuestsBusy(true)
+    try {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id,res_no,reservation_name,check_in,check_out,status,source, guests:primary_guest_id(full_name,phone,customer_id), reservation_rooms(rooms(room_no,room_name))')
+        .order('check_in', { ascending: false })
+        .limit(300)
+      if (error) {
+        flashDay(error.message, 'error')
+        return
+      }
+      setAllGuests(data || [])
+    } catch (error) {
+      flashDay(error?.message || 'Failed to load guests.', 'error')
+    } finally {
+      setGuestsBusy(false)
+    }
+  }
+
+  const filteredGuests = useMemo(() => {
+    const q = guestSearch.toLowerCase()
+    return allGuests.filter((r) => {
+      if (guestStatusFilter !== 'ALL' && r.status !== guestStatusFilter) return false
+      if (!q) return true
+      return [r.res_no, r.reservation_name, r.guests?.full_name, r.guests?.phone, r.guests?.customer_id]
+        .join(' ').toLowerCase().includes(q)
+    })
+  }, [allGuests, guestSearch, guestStatusFilter])
 
   const loadBoard = async () => {
     setBoardBusy(true)
     const { data: rm } = await supabase.from('rooms').select('id, room_no, room_name, room_type, hk_status, is_active').eq('is_active', true).order('room_no')
     const { data: rr } = await supabase
       .from('reservation_rooms')
-      .select('room_id, reservations!inner(status, res_no, reservation_name, check_in, check_out)')
+      .select('room_id, reservations!inner(id, status, res_no, reservation_name, check_in, check_out, guests:primary_guest_id(full_name, phone))')
       .in('reservations.status', ['CHECKED_IN', 'CONFIRMED'])
     const map = {}
     for (const x of rr || []) {
@@ -41,7 +203,15 @@ export default function Dashboard({ openReservation }) {
       if (depToday) st = 'DEPARTURE'
       else if (r.status === 'CHECKED_IN') st = 'OCCUPIED'
       else if (arrToday) st = 'ARRIVAL'
-      if (st) map[x.room_id] = { st, guest: r.reservation_name, res_no: r.res_no, check_in: r.check_in, check_out: r.check_out }
+      if (st) map[x.room_id] = {
+        st,
+        reservation_id: r.id,
+        guest: r.reservation_name || r.guests?.full_name,
+        phone: r.guests?.phone || '',
+        res_no: r.res_no,
+        check_in: r.check_in,
+        check_out: r.check_out,
+      }
     }
     setRooms(rm || [])
     setOcc(map)
@@ -51,123 +221,449 @@ export default function Dashboard({ openReservation }) {
   useEffect(() => {
     const load = async () => {
       const { data: arr } = await supabase.from('reservations')
-        .select('id,res_no,reservation_name,check_in,check_out,status, guests:primary_guest_id(full_name)')
+        .select('id,res_no,reservation_name,check_in,check_out,status, guests:primary_guest_id(full_name), reservation_rooms(rooms(room_no,room_name))')
         .eq('check_in', today).in('status', ['QUERY', 'QUOTED', 'CONFIRMED'])
       setArrivals(arr || [])
       const { data: dep } = await supabase.from('reservations')
         .select('id,res_no,reservation_name,check_in,check_out,status, guests:primary_guest_id(full_name)')
         .eq('check_out', today).eq('status', 'CHECKED_IN')
       setDepartures(dep || [])
-      const { count } = await supabase.from('reservations')
-        .select('id', { count: 'exact', head: true }).eq('status', 'CHECKED_IN')
-      setInHouse(count || 0)
-      const { data: bills } = await supabase.from('v_billing_summary')
-        .select('due_total,status').in('status', ['CHECKED_IN', 'CHECKED_OUT'])
-      setDues((bills || []).reduce((a, b) => a + Number(b.due_total || 0), 0))
     }
     load()
     loadBoard()
+    loadFrontOfficeClose()
+    loadAllGuests()
+    loadHeroData()
   }, [])
 
-  const cycleHK = async (room) => {
-    const idx = HK_STATES.indexOf(room.hk_status || 'Clean')
-    const next = HK_STATES[(idx + 1) % HK_STATES.length]
-    setRooms((rs) => rs.map((r) => r.id === room.id ? { ...r, hk_status: next } : r))
-    await supabase.from('rooms').update({ hk_status: next }).eq('id', room.id)
+  const loadFrontOfficeClose = async () => {
+    const { data } = await supabase.from('day_closes').select('*').eq('close_date', today).eq('type', 'RESERVATION').maybeSingle()
+    setFoCloseRow(data || null)
   }
 
-  const Stat = ({ icon: Icon, label, value, accent }) => (
-    <div className="card p-5 flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${accent}`}><Icon size={20} /></div>
-      <div>
-        <div className="text-xs uppercase tracking-wider text-pine/60 font-semibold">{label}</div>
-        <div className="text-2xl font-display font-bold text-pine money">{value}</div>
-      </div>
-    </div>
-  )
-  const List = ({ title, rows, empty }) => (
-    <div className="card p-5">
-      <h3 className="font-display font-semibold text-pine mb-3">{title}</h3>
-      {rows.length === 0 && <p className="text-sm text-pine/50">{empty}</p>}
-      <div className="space-y-2">
-        {rows.map((r) => (
-          <button key={r.id} onClick={() => openReservation(r.id)}
-            className="w-full flex items-center justify-between p-3 rounded-lg border border-leaf hover:bg-leaf/40 text-left">
-            <div>
-              <div className="font-semibold text-sm">{r.reservation_name || r.guests?.full_name || '—'}</div>
-              <div className="text-xs text-pine/60 money">{r.res_no} · {fmtDate(r.check_in)} → {fmtDate(r.check_out)}</div>
+  const closeFrontOfficeDay = async () => {
+    if (!canCloseFrontDay) {
+      flashDay('Front Office day-close requires Front Office, Accounts, Manager, Admin or SUPERUSER access.', 'warning')
+      return
+    }
+    setDayBusy(true)
+    const payload = { close_date: today, type: 'RESERVATION', closed_by: userName, closed_at: new Date().toISOString() }
+    const { error: delErr } = await supabase.from('day_closes').delete().eq('close_date', today).eq('type', 'RESERVATION')
+    if (delErr) {
+      setDayBusy(false)
+      flashDay(delErr.message, 'error')
+      return
+    }
+    const { error } = await supabase.from('day_closes').insert(payload)
+    setDayBusy(false)
+    if (error) flashDay(error.message, 'error')
+    else {
+      flashDay(`Front Office day closed for ${today}.`, 'success')
+      loadFrontOfficeClose()
+    }
+  }
+
+  const openFrontOfficeDay = async () => {
+    if (!canOpenDay) {
+      flashDay('Only SUPERUSER can open a closed day.', 'warning')
+      return
+    }
+    setDayBusy(true)
+    const { error } = await supabase.from('day_closes').delete().eq('close_date', today).eq('type', 'RESERVATION')
+    setDayBusy(false)
+    if (error) flashDay(error.message, 'error')
+    else {
+      flashDay(`Front Office day opened for ${today}.`, 'success')
+      loadFrontOfficeClose()
+    }
+  }
+
+  const ReservationList = ({ title, rows, empty }) => (
+    <Card className="erp-panel-card">
+      <CardHeader className="pt-4 pb-2">
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {rows.length === 0
+          ? <p className="text-sm text-pine/50">{empty}</p>
+          : (
+            <div className="space-y-2">
+              {rows.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => openReservation(r.id)}
+                  className="w-full flex items-center justify-between gap-2 p-3 rounded-lg border border-leaf/50 bg-white/80 hover:bg-leaf/20 text-left transition-colors"
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm truncate">{r.reservation_name || r.guests?.full_name || '-'}</div>
+                    <div className="text-xs text-pine/60 font-mono truncate">{r.res_no} - {fmtDate(r.check_in)} to {fmtDate(r.check_out)}</div>
+                  </div>
+                  <Badge variant={getStatusBadgeVariant(r.status)} className="shrink-0 whitespace-nowrap">
+                    {r.status.replace('_', ' ')}
+                  </Badge>
+                </button>
+              ))}
             </div>
-            <span className={`status-chip ${STATUS_COLORS[r.status]}`}>{r.status.replace('_', ' ')}</span>
-          </button>
-        ))}
-      </div>
-    </div>
+          )
+        }
+      </CardContent>
+    </Card>
   )
 
-  const groups = rooms.reduce((a, r) => { (a[r.room_type] = a[r.room_type] || []).push(r); return a }, {})
   const occCount = (s) => rooms.filter((r) => (occ[r.id] && occ[r.id].st) === s).length
   const hkAttn = rooms.filter((r) => ['Dirty', 'Out of Order'].includes(r.hk_status || 'Clean')).length
+  const totalRoomsCount = rooms.length
+  const occupiedRooms = occCount('OCCUPIED')
+  const arrivalRooms = occCount('ARRIVAL')
+  const departureRooms = occCount('DEPARTURE')
+  const readyRooms = rooms.filter((r) => !occ[r.id] && (r.hk_status || 'Clean') === 'Clean').length
+
+  const initials = getUserInitials(userName)
+  const occupancyDisplay = heroKPIs ? `${Math.round(heroKPIs.occupancyPct)}%` : '—'
+  const revparDisplay = heroKPIs ? fmtBDT(heroKPIs.revpar) : '—'
+  const revenueDisplay = heroKPIs ? fmtBDT(heroKPIs.todayRevenue) : '—'
+  const vatDisplay = heroKPIs ? fmtBDT(heroKPIs.vatPayable) : '—'
 
   return (
-    <div>
-      <h1 className="font-display text-2xl font-bold text-pine mb-1">Front Office — {fmtDate(today)}</h1>
-      <p className="text-sm text-pine/60 mb-6">The day at a glance.</p>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Stat icon={LogIn} label="Arrivals today" value={arrivals.length} accent="bg-forest/15 text-forest" />
-        <Stat icon={LogOut} label="Departures today" value={departures.length} accent="bg-amber/15 text-amber" />
-        <Stat icon={BedDouble} label="In-house" value={inHouse} accent="bg-pine/10 text-pine" />
-        <Stat icon={Wallet} label="Outstanding dues" value={fmtBDT(dues)} accent="bg-red-50 text-red-600" />
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <List title="Expected arrivals" rows={arrivals} empty="No arrivals expected today." />
-        <List title="Due to check out" rows={departures} empty="No departures due today." />
+    <div className="front-office-page">
+
+      {/* ── Hero greeting section ─────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 mb-5 no-print">
+        <div>
+          <h1 className="text-2xl font-bold text-ink leading-tight">
+            {getGreeting()}, {(userName || '').split(' ')[0] || userName}
+          </h1>
+          <p className="text-sm text-pine/55 mt-0.5">
+            {company?.name || 'Your Property'} · {fmtDate(today)}
+          </p>
+        </div>
+        <div className="w-10 h-10 rounded-full bg-pine flex items-center justify-center flex-shrink-0 shadow-sm">
+          <span className="text-white text-sm font-bold leading-none">{initials || '?'}</span>
+        </div>
       </div>
 
-      {/* ---------------- ROOM STATUS BOARD ---------------- */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-display text-lg font-bold text-pine flex items-center gap-2"><DoorOpen size={18} className="text-forest" /> Room Status Board</h2>
-        <button className="btn-ghost !py-1" onClick={loadBoard} disabled={boardBusy}><RefreshCw size={14} className={boardBusy ? 'animate-spin' : ''} /> Refresh</button>
+      {/* ── 4 Hero KPI cards ─────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5 no-print">
+        <HeroKPICard
+          label="Occupancy"
+          value={occupancyDisplay}
+          sub={heroKPIs ? `${heroKPIs.inhouse} of ${heroKPIs.totalRooms} rooms` : 'Loading…'}
+        />
+        <HeroKPICard
+          label="RevPAR"
+          value={revparDisplay}
+          sub="Revenue per available room"
+        />
+        <HeroKPICard
+          label="Today's Revenue"
+          value={revenueDisplay}
+          sub="Rooms and F&B"
+        />
+        <HeroKPICard
+          label="VAT Payable"
+          value={vatDisplay}
+          sub="Due this month"
+          valueClassName="text-red-600"
+        />
       </div>
-      <div className="card p-3 mb-3 flex flex-wrap gap-3 text-[11px] text-pine/70">
+
+      {/* ── Arrivals + Revenue chart ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5 no-print">
+        {/* Today's arrivals */}
+        <Card>
+          <CardHeader className="pt-4 pb-2">
+            <CardTitle className="text-base">Today&apos;s arrivals</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {arrivals.length === 0 ? (
+              <p className="text-sm text-pine/45 py-2">No arrivals expected today.</p>
+            ) : (
+              <div className="space-y-2">
+                {arrivals.slice(0, 6).map((r) => {
+                  const roomInfo = (r.reservation_rooms || []).map((rr) => rr.rooms).filter(Boolean)[0]
+                  const guestName = r.reservation_name || r.guests?.full_name || '-'
+                  const roomLabel = roomInfo ? `Room ${roomInfo.room_no} · ${roomInfo.room_name}` : r.res_no
+                  const isPending = ['QUERY', 'QUOTED'].includes(r.status)
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => openReservation(r.id)}
+                      className="w-full flex items-center justify-between gap-3 py-2.5 px-1 rounded-lg hover:bg-leaf/10 text-left transition-colors border-b border-leaf/20 last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm truncate text-ink">{guestName}</div>
+                        <div className="text-xs text-pine/50 truncate mt-0.5">{roomLabel}</div>
+                      </div>
+                      <Badge
+                        variant={isPending ? 'warning' : 'success'}
+                        className="shrink-0 whitespace-nowrap text-[11px]"
+                      >
+                        {isPending ? 'Pending' : 'Confirmed'}
+                      </Badge>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Revenue last 7 days */}
+        <Card>
+          <CardHeader className="pt-4 pb-2">
+            <CardTitle className="text-base">Revenue, last 7 days</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {revenueChartData.length > 0 ? (
+              <RevenueBarChart data={revenueChartData} />
+            ) : (
+              <div className="h-28 flex items-center justify-center text-sm text-pine/40">Loading…</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Scroll hint ──────────────────────────────────────────── */}
+      <div className="flex justify-center mb-5 no-print">
+        <div className="flex flex-col items-center gap-1 text-pine/30">
+          <ChevronDown size={18} />
+        </div>
+      </div>
+
+      {/* ── Day close control ────────────────────────────────────── */}
+      <Card className="erp-control-strip mb-5">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div className="font-semibold text-pine flex items-center gap-2">
+                <Clock size={15} className="text-amber" /> Front Office Day Close
+              </div>
+              {foCloseRow && (
+                <p className="text-xs text-pine/50 mt-1">
+                  Closed by {foCloseRow.closed_by || '-'} at {fmtDate(foCloseRow.closed_at || foCloseRow.created_at || today)}.
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={foCloseRow ? 'warning' : 'success'} className="capitalize">
+                {foCloseRow ? 'Closed' : 'Open'}
+              </Badge>
+              {canOpenDay && foCloseRow && (
+                <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300" onClick={openFrontOfficeDay} disabled={dayBusy}>
+                  <XCircle size={14} /> Day Open
+                </Button>
+              )}
+              <Button variant="amber" size="sm" onClick={closeFrontOfficeDay} disabled={dayBusy}>
+                <Clock size={14} /> Close Day
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <ReservationList title="Expected arrivals" rows={arrivals} empty="No arrivals expected today." />
+        <ReservationList title="Due to check out" rows={departures} empty="No departures due today." />
+      </div>
+
+      <div className="erp-section-header no-print">
+        <h2>
+          <DoorOpen size={18} className="text-forest" /> Room Status Board
+        </h2>
+        <Button variant="outline" size="sm" onClick={loadBoard} disabled={boardBusy}>
+          <RefreshCw size={14} className={boardBusy ? 'animate-spin' : ''} /> Refresh
+        </Button>
+      </div>
+
+      <Card className="erp-board-legend no-print">
         <span className="font-semibold text-pine/50 uppercase tracking-wide">Occupancy:</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-pine inline-block" /> In-house ({occCount('OCCUPIED')})</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber inline-block" /> Arrival ({occCount('ARRIVAL')})</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-sky-600 inline-block" /> Departure ({occCount('DEPARTURE')})</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-leaf inline-block" /> Vacant</span>
+        <Badge variant="default" className="bg-pine text-white">In-house ({occupiedRooms})</Badge>
+        <Badge variant="warning">Arrival ({arrivalRooms})</Badge>
+        <Badge variant="info">Departure ({departureRooms})</Badge>
+        <Badge variant="success">Vacant</Badge>
         <span className="font-semibold text-pine/50 uppercase tracking-wide ml-2">HK need attention: {hkAttn}</span>
-      </div>
-      {Object.entries(groups).map(([type, list]) => (
-        <div key={type} className="mb-4">
-          <div className="text-[11px] uppercase tracking-widest text-pine/40 font-semibold mb-2">{type} · {list.length}</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-            {list.map((room) => {
+      </Card>
+
+      <div className="erp-room-grid">
+            {rooms.map((room) => {
               const o = occ[room.id]
               const occSt = (o && o.st) || 'VACANT'
+              const canOpenOverview = o?.reservation_id && occSt === 'OCCUPIED'
               const hk = room.hk_status || 'Clean'
               const Icon = HK_ICON[hk] || Sparkles
               return (
-                <div key={room.id} className="card p-0 overflow-hidden border border-leaf">
-                  <div className={`px-2 py-1.5 flex items-center justify-between ${OCC_STYLE[occSt]}`}>
+                <Card
+                  key={room.id}
+                  role={canOpenOverview ? 'button' : undefined}
+                  tabIndex={canOpenOverview ? 0 : undefined}
+                  onClick={() => canOpenOverview && openReservation(o.reservation_id, 'Overview')}
+                  onKeyDown={(e) => {
+                    if (canOpenOverview && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      openReservation(o.reservation_id, 'Overview')
+                    }
+                  }}
+                  className={cn(
+                    'p-0 overflow-hidden border-leaf/60 rounded-xl shadow-sm',
+                    canOpenOverview && 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-forest/30',
+                  )}
+                  title={canOpenOverview ? `Open overview for Room ${room.room_no}` : undefined}
+                >
+                  <div className={cn('px-2 py-1.5 flex items-center justify-between', OCC_STYLE[occSt])}>
                     <span className="font-bold text-xs flex items-center gap-1"><DoorOpen size={12} /> {room.room_no}</span>
                     <span className="text-[9px] font-medium opacity-90">{OCC_LABEL[occSt]}</span>
                   </div>
+
                   <div className="p-1.5 space-y-1.5">
                     <div className="text-[10px] text-pine/60 leading-tight h-6 overflow-hidden">{room.room_name}</div>
                     {o
-                      ? <div className="text-[10px] text-pine leading-tight"><div className="font-medium truncate">{o.guest || o.res_no}</div><div className="text-pine/50 truncate">{occSt === 'OCCUPIED' ? `Out ${fmtDate(o.check_out)}` : occSt === 'ARRIVAL' ? `In ${fmtDate(o.check_in)}` : occSt === 'DEPARTURE' ? 'Departing' : ''}</div></div>
-                      : <div className="text-[10px] text-pine/30 h-6">No booking</div>}
-                    <button onClick={() => cycleHK(room)}
-                      className={`w-full px-1.5 py-1 rounded-lg text-[10px] font-medium border flex items-center justify-center gap-1 hover:opacity-80 ${HK_STYLE[hk]}`}>
+                      ? (
+                        <div className="text-[10px] text-pine leading-tight space-y-0.5">
+                          <div className="truncate"><span className="text-pine/50">Res:</span> <span className="font-medium">{o.res_no || '-'}</span></div>
+                          <div className="truncate"><span className="text-pine/50">Name:</span> {o.guest || '-'}</div>
+                          <div className="truncate"><span className="text-pine/50">Mobile:</span> {o.phone || '-'}</div>
+                        </div>
+                      )
+                      : <div className="text-[10px] text-pine/30 h-6">No booking</div>
+                    }
+
+                    <Separator className="my-1" />
+
+                    <Badge variant={getHousekeepingBadgeVariant(hk)} className="w-full justify-center">
                       <Icon size={11} /> {hk}
-                    </button>
+                    </Badge>
                   </div>
-                </div>
+                </Card>
               )
             })}
+      </div>
+
+      {/* ── All Guests Panel ── */}
+      <div className="erp-section-header no-print mt-6">
+        <h2>
+          <Users size={18} className="text-forest" /> All Guests
+        </h2>
+        <Button variant="outline" size="sm" onClick={loadAllGuests} disabled={guestsBusy}>
+          <RefreshCw size={14} className={guestsBusy ? 'animate-spin' : ''} /> Refresh
+        </Button>
+      </div>
+
+      <Card className="mb-6">
+        <CardContent className="p-4 space-y-3">
+          {/* Search & filter bar */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-pine/40 pointer-events-none" />
+              <input
+                type="text"
+                className="input !pl-8 w-full"
+                placeholder="Search by name, phone, res no…"
+                value={guestSearch}
+                onChange={(e) => setGuestSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {['ALL', 'QUERY', 'QUOTED', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'SETTLED'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setGuestStatusFilter(s)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                    guestStatusFilter === s
+                      ? 'bg-pine text-white border-pine'
+                      : 'border-leaf text-pine/60 hover:text-pine hover:border-pine/40'
+                  }`}
+                >
+                  {s === 'ALL' ? 'All' : s.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
-      <p className="text-[11px] text-pine/40">Tip: tap a housekeeping badge to cycle Clean → Dirty → Inspected → Out of Order.</p>
+
+          {/* Guest list */}
+          {guestsBusy ? (
+            <div className="text-sm text-pine/50 py-4 text-center">Loading…</div>
+          ) : filteredGuests.length === 0 ? (
+            <div className="text-sm text-pine/50 py-4 text-center">No guests found.</div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className="th">Res No.</th>
+                      <th className="th">Guest / Reservation</th>
+                      <th className="th">Stay</th>
+                      <th className="th">Room(s)</th>
+                      <th className="th">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredGuests.map((r) => (
+                      <tr
+                        key={r.id}
+                        className="hover:bg-leaf/30 cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openReservation(r.id, 'Overview')}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openReservation(r.id, 'Overview')
+                          }
+                        }}
+                      >
+                        <td className="td money font-medium text-xs">{r.res_no}</td>
+                        <td className="td">
+                          <div className="font-semibold text-sm">{r.reservation_name || r.guests?.full_name || '—'}</div>
+                          <div className="text-xs text-pine/50">
+                            {r.guests?.full_name && r.guests.full_name !== r.reservation_name && <span>{r.guests.full_name} · </span>}
+                            {r.guests?.phone || ''}
+                          </div>
+                        </td>
+                        <td className="td money text-xs">{fmtDate(r.check_in)} → {fmtDate(r.check_out)}</td>
+                        <td className="td text-xs">
+                          {(r.reservation_rooms || []).map((x) => x.rooms?.room_no).filter(Boolean).join(', ') || '—'}
+                        </td>
+                        <td className="td">
+                          <span className={`status-chip ${STATUS_COLORS[r.status] || ''}`}>
+                            {r.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="md:hidden divide-y divide-leaf">
+                {filteredGuests.map((r) => (
+                  <button
+                    key={r.id}
+                    className="w-full text-left p-3 hover:bg-leaf/20 active:bg-leaf/40 transition-colors"
+                    onClick={() => openReservation(r.id, 'Overview')}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm truncate">{r.reservation_name || r.guests?.full_name || '—'}</div>
+                        <div className="text-xs text-pine/50 truncate">{r.res_no} · {r.guests?.phone || ''}</div>
+                        <div className="text-xs text-pine/60 money mt-0.5">{fmtDate(r.check_in)} → {fmtDate(r.check_out)}</div>
+                      </div>
+                      <span className={`status-chip shrink-0 whitespace-nowrap ${STATUS_COLORS[r.status] || ''}`}>
+                        {r.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-pine/40 text-right pt-1">
+                Showing {filteredGuests.length} of {allGuests.length} reservations
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

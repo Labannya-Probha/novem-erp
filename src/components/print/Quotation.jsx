@@ -22,26 +22,28 @@ export default function Quotation({ res, guest, resRooms, company, taxConfig, te
     base: a.base + l.calc.base_amount * l.nights,
     discount: a.discount + l.calc.discount * l.nights,
     sc: a.sc + l.calc.service_charge * l.nights, 
-    sd: a.sd + l.calc.sd * l.nights,
     vat: a.vat + l.calc.vat * l.nights, 
     total: a.total + (l.calc.base_amount - l.calc.discount) * l.nights,
-  }), { base: 0, discount: 0, sc: 0, sd: 0, vat: 0, total: 0 })
+  }), { base: 0, discount: 0, sc: 0, vat: 0, total: 0 })
 
   const cell = { border: '1px solid #000', padding: '5px 8px' }
   const rt = { ...cell, textAlign: 'right' }
   const validUntil = new Date(Date.now() + (validDays || 7) * 86400000)
+  const primary = 'var(--print-primary, #1B4D2E)'
+  const line = 'var(--print-line, rgba(27,77,46,0.24))'
+  const soft = 'var(--print-soft, rgba(46,125,50,0.08))'
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '2px solid #000', paddingBottom: 8, marginBottom: 12 }}>
+    <div className="print-a4-doc" style={{ maxWidth: '186mm', margin: '0 auto' }}>
+      <div className="print-avoid-break" style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: `2px solid ${primary}`, paddingBottom: 8, marginBottom: 12 }}>
         {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 54, width: 54, objectFit: 'contain' }} />}
         <div style={{ flex: 1, textAlign: company?.logo_url ? 'left' : 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Fraunces, serif' }}>{company?.name || 'Novem Eco Resort'}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Fraunces, serif', color: primary }}>{company?.name || 'Novem Eco Resort'}</div>
           <div style={{ fontSize: 11 }}>{company?.address} · {company?.phone} · {company?.email}</div>
           {company?.bin && <div style={{ fontSize: 10 }}>BIN: {company.bin}</div>}
         </div>
       </div>
-      <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, letterSpacing: 1, marginBottom: 10 }}>QUOTATION</div>
+      <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, letterSpacing: 1, marginBottom: 10, color: primary }}>QUOTATION</div>
 
       <table style={{ width: '100%', fontSize: 12, marginBottom: 10 }}>
         <tbody>
@@ -58,7 +60,7 @@ export default function Quotation({ res, guest, resRooms, company, taxConfig, te
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
-          <tr style={{ background: '#eee' }}>
+          <tr style={{ background: soft }}>
             <th style={cell}>Description</th><th style={rt}>Tariff</th><th style={rt}>Dates</th><th style={rt}>Nights</th><th style={rt}>Disc %</th><th style={rt}>Disc Amt</th><th style={rt}>Amount</th>
           </tr>
         </thead>
@@ -77,14 +79,18 @@ export default function Quotation({ res, guest, resRooms, company, taxConfig, te
         </tbody>
         <tfoot>
           {sum.sc > 0 && <tr><td style={cell} colSpan={6}>Service charge {rate.service_charge_pct}%</td><td style={rt}>{fmtBDT(sum.sc)}</td></tr>}
-          {sum.sd > 0 && <tr><td style={cell} colSpan={6}>Supplementary duty {rate.sd_pct}%</td><td style={rt}>{fmtBDT(sum.sd)}</td></tr>}
           <tr><td style={cell} colSpan={6}>VAT {rate.vat_pct}%</td><td style={rt}>{fmtBDT(sum.vat)}</td></tr>
-          <tr style={{ fontWeight: 700, background: '#f5f5f5' }}><td style={cell} colSpan={6}>GRAND TOTAL</td><td style={rt}>{fmtBDT(sum.total + sum.sc + sum.sd + sum.vat)}</td></tr>
+          <tr style={{ fontWeight: 700, background: soft }}><td style={{ ...cell, borderColor: line }} colSpan={6}>GRAND TOTAL</td><td style={{ ...rt, borderColor: line, color: primary }}>{fmtBDT(sum.total + sum.sc + sum.vat)}</td></tr>
         </tfoot>
       </table>
 
       {terms && (
-        <div style={{ marginTop: 14, fontSize: 10.5, lineHeight: 1.5, whiteSpace: 'pre-wrap', borderTop: '1px solid #999', paddingTop: 8 }}>{terms}</div>
+        <div style={{ marginTop: 14, fontSize: 10.5, lineHeight: 1.6, borderTop: `1px solid ${line}`, paddingTop: 8 }}>
+          {/<[a-z][\s\S]*>/i.test(terms)
+            ? <div dangerouslySetInnerHTML={{ __html: terms }} />
+            : <div style={{ whiteSpace: 'pre-wrap' }}>{terms}</div>
+          }
+        </div>
       )}
 
       <div style={{ marginTop: 28, fontSize: 12 }}>

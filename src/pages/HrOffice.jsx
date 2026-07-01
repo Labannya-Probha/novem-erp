@@ -1,42 +1,297 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { fmtBDT, fmtDate, todayISO } from '../lib/helpers'
-import { Users, Plus, Check, X, CalendarDays, FileText } from 'lucide-react'
+import { generatePayrollJournal, approvePayrollAndPostJv } from '../lib/generatePayrollJournal'
+import KPICards from '../components/KPICards.jsx'
+import { Users, Plus, Check, X, CalendarDays, FileText, Wallet, Printer } from 'lucide-react'
+import PrintPortal from '../components/PrintPortal.jsx'
+import ComplianceTab from '../components/ComplianceTab'
+import EmployeeProfile from '../components/EmployeeProfile.jsx'
+import HrLetterDoc from '../components/print/HrLetterDoc.jsx'
 
-const TABS = ['Employees', 'Attendance', 'Leave', 'Comp Leave', 'Incidents', 'Letters / Docket']
-
-export default function HrOffice({ userName, role, isAdmin, company }) {
-  const [tab, setTab] = useState('Employees')
+/* ─── shared flash helper ─── */
+function useFlash() {
   const [msg, setMsg] = useState('')
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 5000) }
-  const canApprove = isAdmin || role === 'MANAGER' || role === 'HR'
+  return [msg, flash]
+}
+
+/* ─── page wrapper ─── */
+function HrPage({ title, subtitle, children }) {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2"><Users className="text-forest" /> HR & Office</h1>
-        <p className="text-sm text-pine/60">Employee records, attendance, leave, incidents and the office document register.</p>
+        <h1 className="font-display text-2xl font-bold text-pine flex items-center gap-2">
+          <Users className="text-forest" /> {title}
+        </h1>
+        {subtitle && <p className="text-sm text-pine/60">{subtitle}</p>}
       </div>
-      {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
-      <div className="flex gap-1 border-b border-leaf flex-wrap">
-        {TABS.map((t) => (<button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-semibold rounded-t-lg ${tab === t ? 'bg-white border border-leaf border-b-white text-forest -mb-px' : 'text-pine/60 hover:text-pine'}`}>{t}</button>))}
-      </div>
-      {tab === 'Employees' && <EmployeesTab flash={flash} isAdmin={isAdmin} />}
-      {tab === 'Attendance' && <AttendanceTab flash={flash} />}
-      {tab === 'Leave' && <LeaveTab flash={flash} userName={userName} canApprove={canApprove} />}
-      {tab === 'Comp Leave' && <CompLeaveTab flash={flash} />}
-      {tab === 'Incidents' && <IncidentsTab flash={flash} userName={userName} />}
-      {tab === 'Letters / Docket' && <DocketTab flash={flash} userName={userName} />}
+      {children}
     </div>
   )
 }
 
-function EmployeesTab({ flash, isAdmin }) {
+/* ─── placeholder ─── */
+function ComingSoon({ title }) {
+  return (
+    <div className="card p-10 text-center text-pine/40">
+      <div className="text-4xl mb-3">🚧</div>
+      <div className="font-semibold text-pine/60">{title}</div>
+      <div className="text-sm mt-1">This module is under development.</div>
+    </div>
+  )
+}
+
+/* ================================================================== */
+/*  DEFAULT EXPORT — kept for backward compat (not used in new routes) */
+/* ================================================================== */
+export default function HrOffice({ userName, role, isAdmin, company }) {
+  return <HrEmployeeEntryPage userName={userName} role={role} isAdmin={isAdmin} company={company} />
+}
+
+/* ================================================================== */
+/*  EMPLOYEE MANAGEMENT                                                 */
+/* ================================================================== */
+export function HrEmployeeEntryPage({ userName, role, isAdmin, company }) {
+  const [msg, flash] = useFlash()
+  return (
+    <HrPage title="Employee Entry" subtitle="Add and manage employee master records.">
+      <KPICards module="hr" />
+      {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
+      <EmployeesTab flash={flash} isAdmin={isAdmin} userName={userName} company={company} />
+    </HrPage>
+  )
+}
+
+export function HrServiceBookPage({ userName, role, isAdmin, company }) {
+  return (
+    <HrPage title="Service Book Entry" subtitle="Maintain employee service history records.">
+      <ComingSoon title="Service Book Entry" />
+    </HrPage>
+  )
+}
+
+export function HrNomineePage({ userName, role, isAdmin, company }) {
+  return (
+    <HrPage title="Nominee Declaration Entry" subtitle="Record employee nominee / beneficiary declarations.">
+      <ComingSoon title="Nominee Declaration Entry" />
+    </HrPage>
+  )
+}
+
+/* ================================================================== */
+/*  LEAVE MANAGEMENT                                                    */
+/* ================================================================== */
+export function HrLeaveEntryPage({ userName, role, isAdmin, company }) {
+  const [msg, flash] = useFlash()
+  const canApprove = isAdmin || role === 'MANAGER' || role === 'HR'
+  return (
+    <HrPage title="Leave Entry" subtitle="Apply and approve employee leave requests.">
+      {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
+      <LeaveTab flash={flash} userName={userName} canApprove={canApprove} />
+    </HrPage>
+  )
+}
+
+export function HrCompLeavePage({ userName, role, isAdmin, company }) {
+  const [msg, flash] = useFlash()
+  return (
+    <HrPage title="Compensatory Leave Management" subtitle="Track and manage compensatory leave earned.">
+      {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
+      <CompLeaveTab flash={flash} />
+    </HrPage>
+  )
+}
+
+export function HrFestivalLeavePage({ userName, role, isAdmin, company }) {
+  return (
+    <HrPage title="Festival Leave Management" subtitle="Configure festival / public holiday leave calendar.">
+      <ComingSoon title="Festival Leave Management" />
+    </HrPage>
+  )
+}
+
+/* ================================================================== */
+/*  PAYROLL MANAGEMENT                                                  */
+/* ================================================================== */
+export function HrPayrollConfigPage({ userName, role, isAdmin, company }) {
+  return (
+    <HrPage title="Payroll Configuration" subtitle="Configure salary structure, allowances and deduction rules.">
+      <ComingSoon title="Payroll Configuration" />
+    </HrPage>
+  )
+}
+
+export function HrPayrollGenPage({ userName, role, isAdmin, company }) {
+  const [msg, flash] = useFlash()
+  const canApprove = isAdmin || role === 'MANAGER' || role === 'HR'
+  return (
+    <HrPage title="Payroll Generation" subtitle="Generate and approve monthly payroll runs.">
+      {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
+      <PayrollTab flash={flash} userName={userName} canApprove={canApprove} isAdmin={isAdmin} company={company} />
+    </HrPage>
+  )
+}
+
+export function HrPayrollRegisterPage({ userName, role, isAdmin, company }) {
+  return (
+    <HrPage title="Payroll Register" subtitle="View historical payroll runs and disbursement records.">
+      <ComingSoon title="Payroll Register" />
+    </HrPage>
+  )
+}
+/* ================================================================== */
+/*  HR LETTERS                                                          */
+/* ================================================================== */
+const LETTER_TYPES = [
+  { value: 'OFFER_LETTER',     label: 'Offer Letter',               extraFields: ['joiningDate', 'probation'] },
+  { value: 'APPOINTMENT',      label: 'Appointment Letter',         extraFields: ['joiningDate', 'probation'] },
+  { value: 'JOINING',          label: 'Joining Letter',             extraFields: ['joiningDate'] },
+  { value: 'CONFIRMATION',     label: 'Confirmation Letter',        extraFields: ['joiningDate', 'probation'] },
+  { value: 'SALARY_INCREMENT', label: 'Salary Increment Letter',    extraFields: ['purpose'] },
+  { value: 'PROMOTION',        label: 'Promotion Letter',           extraFields: ['joiningDate'] },
+  { value: 'OBJECTION',        label: 'Objection Letter',           extraFields: ['subject', 'description'] },
+  { value: 'SHOW_CAUSE',       label: 'Show Cause Notice',          extraFields: ['incidentDate', 'subject', 'allegation', 'details', 'replyDays'] },
+  { value: 'WARNING',          label: 'Warning Letter',             extraFields: ['incidentDate', 'subject', 'description', 'warningNo'] },
+  { value: 'RELIEVING',        label: 'Letter of Dismissal/Termination', extraFields: ['lastWorkingDate', 'resignationType'] },
+  { value: 'NOC',              label: 'No Objection Certificate',   extraFields: ['purpose'] },
+  { value: 'EXP_CERT',         label: 'Experience Certificate',     extraFields: ['lastWorkingDate', 'tenure', 'skills', 'additionalNote'] },
+  { value: 'SALARY_CERT',      label: 'Employment Certificate',     extraFields: ['purpose', 'showBreakdown'] },
+  { value: 'FINAL_PAYMENT',    label: 'Final Payment Letter',       extraFields: ['lastWorkingDate'] },
+]
+
+export function HrLetterPage({ type, company }) {
+  const [emps, setEmps]     = useState([])
+  const [empId, setEmpId]   = useState('')
+  const [date, setDate]     = useState(todayISO())
+  const [extra, setExtra]   = useState({})
+  const [printDoc, setPrintDoc] = useState(null)
+  const [msg, setMsg]       = useState('')
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000) }
+
+  useEffect(() => {
+    supabase.from('employees').select('*').order('full_name').then(({ data }) => setEmps(data || []))
+  }, [])
+
+  const selectedEmp  = emps.find((e) => e.id === empId) || null
+  const selectedType = LETTER_TYPES.find((t) => t.value === type)
+  const setE = (k, v) => setExtra((p) => ({ ...p, [k]: v }))
+
+  const openPrint = () => {
+    if (!selectedEmp) { flash('Please select an employee.'); return }
+    setPrintDoc({ type, employee: selectedEmp, extra, date })
+  }
+
+  return (
+    <HrPage title={selectedType?.label || 'HR Letter'} subtitle="Generate and print HR correspondence.">
+      {msg && <div className="px-4 py-3 rounded-lg bg-forest/10 text-forest text-sm font-medium">{msg}</div>}
+      <div className="card p-4 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Employee</label>
+            <select className="input" value={empId} onChange={(e) => setEmpId(e.target.value)}>
+              <option value="">Select employee…</option>
+              {emps.map((e) => <option key={e.id} value={e.id}>{e.full_name} ({e.emp_code})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Date</label>
+            <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+        {selectedType && (
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            {selectedType.extraFields.includes('joiningDate')        && <div><label className="label">Joining Date</label><input type="date" className="input" value={extra.joiningDate || ''} onChange={(e) => setE('joiningDate', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('lastWorkingDate')    && <div><label className="label">Last Working Date</label><input type="date" className="input" value={extra.lastWorkingDate || ''} onChange={(e) => setE('lastWorkingDate', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('incidentDate')       && <div><label className="label">Incident Date</label><input type="date" className="input" value={extra.incidentDate || ''} onChange={(e) => setE('incidentDate', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('probation')          && <div><label className="label">Probation Period</label><input className="input" placeholder="e.g. 3 months" value={extra.probation || ''} onChange={(e) => setE('probation', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('purpose')            && <div><label className="label">Purpose</label><input className="input" placeholder="e.g. bank loan, visa" value={extra.purpose || ''} onChange={(e) => setE('purpose', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('tenure')             && <div><label className="label">Tenure</label><input className="input" placeholder="e.g. 2 years 3 months" value={extra.tenure || ''} onChange={(e) => setE('tenure', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('replyDays')          && <div><label className="label">Reply Within</label><input className="input" placeholder="e.g. 48 hours" value={extra.replyDays || ''} onChange={(e) => setE('replyDays', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('warningNo')          && <div><label className="label">Warning Number</label><select className="input" value={extra.warningNo || '1st'} onChange={(e) => setE('warningNo', e.target.value)}>{['1st','2nd','3rd','Final'].map((v) => <option key={v}>{v}</option>)}</select></div>}
+            {selectedType.extraFields.includes('resignationType')    && <div><label className="label">Separation Type</label><select className="input" value={extra.resignationType || 'RESIGNATION'} onChange={(e) => setE('resignationType', e.target.value)}><option value="RESIGNATION">Resignation</option><option value="TERMINATION">Termination</option></select></div>}
+            {selectedType.extraFields.includes('showBreakdown')      && <div className="flex items-center gap-2 pt-4"><input type="checkbox" id="showBreakdown" checked={!!extra.showBreakdown} onChange={(e) => setE('showBreakdown', e.target.checked)} /><label htmlFor="showBreakdown" className="text-sm text-pine cursor-pointer">Show salary breakdown</label></div>}
+            {selectedType.extraFields.includes('subject')            && <div className="col-span-2"><label className="label">Subject</label><input className="input" placeholder="Brief subject" value={extra.subject || ''} onChange={(e) => setE('subject', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('description')        && <div className="col-span-2"><label className="label">Description</label><textarea className="input" rows={2} value={extra.description || ''} onChange={(e) => setE('description', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('allegation')         && <div className="col-span-2"><label className="label">Allegation</label><input className="input" placeholder="e.g. violated leave policy" value={extra.allegation || ''} onChange={(e) => setE('allegation', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('details')            && <div className="col-span-2"><label className="label">Details</label><textarea className="input" rows={2} value={extra.details || ''} onChange={(e) => setE('details', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('skills')             && <div className="col-span-2"><label className="label">Skills / Qualities</label><input className="input" placeholder="e.g. excellent communication" value={extra.skills || ''} onChange={(e) => setE('skills', e.target.value)} /></div>}
+            {selectedType.extraFields.includes('additionalNote')     && <div className="col-span-2"><label className="label">Additional Note</label><textarea className="input" rows={2} value={extra.additionalNote || ''} onChange={(e) => setE('additionalNote', e.target.value)} /></div>}
+          </div>
+        )}
+        <div className="flex justify-end pt-1">
+          <button className="btn-primary" onClick={openPrint}><Printer size={15} /> Preview &amp; Print</button>
+        </div>
+      </div>
+      {printDoc && (
+        <PrintPortal title={`${selectedType?.label} — ${printDoc.employee.full_name}`} onClose={() => setPrintDoc(null)}>
+          <HrLetterDoc type={printDoc.type} employee={printDoc.employee} extra={printDoc.extra} company={company} date={printDoc.date} />
+        </PrintPortal>
+      )}
+    </HrPage>
+  )
+}
+
+/* ================================================================== */
+/*  REGISTER                                                            */
+/* ================================================================== */
+export function HrAttendanceRegisterPage({ flash }) {
+  return (
+    <HrPage title="Attendance Register" subtitle="Daily attendance marking for all active employees.">
+      <AttendanceTab flash={flash || (() => {})} />
+    </HrPage>
+  )
+}
+
+export function HrEmployeeRegisterPage({ role }) {
+  return (
+    <HrPage title="Employee Register (Form-8)" subtitle="Statutory employee register as per Bangladesh Labour Rules.">
+      <ComingSoon title="Employee Register (Form-8)" />
+    </HrPage>
+  )
+}
+
+export function HrServiceBookRegPage({ userName }) {
+  return (
+    <HrPage title="Service Book Register" subtitle="View and print service book records for all employees.">
+      <ComingSoon title="Service Book Register" />
+    </HrPage>
+  )
+}
+
+export function HrIncidentsPage({ userName, flash }) {
+  return (
+    <HrPage title="Incidents Register" subtitle="Log and track workplace incidents and disciplinary actions.">
+      <IncidentsTab flash={flash || (() => {})} userName={userName} />
+    </HrPage>
+  )
+}
+
+export function HrCompliancePage({ role }) {
+  return (
+    <HrPage title="Compliance" subtitle="Bangladesh Labour Law compliance checklists and statutory forms.">
+      <ComplianceTab role={role} />
+    </HrPage>
+  )
+}
+
+/* ================================================================== */
+/*  INNER TAB COMPONENTS (unchanged from original)                     */
+/* ================================================================== */
+
+function EmployeesTab({ flash, isAdmin, userName, company }) {
   const [rows, setRows] = useState([])
+  const [viewing, setViewing] = useState(null)
   const [f, setF] = useState({ full_name: '', designation: '', department: '', join_date: todayISO(), phone: '', gross_salary: '' })
   const load = async () => { const { data } = await supabase.from('employees').select('*').order('created_at'); setRows(data || []) }
   useEffect(() => { load() }, [])
   const add = async () => { if (!f.full_name) return; const { error } = await supabase.from('employees').insert({ ...f, gross_salary: +f.gross_salary || 0 }); if (error) flash(error.message); else { setF({ full_name: '', designation: '', department: '', join_date: todayISO(), phone: '', gross_salary: '' }); load() } }
   const setStatus = async (id, status) => { await supabase.from('employees').update({ status }).eq('id', id); load() }
+
+  if (viewing) {
+    return <EmployeeProfile employee={viewing} company={company} userName={userName} back={() => setViewing(null)} />
+  }
+
   return (
     <div className="space-y-4">
       <div className="card p-4 grid grid-cols-6 gap-2">
@@ -47,20 +302,22 @@ function EmployeesTab({ flash, isAdmin }) {
         <button className="btn-primary justify-center" onClick={add}><Plus size={15} /> Add</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Code</th><th className="th">Name</th><th className="th">Designation</th><th className="th">Dept</th><th className="th text-right">Gross</th><th className="th">Status</th></tr></thead>
           <tbody>
             {rows.map((e) => (
-              <tr key={e.id}>
+              <tr key={e.id} className="hover:bg-leaf/20 cursor-pointer" onClick={() => setViewing(e)}>
                 <td className="td money text-xs">{e.emp_code}</td><td className="td text-sm font-medium">{e.full_name}</td>
                 <td className="td text-sm">{e.designation || '—'}</td><td className="td text-xs">{e.department || '—'}</td>
                 <td className="td money text-right">{fmtBDT(e.gross_salary)}</td>
-                <td className="td">{isAdmin ? <select className="input !py-1 !w-32" value={e.status} onChange={(ev) => setStatus(e.id, ev.target.value)}>{['ACTIVE', 'RESIGNED', 'TERMINATED'].map((s) => <option key={s}>{s}</option>)}</select> : <span className={`status-chip ${e.status === 'ACTIVE' ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-700'}`}>{e.status}</span>}</td>
+                <td className="td" onClick={(ev) => ev.stopPropagation()}>{isAdmin ? <select className="input !py-1 !w-32" value={e.status} onChange={(ev) => setStatus(e.id, ev.target.value)}>{['ACTIVE', 'RESIGNED', 'TERMINATED'].map((s) => <option key={s}>{s}</option>)}</select> : <span className={`status-chip ${e.status === 'ACTIVE' ? 'bg-forest/15 text-forest' : 'bg-stone-200 text-stone-700'}`}>{e.status}</span>}</td>
               </tr>
             ))}
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={6}>No employees yet.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -89,6 +346,7 @@ function AttendanceTab({ flash }) {
     <div className="space-y-4">
       <div className="card p-4 flex items-center gap-3"><CalendarDays size={16} className="text-forest" /><span className="label !mb-0">Date</span><input type="date" className="input !w-44" value={date} onChange={(e) => setDate(e.target.value)} /></div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Code</th><th className="th">Employee</th><th className="th">Mark</th></tr></thead>
           <tbody>
@@ -101,6 +359,7 @@ function AttendanceTab({ flash }) {
             {emps.length === 0 && <tr><td className="td text-pine/40" colSpan={3}>No active employees.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -136,6 +395,7 @@ function LeaveTab({ flash, userName, canApprove }) {
         <button className="btn-primary justify-center" onClick={apply}><Plus size={15} /> Apply</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Employee</th><th className="th">Type</th><th className="th">From → To</th><th className="th text-right">Days</th><th className="th text-right">Balance</th><th className="th">Status</th><th className="th"></th></tr></thead>
           <tbody>
@@ -150,6 +410,7 @@ function LeaveTab({ flash, userName, canApprove }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={7}>No leave applications.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -177,6 +438,7 @@ function CompLeaveTab({ flash }) {
         <button className="btn-primary justify-center" onClick={add}><Plus size={15} /> Earn</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Employee</th><th className="th">Earned</th><th className="th text-right">Days</th><th className="th">Reason</th><th className="th">Used</th></tr></thead>
           <tbody>
@@ -184,7 +446,229 @@ function CompLeaveTab({ flash }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={5}>No compensatory leave recorded.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
+    </div>
+  )
+}
+
+const BASIC_PCT_OF_GROSS = 0.48
+const SPLIT_OF_BASIC = { house_rent: 0.50, conveyance: 0.35, medical: 0.20 }
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+function PayrollTab({ flash, userName, canApprove, isAdmin, company }) {
+  const now = new Date()
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [year, setYear] = useState(now.getFullYear())
+  const [runs, setRuns] = useState([])
+  const [runsLoaded, setRunsLoaded] = useState(false)
+  const [active, setActive] = useState(null)
+  const [slips, setSlips] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [printSlip, setPrintSlip] = useState(null)
+
+  const loadRuns = async () => {
+    const { data } = await supabase.from('payroll_runs').select('*').order('period_year', { ascending: false }).order('period_month', { ascending: false })
+    setRuns(data || [])
+  }
+  useEffect(() => { loadRuns() }, [])
+
+  const loadSlips = async (runId) => {
+    const { data } = await supabase.from('payslips').select('*').eq('payroll_run_id', runId).order('full_name')
+    setSlips(data || [])
+  }
+  const openRun = async (run) => { setActive(run); await loadSlips(run.id) }
+
+  const generateRun = async ({ silent = false } = {}) => {
+    setBusy(true)
+    try {
+      const { data: existing } = await supabase.from('payroll_runs').select('id').eq('period_month', month).eq('period_year', year).maybeSingle()
+      if (existing) { flash(`Payroll for ${MONTH_NAMES[month - 1]} ${year} already exists — open it below to review.`); setBusy(false); return }
+      const { data: run, error: re } = await supabase.from('payroll_runs').insert({ period_month: month, period_year: year, generated_by: userName }).select().single()
+      if (re) throw re
+      const [{ data: emps }, { data: allowances }] = await Promise.all([
+        supabase.from('employees').select('*').eq('status', 'ACTIVE'),
+        supabase.from('allowance_config').select('*').eq('is_active', true).eq('allowance_name', 'Internet/Telephone Allowance'),
+      ])
+      const allowanceMap = Object.fromEntries((allowances || []).map((a) => [a.designation, +a.amount]))
+      const periodStart = `${year}-${String(month).padStart(2, '0')}-01`
+      const periodEnd   = `${year}-${String(month).padStart(2, '0')}-31`
+      const slipsToInsert = []
+      for (const e of emps || []) {
+        const { count } = await supabase.from('attendance_records').select('*', { count: 'exact', head: true }).eq('employee_id', e.id).eq('status', 'A').gte('att_date', periodStart).lte('att_date', periodEnd)
+        const absentDays = count || 0
+        const gross = +e.gross_salary || 0
+        const basic = +(gross * BASIC_PCT_OF_GROSS).toFixed(2)
+        const houseRent = +(basic * SPLIT_OF_BASIC.house_rent).toFixed(2)
+        const conveyance = +(basic * SPLIT_OF_BASIC.conveyance).toFixed(2)
+        const medical = +(basic * SPLIT_OF_BASIC.medical).toFixed(2)
+        const internetAllowance = allowanceMap[e.designation] ?? allowanceMap['DEFAULT'] ?? 0
+        const perDay = gross / 30
+        const absentDeduction = +(perDay * absentDays).toFixed(2)
+        const netPayable = +(gross - absentDeduction).toFixed(2)
+        slipsToInsert.push({ payroll_run_id: run.id, employee_id: e.id, emp_code: e.emp_code, full_name: e.full_name, designation: e.designation, department: e.department, gross_salary: gross, basic, house_rent: houseRent, medical, conveyance, internet_allowance: internetAllowance, other_allowance: 0, absent_days: absentDays, absent_deduction: absentDeduction, advance_deduction: 0, other_deduction: 0, net_payable: netPayable })
+      }
+      if (slipsToInsert.length === 0) { if (!silent) flash('No active employees to run payroll for.'); setBusy(false); return }
+      const { error: se } = await supabase.from('payslips').insert(slipsToInsert)
+      if (se) throw se
+      await loadRuns(); await openRun(run)
+      flash(`Payroll generated for ${MONTH_NAMES[month - 1]} ${year} — ${slipsToInsert.length} payslip(s).`)
+    } catch (e) { flash(e.message) }
+    setBusy(false)
+  }
+
+  useEffect(() => {
+    if (!canApprove || !runsLoaded || busy) return
+    const exists = runs.some((r) => r.period_month === month && r.period_year === year)
+    if (!exists) generateRun({ silent: true })
+  }, [canApprove, runsLoaded, runs, month, year])
+
+  const updateSlip = async (slip, field, value) => {
+    const n = { ...slip, [field]: value }
+    n.net_payable = +(+n.gross_salary - +n.absent_deduction - (+n.advance_deduction || 0) - (+n.other_deduction || 0) + (+n.other_allowance || 0)).toFixed(2)
+    setSlips((prev) => prev.map((s) => s.id === slip.id ? n : s))
+    const { error } = await supabase.from('payslips').update({ [field]: value, net_payable: n.net_payable }).eq('id', slip.id)
+    if (error) flash(error.message)
+  }
+
+  const approveRun = async () => {
+    if (!window.confirm(`Approve payroll for ${MONTH_NAMES[active.period_month - 1]} ${active.period_year}?`)) return
+    try {
+      const jvId = await approvePayrollAndPostJv(active.id)
+      flash(`Payroll approved and journal ${jvId ? 'posted' : 'generated'}.`)
+    } catch (e) { flash(e.message); return }
+    await loadRuns(); setActive((a) => ({ ...a, status: 'APPROVED' }))
+  }
+
+  const markPaid = async () => {
+    if (!window.confirm('Mark this payroll run as PAID?')) return
+    const { error } = await supabase.from('payroll_runs').update({ status: 'PAID', paid_at: new Date().toISOString() }).eq('id', active.id)
+    if (error) { flash(error.message); return }
+    await supabase.from('payslips').update({ paid_at: new Date().toISOString() }).eq('payroll_run_id', active.id)
+    await loadRuns(); setActive((a) => ({ ...a, status: 'PAID' }))
+    flash('Payroll marked as paid.')
+  }
+
+  const totalNet = slips.reduce((a, s) => a + (+s.net_payable || 0), 0)
+
+  if (active) {
+    const locked = active.status !== 'DRAFT'
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <button className="btn-ghost !py-1" onClick={() => setActive(null)}>← All runs</button>
+            <h3 className="font-display font-semibold text-pine flex items-center gap-2"><Wallet size={16} className="text-forest" /> {MONTH_NAMES[active.period_month - 1]} {active.period_year}</h3>
+            <span className={`status-chip ${active.status === 'PAID' ? 'bg-forest/15 text-forest' : active.status === 'APPROVED' ? 'bg-amber/20 text-amber' : 'bg-stone-200 text-stone-700'}`}>{active.status}</span>
+          </div>
+          <div className="flex gap-2">
+            {canApprove && active.status === 'DRAFT' && <button className="btn-primary !py-1.5" onClick={approveRun}><Check size={14} /> Approve</button>}
+            {isAdmin && active.status === 'APPROVED' && <button className="btn-amber !py-1.5" onClick={markPaid}><Wallet size={14} /> Mark paid</button>}
+          </div>
+        </div>
+        {locked && <div className="px-4 py-2 rounded-lg bg-amber/10 text-amber text-sm">This run is {active.status.toLowerCase()} — amounts are locked.</div>}
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead><tr>
+              <th className="th">Employee</th><th className="th text-right">Gross</th>
+              <th className="th text-right">Basic</th><th className="th text-right">House Rent</th>
+              <th className="th text-right">Transport</th><th className="th text-right">Medical</th>
+              <th className="th text-right">Internet</th>
+              <th className="th text-right">Absent</th><th className="th text-right">Absent ded.</th>
+              <th className="th text-right">Advance ded.</th><th className="th text-right">Other ded.</th>
+              <th className="th text-right">Net payable</th><th className="th text-right">Print</th>
+            </tr></thead>
+            <tbody>
+              {slips.map((s) => (
+                <tr key={s.id}>
+                  <td className="td text-sm font-medium">{s.full_name}<div className="text-xs text-pine/40">{s.emp_code} · {s.designation}</div></td>
+                  <td className="td money text-right">{fmtBDT(s.gross_salary)}</td>
+                  <td className="td money text-right">{fmtBDT(s.basic)}</td>
+                  <td className="td money text-right">{fmtBDT(s.house_rent)}</td>
+                  <td className="td money text-right">{fmtBDT(s.conveyance)}</td>
+                  <td className="td money text-right">{fmtBDT(s.medical)}</td>
+                  <td className="td money text-right">{fmtBDT(s.internet_allowance)}</td>
+                  <td className="td money text-right">{s.absent_days}</td>
+                  <td className="td money text-right">{fmtBDT(s.absent_deduction)}</td>
+                  <td className="td text-right">{locked ? fmtBDT(s.advance_deduction) : <input type="number" className="input !w-24 !py-1 money text-right" defaultValue={s.advance_deduction} onBlur={(e) => updateSlip(s, 'advance_deduction', +e.target.value || 0)} />}</td>
+                  <td className="td text-right">{locked ? fmtBDT(s.other_deduction) : <input type="number" className="input !w-24 !py-1 money text-right" defaultValue={s.other_deduction} onBlur={(e) => updateSlip(s, 'other_deduction', +e.target.value || 0)} />}</td>
+                  <td className="td money text-right font-bold text-forest">{fmtBDT(s.net_payable)}</td>
+                  <td className="td text-right"><button className="btn-ghost !py-1" onClick={() => setPrintSlip(s)}><Printer size={13} /></button></td>
+                </tr>
+              ))}
+              {slips.length === 0 && <tr><td className="td text-pine/40" colSpan={13}>No payslips in this run.</td></tr>}
+            </tbody>
+            {slips.length > 0 && <tfoot><tr className="bg-leaf/40 font-bold money"><td className="td" colSpan={11}>Total net payable</td><td className="td text-right">{fmtBDT(totalNet)}</td><td className="td"></td></tr></tfoot>}
+          </table>
+          </div>
+        </div>
+        {printSlip && <PrintPortal title={`Payslip — ${printSlip.full_name}`} onClose={() => setPrintSlip(null)}><PayslipDoc slip={printSlip} run={active} company={company} /></PrintPortal>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-4 flex items-end gap-3 flex-wrap">
+        <div><label className="label">Month</label><select className="input !w-40" value={month} onChange={(e) => setMonth(+e.target.value)}>{MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select></div>
+        <div><label className="label">Year</label><input type="number" className="input !w-28 money" value={year} onChange={(e) => setYear(+e.target.value)} /></div>
+        {canApprove && <button className="btn-primary" disabled={busy} onClick={generateRun}><Wallet size={15} /> {busy ? 'Generating…' : 'Generate payroll'}</button>}
+      </div>
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead><tr><th className="th">Period</th><th className="th">Status</th><th className="th">Generated by</th><th className="th text-right">Open</th></tr></thead>
+          <tbody>
+            {runs.map((r) => (<tr key={r.id} className="hover:bg-leaf/20 cursor-pointer" onClick={() => openRun(r)}><td className="td text-sm font-medium">{MONTH_NAMES[r.period_month - 1]} {r.period_year}</td><td className="td"><span className={`status-chip ${r.status === 'PAID' ? 'bg-forest/15 text-forest' : r.status === 'APPROVED' ? 'bg-amber/20 text-amber' : 'bg-stone-200 text-stone-700'}`}>{r.status}</span></td><td className="td text-xs">{r.generated_by || '—'}</td><td className="td text-right"><button className="btn-ghost !py-1" onClick={() => openRun(r)}>Open →</button></td></tr>))}
+            {runs.length === 0 && <tr><td className="td text-pine/40" colSpan={4}>No payroll runs yet.</td></tr>}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PayslipDoc({ slip, run, company }) {
+  const primary = 'var(--print-primary, #1B4D2E)'
+  const accent  = 'var(--print-accent, #2E7D32)'
+  const cell = { border: '1px solid #000', padding: '6px 8px', fontSize: 11, verticalAlign: 'top' }
+  const rt   = { ...cell, textAlign: 'right', fontFamily: '"IBM Plex Mono", monospace' }
+  return (
+    <div style={{ maxWidth: 600, margin: '0 auto', color: '#000' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: `2px solid ${primary}`, paddingBottom: 8, marginBottom: 12 }}>
+        {company?.logo_url && <img src={company.logo_url} alt="" style={{ height: 50, width: 50, objectFit: 'contain' }} />}
+        <div style={{ flex: 1, textAlign: company?.logo_url ? 'left' : 'center' }}>
+          <div style={{ fontSize: 19, fontWeight: 700, fontFamily: 'Fraunces, serif', color: primary }}>{company?.name || 'Resort'}</div>
+          <div style={{ fontSize: 10.5 }}>{company?.address}</div>
+        </div>
+      </div>
+      <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, letterSpacing: 1, marginBottom: 10, textDecoration: 'underline' }}>PAYSLIP — {String(run.period_month).padStart(2, '0')}/{run.period_year}</div>
+      <table style={{ width: '100%', fontSize: 11, marginBottom: 10 }}><tbody>
+        <tr><td><b>Employee:</b> {slip.full_name}</td><td style={{ textAlign: 'right' }}><b>Code:</b> {slip.emp_code}</td></tr>
+        <tr><td><b>Designation:</b> {slip.designation || '—'}</td><td style={{ textAlign: 'right' }}><b>Department:</b> {slip.department || '—'}</td></tr>
+      </tbody></table>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr style={{ background: '#eee' }}><th style={cell}>Salary Breakdown</th><th style={{ ...cell, textAlign: 'right' }}>Amount</th><th style={cell}>Deductions</th><th style={{ ...cell, textAlign: 'right' }}>Amount</th></tr></thead>
+        <tbody>
+          <tr><td style={cell}>Basic</td><td style={rt}>{fmtBDT(slip.basic)}</td><td style={cell}>Absent ({slip.absent_days} day(s))</td><td style={rt}>{fmtBDT(slip.absent_deduction)}</td></tr>
+          <tr><td style={cell}>House Rent</td><td style={rt}>{fmtBDT(slip.house_rent)}</td><td style={cell}>Advance</td><td style={rt}>{fmtBDT(slip.advance_deduction)}</td></tr>
+          <tr><td style={cell}>Transportation</td><td style={rt}>{fmtBDT(slip.conveyance)}</td><td style={cell}>Other</td><td style={rt}>{fmtBDT(slip.other_deduction)}</td></tr>
+          <tr><td style={cell}>Medical Allowance</td><td style={rt}>{fmtBDT(slip.medical)}</td><td style={cell}></td><td style={rt}></td></tr>
+          <tr><td style={cell}>Internet/Telephone</td><td style={rt}>{fmtBDT(slip.internet_allowance)}</td><td style={cell}></td><td style={rt}></td></tr>
+          {+slip.other_allowance > 0 && <tr><td style={cell}>Other allowance</td><td style={rt}>{fmtBDT(slip.other_allowance)}</td><td style={cell}></td><td style={rt}></td></tr>}
+        </tbody>
+        <tfoot><tr style={{ fontWeight: 700, background: '#f5f5f5' }}><td style={cell}>Gross</td><td style={rt}>{fmtBDT(slip.gross_salary)}</td><td style={cell}>Total deduction</td><td style={rt}>{fmtBDT(+slip.absent_deduction + +slip.advance_deduction + +slip.other_deduction)}</td></tr></tfoot>
+      </table>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#fff', background: accent, padding: '8px 12px', borderRadius: 6, margin: '10px 0' }}>
+        <span>NET PAYABLE</span><span>{fmtBDT(slip.net_payable)}</span>
+      </div>
+      <table style={{ width: '100%', marginTop: 40, fontSize: 11 }}><tbody><tr>
+        <td style={{ width: '45%', borderTop: '1px solid #000', paddingTop: 6, textAlign: 'center' }}>Employee Signature</td>
+        <td style={{ width: '10%' }}></td>
+        <td style={{ width: '45%', borderTop: '1px solid #000', paddingTop: 6, textAlign: 'center' }}>Authorized Signature</td>
+      </tr></tbody></table>
     </div>
   )
 }
@@ -206,6 +690,7 @@ function IncidentsTab({ flash, userName }) {
         <button className="btn-primary justify-center" onClick={add}><Plus size={15} /> Log</button>
       </div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr><th className="th">Date</th><th className="th">Category</th><th className="th">Description</th><th className="th">Action</th><th className="th">By</th><th className="th">Status</th></tr></thead>
           <tbody>
@@ -213,35 +698,7 @@ function IncidentsTab({ flash, userName }) {
             {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={6}>No incidents logged.</td></tr>}
           </tbody>
         </table>
-      </div>
-    </div>
-  )
-}
-
-function DocketTab({ flash, userName }) {
-  const [rows, setRows] = useState([])
-  const [f, setF] = useState({ doc_date: todayISO(), department: 'GEN', doc_type: 'LETTER', subject: '', party: '' })
-  const load = async () => { const { data } = await supabase.from('doc_register').select('*').order('created_at', { ascending: false }); setRows(data || []) }
-  useEffect(() => { load() }, [])
-  const add = async () => { if (!f.subject) return; const { error } = await supabase.from('doc_register').insert({ ...f, created_by: userName }); if (error) flash(error.message); else { setF({ doc_date: todayISO(), department: 'GEN', doc_type: 'LETTER', subject: '', party: '' }); load() } }
-  return (
-    <div className="space-y-4">
-      <div className="card p-4 grid grid-cols-6 gap-2">
-        <input type="date" className="input" value={f.doc_date} onChange={(e) => setF({ ...f, doc_date: e.target.value })} />
-        <input className="input" placeholder="Dept" value={f.department} onChange={(e) => setF({ ...f, department: e.target.value })} />
-        <select className="input" value={f.doc_type} onChange={(e) => setF({ ...f, doc_type: e.target.value })}>{['LETTER', 'MEMO', 'NOTICE', 'CIRCULAR', 'INWARD', 'OUTWARD'].map((t) => <option key={t}>{t}</option>)}</select>
-        <input className="input" placeholder="Subject" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} />
-        <input className="input" placeholder="Party" value={f.party} onChange={(e) => setF({ ...f, party: e.target.value })} />
-        <button className="btn-primary justify-center" onClick={add}><FileText size={15} /> Register</button>
-      </div>
-      <div className="card overflow-hidden">
-        <table className="w-full">
-          <thead><tr><th className="th">Docket No</th><th className="th">Date</th><th className="th">Type</th><th className="th">Subject</th><th className="th">Party</th></tr></thead>
-          <tbody>
-            {rows.map((r) => (<tr key={r.id}><td className="td money text-xs font-semibold">{r.doc_no}</td><td className="td money text-xs">{fmtDate(r.doc_date)}</td><td className="td text-xs">{r.doc_type}</td><td className="td text-sm">{r.subject}</td><td className="td text-xs">{r.party || '—'}</td></tr>))}
-            {rows.length === 0 && <tr><td className="td text-pine/40" colSpan={5}>No documents registered.</td></tr>}
-          </tbody>
-        </table>
+        </div>
       </div>
     </div>
   )

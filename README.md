@@ -1,39 +1,118 @@
-# Aura Stay — Resort ERP (white-label)
+# emotet-malware-killer
+## Use at your own risk
+This software utilizes autorunsc to check processes and services against Virus Total, if it reaches the set threshold it will auto-nuke the malware.
 
-White-label hotel/resort ERP. Front Office, Restaurant POS, Facilities, Inventory,
-VAT Center (NBR Mushak), Accounting, HR & Office, Night Audit, Booking Calendar and Reports.
+## Team editor note (Tailwind CSS)
 
-## White-label / resale
-All branding lives in **Settings → Branding & company profile**:
-- Upload your logo (stored in Supabase Storage bucket `branding`, public URL).
-- Software name, property name, legal name, address, BIN, currency symbol,
-  document short code, VAT circle, Mushak-6.10 threshold, invoice footer and
-  default Terms & Conditions are all editable per client.
-- No company detail is hard-coded in the UI — a new client only edits Settings.
+This repository includes workspace-level VS Code settings in `.vscode/settings.json` to avoid false CSS diagnostics for Tailwind directives such as `@tailwind` and `@apply`.
 
-## Tech
-React 18 + Vite + Tailwind 3, Supabase (Postgres + Auth + Storage), deploy on Vercel.
-Supabase credentials live in `src/supabase.js`.
+- If you open this repo in VS Code, these settings are applied automatically.
+- Please keep this file committed so the whole team sees the same lint behavior.
 
-## Deploy (no local tooling)
-1. Upload this folder's contents to your GitHub repo (web upload is fine).
-2. Vercel auto-builds on push (`npm run build`, output `dist`).
-3. First user to sign in becomes Administrator. Add more users in
-   Supabase → Authentication → Users; set their role in Settings → Staff & roles.
+## Supabase setup — required steps
 
-## Roles
-ADMIN, MANAGER, FRONT_OFFICE, RESTAURANT, STORE, ACCOUNTS, HR — module access is role-gated.
+### 1. Database migrations
 
-## Login (username-based, no email)
-Staff sign in with a **username + password** — no email required. Internally each
-account maps to a system address. Create staff in **Settings → Staff & roles**
-(admin only): enter name, username, password, role.
+Run all SQL files in the `migrations/` directory in numbered order against your Supabase project (SQL Editor → New query or via Supabase CLI).
 
-IMPORTANT for new installs: in Supabase → Authentication → Providers → Email,
-turn **off** "Confirm email" so username accounts activate instantly.
+Migration `010_ensure_handle_new_user_trigger.sql` is critical: it creates the `handle_new_user` trigger that links every new `auth.users` record to a matching row in `public.app_users`.
 
-## Bill rounding
-Grand total auto-rounds per **Settings → Branding → Bill rounding**
-(None / Nearest 1 / 5 / 10). Taxable value, service charge, SD and VAT stay exact;
-the difference posts as a "Rounding adjustment" line so the folio balance and the
-printed bill agree to the rounded payable.
+### 2. Edge Functions
+
+The staff-creation flow uses a Supabase Edge Function that bypasses the public sign-up restriction (recommended to keep disabled for ERP systems).
+
+Deploy the functions with the Supabase CLI:
+
+```bash
+supabase functions deploy admin-create-user
+supabase functions deploy admin-reset-password
+```
+
+Or deploy them from the Supabase Dashboard → Edge Functions.
+
+**Required secrets** (set in Dashboard → Edge Functions → Secrets, or via CLI):
+
+```bash
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+```
+
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected automatically by Supabase.
+
+### 3. Authentication settings
+
+- **Disable public sign-ups** — Authentication → Providers → Email → disable "Enable email sign-ups". All accounts are created by admins through the Settings → Staff Management screen.
+- **Enable Leaked password protection** — Authentication → Providers → Email → enable "Leaked password protection".
+
+### 4. SSH & GPG key setup (Git)
+
+Add your SSH key to GitHub:
+
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com"
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub
+```
+
+Then add the printed public key in GitHub → Settings → SSH and GPG keys.
+
+Add your GPG key for signed commits:
+
+```bash
+gpg --full-generate-key
+gpg --list-secret-keys --keyid-format=long
+gpg --armor --export <YOUR_KEY_ID>
+git config --global user.signingkey <YOUR_KEY_ID>
+git config --global commit.gpgsign true
+```
+
+Then add the exported public key in GitHub → Settings → SSH and GPG keys.
+
+---
+
+## Deployment
+
+### Primary: Cloudflare Workers (production)
+
+The project is deployed as a **Cloudflare Workers static asset site** via `wrangler deploy`.
+
+```bash
+npm run build          # Vite build → dist/
+npx wrangler deploy    # Upload dist/ to Cloudflare Workers
+```
+
+The GitHub Actions workflow `.github/workflows/deploy.yml` runs this automatically on every push to `main`.
+
+Configuration lives in `wrangler.jsonc`:
+- `assets.directory = './dist'` — serves the Vite output
+- `name` — your Workers service name
+
+Required Cloudflare secrets in GitHub Actions:
+```
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+```
+
+### Vercel (removed / not in use)
+
+`vercel.json` was inherited from an earlier prototype and is **not used in production**.  
+The Cloudflare Workers deployment is the sole production path.  
+If you need a Vercel staging environment, re-enable the Vercel GitHub integration manually and treat it as staging only.
+
+### POS Print / Reporting API (optional sidecar)
+
+The Express server in `server/` provides PDF/thermal-print proxying and advanced reporting.  
+Run it alongside the frontend when needed:
+
+```bash
+# Development
+node server/index.js          # listens on :4000 by default
+
+# Docker (production)
+docker compose up -d          # uses compose.yaml with healthcheck + restart policy
+
+# Health check
+curl http://localhost:4000/health
+```
+
+See `compose.yaml` for the full Docker configuration including healthcheck and `restart: unless-stopped`.
