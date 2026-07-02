@@ -547,6 +547,18 @@ export default function CmsPortal({ role, isAdmin, entityId, hidePageHeader = fa
   const isAdminPlus = isSuperuser || isAdmin
   const [selectedId, setSelectedId] = useState(CMS_TABS[0].id)
 
+  useEffect(() => {
+    if (!isAdminPlus) return
+    if (entityId && CMS_TABS.some((t) => t.id === entityId)) {
+      setSelectedId(entityId)
+      return
+    }
+    const requested = new URLSearchParams(location.search).get('entity')
+    if (requested && CMS_TABS.some((t) => t.id === requested)) {
+      setSelectedId(requested)
+    }
+  }, [entityId, location.search, isAdminPlus])
+
   if (!isAdminPlus) {
     return (
       <div className="card p-8 max-w-xl">
@@ -559,17 +571,6 @@ export default function CmsPortal({ role, isAdmin, entityId, hidePageHeader = fa
   }
 
   const entity = CMS_ENTITIES.find((e) => e.id === selectedId) || CMS_ENTITIES[0]
-
-  useEffect(() => {
-    if (entityId && CMS_TABS.some((t) => t.id === entityId)) {
-      setSelectedId(entityId)
-      return
-    }
-    const requested = new URLSearchParams(location.search).get('entity')
-    if (requested && CMS_TABS.some((t) => t.id === requested)) {
-      setSelectedId(requested)
-    }
-  }, [entityId, location.search])
 
   return (
     <div>

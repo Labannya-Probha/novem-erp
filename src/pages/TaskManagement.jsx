@@ -170,8 +170,6 @@ function AITaskerBoard({ userName }) {
 }
 
 export default function TaskManagement({ userName, aiTaskerMode = false }) {
-  if (aiTaskerMode) return <AITaskerBoard userName={userName} />
-
   const [rows, setRows] = useState([])
   const [categories, setCategories] = useState([])
   const [employees, setEmployees] = useState([])
@@ -194,12 +192,15 @@ export default function TaskManagement({ userName, aiTaskerMode = false }) {
   }
 
   useEffect(() => {
+    if (aiTaskerMode) return
     load()
     supabase.from('task_categories').select('id,name').eq('is_active', true).order('name')
       .then(({ data }) => setCategories(data || []))
     supabase.from('employees').select('id,full_name').eq('status', 'ACTIVE').order('full_name')
       .then(({ data }) => setEmployees(data || []))
-  }, [])
+  }, [aiTaskerMode])
+
+  if (aiTaskerMode) return <AITaskerBoard userName={userName} />
 
   const filtered = rows.filter((r) =>
     (filter === 'ALL' || r.status === filter) &&

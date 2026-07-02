@@ -117,16 +117,6 @@ export default function AppRoutes({
       {/* Dashboard / frontoffice legacy routes */}
       <Route path={PATHS.DASHBOARD} element={<FrontOfficeLegacyRedirect legacyRoute="dashboard" />} />
       <Route path={PATHS.FRONTOFFICE} element={<FrontOfficeLegacyRedirect legacyRoute="frontoffice" />} />
-      <Route path={PATHS.DASHBOARD} element={
-        <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <DashboardPage openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
-        </SaasModuleRoute>
-      } />
-      <Route path={PATHS.FRONTOFFICE} element={
-        <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <DashboardPage openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
-        </SaasModuleRoute>
-      } />
 
       {/* Reservations — unified tab page */}
       <Route path={PATHS.RESERVATIONS} element={

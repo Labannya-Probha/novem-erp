@@ -113,6 +113,7 @@ export default function ReservationDetail({ id, back, userName, isAdmin }) {
           userName={userName}
           isAdmin={isAdmin}
           flash={flash}
+          company={company}
         />
       )}
 
@@ -825,7 +826,7 @@ function Overview({
 /* ------------------------------------------------------------------ */
 /*  PAYMENTS TAB                                                       */
 /* ------------------------------------------------------------------ */
-function ReservationPaymentsTab({ res, guest, payments, reload, userName, isAdmin, flash }) {
+function ReservationPaymentsTab({ res, guest, payments, reload, userName, isAdmin, flash, company }) {
   const [p, setP] = useState({
     amount: '',
     method: 'CASH',
