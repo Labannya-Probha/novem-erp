@@ -13,7 +13,7 @@ import {
   FrontOfficeReservationRoute,
 } from './routeGuards.jsx'
 
-import Dashboard from './pages/Dashboard.jsx'
+import DashboardPage from './modules/dashboard/DashboardPage.jsx'
 import FrontOfficePage from './modules/front-office/FrontOfficePage.jsx'
 import ReservationsPage from './modules/reservations/ReservationsPage.jsx'
 import HousekeepingHub from './pages/HousekeepingHub.jsx'
@@ -90,10 +90,14 @@ export default function AppRoutes({
       } />
 
       {/* Dashboard / frontoffice legacy routes */}
-      <Route path={PATHS.DASHBOARD} element={<Navigate to={PATHS.FRONT_OFFICE} replace />} />
+      <Route path={PATHS.DASHBOARD} element={
+        <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
+          <DashboardPage openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
+        </SaasModuleRoute>
+      } />
       <Route path={PATHS.FRONTOFFICE} element={
         <SaasModuleRoute moduleId="frontoffice" role={role} navId="dashboard" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <Dashboard openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
+          <DashboardPage openReservation={openFrontOfficeReservation} userName={userName} role={role} isAdmin={isAdmin} company={company} />
         </SaasModuleRoute>
       } />
 
