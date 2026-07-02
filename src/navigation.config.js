@@ -6,6 +6,7 @@ export { NAV_GROUPS, ALL_NAV_IDS } from './app/navigation/navGroups'
 export { getActiveNavGroupTitle, firstAccessiblePath } from './app/navigation/helpers'
 export {
   SIDEBAR_SETTINGS_SECTIONS,
+  SIDEBAR_MASTER_DATA_TABS,
   SIDEBAR_CMS_ENTITY_TABS,
   SIDEBAR_INVENTORY_TABS,
   SIDEBAR_POS_TABS,

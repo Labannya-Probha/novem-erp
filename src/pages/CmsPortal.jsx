@@ -541,7 +541,7 @@ function ReservationPoliciesCard() {
 /* ------------------------------------------------------------------ */
 /*  ROOT — Admin & Superuser only                                       */
 /* ------------------------------------------------------------------ */
-export default function CmsPortal({ role, isAdmin }) {
+export default function CmsPortal({ role, isAdmin, entityId, hidePageHeader = false }) {
   const location = useLocation()
   const isSuperuser = role === 'SUPERUSER'
   const isAdminPlus = isSuperuser || isAdmin
@@ -561,16 +561,24 @@ export default function CmsPortal({ role, isAdmin }) {
   const entity = CMS_ENTITIES.find((e) => e.id === selectedId) || CMS_ENTITIES[0]
 
   useEffect(() => {
+    if (entityId && CMS_TABS.some((t) => t.id === entityId)) {
+      setSelectedId(entityId)
+      return
+    }
     const requested = new URLSearchParams(location.search).get('entity')
     if (requested && CMS_TABS.some((t) => t.id === requested)) {
       setSelectedId(requested)
     }
-  }, [location.search])
+  }, [entityId, location.search])
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold text-pine mb-1">Configuration</h1>
-      <p className="text-sm text-pine/60 mb-6">Create and edit master records used across Reservations, POS, Inventory and Accounting.</p>
+      {!hidePageHeader && (
+        <>
+          <h1 className="font-display text-2xl font-bold text-pine mb-1">Configuration</h1>
+          <p className="text-sm text-pine/60 mb-6">Create and edit master records used across Reservations, POS, Inventory and Accounting.</p>
+        </>
+      )}
       <div>
         {selectedId === 'reservation_policies'
           ? <ReservationPoliciesCard />

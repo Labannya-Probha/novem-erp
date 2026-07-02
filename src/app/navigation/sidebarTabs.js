@@ -15,20 +15,21 @@ import { SETTINGS_SECTIONS } from './settingsSections'
 
 export const SIDEBAR_SETTINGS_SECTIONS = SETTINGS_SECTIONS
 
-export const SIDEBAR_CMS_ENTITY_TABS = [
-  { id: 'companies',            label: 'Companies' },
-  { id: 'agencies',             label: 'Agencies' },
-  { id: 'shareholders',         label: 'Shareholders' },
-  { id: 'vendors',              label: 'Vendors' },
-  { id: 'inv_items',            label: 'Inventory Items' },
-  { id: 'menu_categories',      label: 'Menu Categories' },
-  { id: 'menu_items',           label: 'Menu Items' },
-  { id: 'chart_of_accounts',    label: 'Chart of Accounts' },
-  { id: 'rooms',                label: 'Rooms' },
-  { id: 'reservation_policies', label: 'Reservation Policies' },
-  { id: 'store_locations',      label: 'Store Locations' },
-  { id: 'guests',               label: 'Guests' },
+export const SIDEBAR_MASTER_DATA_TABS = [
+  { id: 'companies', label: 'Companies / Property', path: `${PATHS.MASTER_DATA}?tab=companies` },
+  { id: 'rooms', label: 'Rooms', path: `${PATHS.MASTER_DATA}?tab=rooms` },
+  { id: 'guests', label: 'Guests', path: `${PATHS.MASTER_DATA}?tab=guests` },
+  { id: 'vendors', label: 'Vendors', path: `${PATHS.MASTER_DATA}?tab=vendors` },
+  { id: 'inventory-items', label: 'Inventory Items', path: `${PATHS.MASTER_DATA}?tab=inventory-items` },
+  { id: 'menu-categories', label: 'Menu Categories', path: `${PATHS.MASTER_DATA}?tab=menu-categories` },
+  { id: 'menu-items', label: 'Menu Items', path: `${PATHS.MASTER_DATA}?tab=menu-items` },
+  { id: 'chart-of-accounts', label: 'Chart of Accounts', path: `${PATHS.MASTER_DATA}?tab=chart-of-accounts` },
+  { id: 'store-locations', label: 'Store Locations', path: `${PATHS.MASTER_DATA}?tab=store-locations` },
+  { id: 'reservation-policies', label: 'Reservation Policies', path: `${PATHS.MASTER_DATA}?tab=reservation-policies` },
+  { id: 'agencies-shareholders', label: 'Agencies / Shareholders', path: `${PATHS.MASTER_DATA}?tab=agencies-shareholders` },
 ]
+
+export const SIDEBAR_CMS_ENTITY_TABS = SIDEBAR_MASTER_DATA_TABS
 
 export const SIDEBAR_INVENTORY_TABS = [
   { id: 'Items & Stock',   label: 'Items & Stock' },

@@ -12,6 +12,7 @@ import { NAV_GROUPS } from './app/navigation/navGroups'
 import {
   SIDEBAR_ACCOUNTING_TABS,
   SIDEBAR_HR_TABS,
+  SIDEBAR_MASTER_DATA_TABS,
 } from './app/navigation/sidebarTabs'
 import { getActiveNavGroupTitle } from './app/navigation/helpers'
 import { getVisibleSettingsSections } from './app/navigation/settingsSections'
@@ -103,6 +104,8 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
     ? 'nightaudit'
     : currentTopSegment === 'consumption'
       ? 'inventory'
+      : currentTopSegment === 'cms' || currentTopSegment === 'master-data'
+        ? 'master-data'
       : currentTopSegment === 'night-audit-reports'
         ? 'reports'
       : currentTopSegment === 'restaurant'
@@ -195,6 +198,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
     const isTasksRoute = location.pathname === PATHS.TASKS || location.pathname === PATHS.AI_TASKER
 
     if (currentTopId === 'settings') setOpenSystemMenu('settings')
+    else if (currentTopId === 'master-data') setOpenSystemMenu('master-data')
     else if (isTasksRoute) setOpenSystemMenu('tasks')
     else if (isReportsRoute) setOpenSystemMenu('reports')
     else if (isHrRoute) setOpenSystemMenu('hr')
@@ -228,6 +232,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
               can(role, 'nightaudit', privileges) ||
               can(role, 'facilities', privileges)
             )
+            if (n.id === 'master-data') return role === 'SUPERUSER' && can(role, 'cms', privileges)
             return can(role, n.id, privileges)
           })
           if (items.length === 0) return null
@@ -235,7 +240,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
             <div key={g.title} className={gi > 0 ? 'mt-1 pt-1 border-t border-white/[0.08]' : ''}>
               <div className="space-y-0.5">
                 {items.map((n) => {
-                  const isExpandable = ['reservations', 'nightaudit', 'pos', 'inventory', 'accounting', 'hr', 'reports', 'tasks', 'settings'].includes(n.id)
+                  const isExpandable = ['reservations', 'nightaudit', 'pos', 'inventory', 'accounting', 'hr', 'reports', 'tasks', 'master-data', 'settings'].includes(n.id)
                   if (!isExpandable) {
                     return (
                       <button key={n.id}
@@ -258,6 +263,12 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                       ...s,
                       path: `${PATHS.SETTINGS}?section=${s.id}`,
                       active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`),
+                    }))
+                  } else if (n.id === 'master-data') {
+                    const mdTab = new URLSearchParams(location.search).get('tab') || 'companies'
+                    nested = SIDEBAR_MASTER_DATA_TABS.map((tab) => ({
+                      ...tab,
+                      active: (location.pathname === PATHS.MASTER_DATA || location.pathname === PATHS.CMS) && mdTab === tab.id,
                     }))
                   } else if (n.id === 'reservations') {
                     const resTab = new URLSearchParams(location.search).get('tab')
