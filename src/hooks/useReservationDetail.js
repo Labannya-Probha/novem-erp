@@ -19,6 +19,23 @@ export default function useReservationDetail(id) {
   const [company, setCompany] = useState(null)
 
   const loadAll = useCallback(async () => {
+    if (!id) {
+      setRes(null)
+      setGuest(null)
+      setGuestCompany(null)
+      setResGuests([])
+      setGuestIds([])
+      setResRooms([])
+      setRooms([])
+      setCharges([])
+      setPayments([])
+      setInvoices([])
+      setAddons([])
+      setTaxConfig([])
+      setCompany(null)
+      return
+    }
+
     const { data: r } = await withTenantScope(
       supabase
         .from('reservations')

@@ -53,7 +53,7 @@ export default function AvailabilityTab({ onCreateReservation }) {
           <h2 className="font-medium text-foreground">Availability</h2>
           <p className="text-sm text-muted-foreground">Fast availability preview using the current room inventory and active room allocations.</p>
         </div>
-        <ExportMenu onCsv={() => window.print()} onPrint={() => window.print()} />
+        <ExportMenu onPrint={() => window.print()} />
       </div>
 
       <FilterPanel

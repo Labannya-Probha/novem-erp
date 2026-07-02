@@ -9,8 +9,8 @@ function normalizeRoomType(room) {
 }
 
 function nextDay(date) {
-  const instance = new Date(`${date}T00:00:00`)
-  instance.setDate(instance.getDate() + 1)
+  const [year, month, day] = String(date).split('-').map((part) => Number(part))
+  const instance = new Date(Date.UTC(year, month - 1, day + 1))
   return instance.toISOString().slice(0, 10)
 }
 

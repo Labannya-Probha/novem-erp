@@ -24,7 +24,7 @@ export default function ReservationActionsMenu({ label = 'Actions', actions = []
           <DropdownMenuItem
             key={action.id}
             disabled={action.disabled}
-            onClick={action.onSelect}
+            onSelect={action.onSelect}
             className="flex items-center gap-2"
           >
             {action.icon ? <action.icon className="size-4" /> : null}

@@ -21,7 +21,7 @@ export async function getReservationKpis(referenceDate = todayISO()) {
     noShowsRes,
     roomsRes,
     occupiedRes,
-    pendingReservationsRes,
+    pendingReservationsCountRes,
   ] = await Promise.all([
     withTenantScope(
       supabase.from('reservations').select('id', { count: 'exact', head: true })
@@ -54,12 +54,12 @@ export async function getReservationKpis(referenceDate = todayISO()) {
     ),
     withTenantScope(
       supabase.from('reservations')
-        .select('id')
+        .select('id', { count: 'exact', head: true })
         .in('status', ['CONFIRMED', 'CHECKED_IN'])
     ),
   ])
 
-  const error = [arrivalsRes, departuresRes, inHouseRes, noShowsRes, roomsRes, occupiedRes, pendingReservationsRes]
+  const error = [arrivalsRes, departuresRes, inHouseRes, noShowsRes, roomsRes, occupiedRes, pendingReservationsCountRes]
     .map((result) => result.error)
     .find(Boolean)
 
@@ -72,18 +72,20 @@ export async function getReservationKpis(referenceDate = todayISO()) {
       .filter(Boolean)
   )
 
-  const pendingReservationIds = (pendingReservationsRes.data || []).map((reservation) => reservation.id)
-  let pendingPayments = pendingReservationIds.length
+  const pendingReservationCount = pendingReservationsCountRes.count || 0
+  let pendingPayments = pendingReservationCount
 
-  if (pendingReservationIds.length) {
+  if (pendingReservationCount) {
     const paymentsRes = await withTenantScope(
-      supabase.from('payments').select('reservation_id').in('reservation_id', pendingReservationIds)
+      supabase.from('payments')
+        .select('reservation_id, reservations!inner(status)')
+        .in('reservations.status', ['CONFIRMED', 'CHECKED_IN'])
     )
 
     if (paymentsRes.error) throw paymentsRes.error
 
     const paidReservationIds = new Set((paymentsRes.data || []).map((payment) => payment.reservation_id).filter(Boolean))
-    pendingPayments = pendingReservationIds.filter((reservationId) => !paidReservationIds.has(reservationId)).length
+    pendingPayments = Math.max(0, pendingReservationCount - paidReservationIds.size)
   }
 
   return {
