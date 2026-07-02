@@ -61,8 +61,10 @@ export function useReportsCenter({ role, userId }) {
 
   const reportsForCategory = useMemo(() => {
     const allowedCodes = new Set(tenantReports.map((report) => report.code))
+    const reportByCode = new Map(tenantReports.map((report) => [report.code, report]))
     return getReportsByCategory(category).map((item) => ({
       ...item,
+      ...(item.reportCode ? reportByCode.get(item.reportCode) || {} : {}),
       enabled: !item.reportCode || allowedCodes.has(item.reportCode),
     }))
   }, [category, tenantReports])
