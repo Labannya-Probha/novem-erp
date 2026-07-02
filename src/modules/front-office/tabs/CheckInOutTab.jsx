@@ -10,8 +10,7 @@ export default function CheckInOutTab({ openReservation }) {
       targetTab={(row) => row.status === 'CHECKED_IN' ? 'Billings & Check-Out' : 'Check-In'}
       filter={(row, today) => (
         row.status === 'CHECKED_IN' ||
-        (['QUERY', 'QUOTED', 'CONFIRMED'].includes(row.status) && row.check_in === today) ||
-        (row.status === 'CHECKED_IN' && row.check_out === today)
+        (['QUERY', 'QUOTED', 'CONFIRMED'].includes(row.status) && row.check_in === today)
       )}
     />
   )
