@@ -35,6 +35,7 @@ export const MODULE_ENTITLEMENT_BY_NAV = {
   reports: 'reports',
   tasks: 'tasks',
   'ai-tasker': 'tasks',
+  'master-data': 'settings',
   cms: 'settings',
   settings: 'settings',
 }

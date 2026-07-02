@@ -92,6 +92,7 @@ export const PATHS = {
   AI_TASKER: '/ai-tasker',
 
   // System / Config
+  MASTER_DATA: '/master-data',
   CMS: '/cms',
   SETTINGS: '/settings',
 }
