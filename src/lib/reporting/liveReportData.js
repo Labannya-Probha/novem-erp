@@ -112,6 +112,7 @@ function posToRow(order) {
     guestName: order.guest_name || '',
     roomNo: order.room_no || order.table_no || '',
     roomType: '',
+    outlet: order.outlet || '',
     department: 'Restaurant',
     costCenter: 'F&B',
     accountCode: '4010',
@@ -254,6 +255,17 @@ function roomToRow(room) {
   }
 }
 
+function enrichRowMetadata(row) {
+  return {
+    ...row,
+    outlet: row.outlet || '',
+    businessUnit: row.businessUnit || 'Hospitality',
+    segment: row.segment || row.guestType || row.department || 'General',
+    tags: row.tags || row.sourceTable || 'General',
+    user: row.user || row.createdBy || '',
+  }
+}
+
 function journalToRows(entry, lines, accountMap) {
   const entryLines = lines.filter((line) => line.entry_id === entry.id)
   if (entryLines.length === 0) {
@@ -363,9 +375,9 @@ function applyReportScope(report, data, lookups) {
   const accountMap = new Map(data.accounts.map((account) => [account.id, account]))
   const journalRows = data.journalEntries.flatMap((entry) => journalToRows(entry, data.journalLines, accountMap))
 
-  if (code === 'REST-SALES' || code === 'POS-COLL') return posRows
-  if (code === 'PAY-SUM') return paymentRows
-  if (code === 'ROOM-AVAIL' || code === 'HK-STATUS') return roomRows
+  if (code === 'REST-SALES' || code === 'POS-COLL') return posRows.map(enrichRowMetadata)
+  if (code === 'PAY-SUM') return paymentRows.map(enrichRowMetadata)
+  if (code === 'ROOM-AVAIL' || code === 'HK-STATUS') return roomRows.map(enrichRowMetadata)
   if (['OCC-RPT', 'ADR-RPT', 'REVPAR-RPT', 'ROOM-REV', 'GUEST-LEDGER', 'RES-RPT', 'CHECKIN-RPT', 'CHECKOUT-RPT', 'NOSHOW-RPT', 'CANCEL-RPT'].includes(code)) {
     const statusNeedle = {
       'CHECKIN-RPT': 'CHECKED_IN',
@@ -373,19 +385,20 @@ function applyReportScope(report, data, lookups) {
       'NOSHOW-RPT': 'NO_SHOW',
       'CANCEL-RPT': 'CANCEL',
     }[code]
-    if (!statusNeedle) return reservationRows.concat(chargeRows.filter((row) => row.department === 'Rooms'))
-    return reservationRows.filter((row) => String(row.status).toUpperCase().includes(statusNeedle))
+    if (!statusNeedle) return reservationRows.concat(chargeRows.filter((row) => row.department === 'Rooms')).map(enrichRowMetadata)
+    return reservationRows.filter((row) => String(row.status).toUpperCase().includes(statusNeedle)).map(enrichRowMetadata)
   }
-  if (['IFRS-PNL', 'IFRS-REV-REC', 'IFRS-DEF-REV', 'DAILY-SALES', 'NIGHT-AUDIT'].includes(code)) return chargeRows.concat(posRows)
+  if (['IFRS-PNL', 'IFRS-REV-REC', 'IFRS-DEF-REV', 'DAILY-SALES', 'NIGHT-AUDIT'].includes(code)) return chargeRows.concat(posRows).map(enrichRowMetadata)
   if (['IFRS-SFP', 'IFRS-CFS', 'IFRS-SCE', 'AR-AGING', 'AP-AGING', 'INV-MOV', 'FA-REG', 'FA-DEP', 'LEASE-LIAB'].includes(code)) {
-    return accountRowsFromActual(journalRows.concat(chargeRows, paymentRows))
+    return accountRowsFromActual(journalRows.concat(chargeRows, paymentRows)).map(enrichRowMetadata)
   }
-  return chargeRows.concat(posRows, paymentRows, reservationRows)
+  return chargeRows.concat(posRows, paymentRows, reservationRows).map(enrichRowMetadata)
 }
 
 function applyFilters(rows, filters, report) {
   return rows.filter((row) => {
     if (!inRange(row.transactionDate, filters)) return false
+    if (!allValue(filters.outlet) && row.outlet !== filters.outlet) return false
     if (!allValue(filters.department) && row.department !== filters.department) return false
     if (!allValue(filters.costCenter) && row.costCenter !== filters.costCenter) return false
     if (!allValue(filters.roomType) && row.roomType !== filters.roomType) return false
@@ -393,6 +406,10 @@ function applyFilters(rows, filters, report) {
     if (!allValue(filters.status) && row.status !== filters.status) return false
     if (!allValue(filters.reservationSource) && row.reservationSource !== filters.reservationSource) return false
     if (!allValue(filters.guestType) && row.guestType !== filters.guestType) return false
+    if (!allValue(filters.user) && row.user !== filters.user) return false
+    if (!allValue(filters.businessUnit) && row.businessUnit !== filters.businessUnit) return false
+    if (!allValue(filters.segment) && row.segment !== filters.segment) return false
+    if (!allValue(filters.tags) && row.tags !== filters.tags) return false
     if (report.category === 'POS' && row.department !== 'Restaurant' && row.costCenter !== 'F&B') return false
     return true
   }).map((row, index) => ({ ...row, slNo: index + 1 }))
@@ -446,6 +463,10 @@ function buildFilterOptions(rows, data) {
     paymentMethod: optionList('All Methods', data.payments.map((row) => row.method).concat(data.posOrders.map((row) => row.payment_method))),
     status: optionList('All Status', rows.map((row) => row.status)),
     user: optionList('All Users', rows.map((row) => row.createdBy).concat(data.reservations.map((row) => row.created_by))),
+    businessUnit: optionList('All Business Units', rows.map((row) => row.businessUnit)),
+    segment: optionList('All Segments', rows.map((row) => row.segment)),
+    tags: optionList('All Tags', rows.map((row) => row.tags)),
+    currency: ['BDT', 'USD'],
   }
 }
 

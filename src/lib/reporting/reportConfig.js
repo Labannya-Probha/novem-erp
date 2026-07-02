@@ -32,11 +32,14 @@ export const STANDARD_FILTERS = [
   { key: 'costCenter', label: 'Cost Center', type: 'select', options: ['All Cost Centers', 'ROOMS', 'F&B', 'ADMIN', 'HK'] },
   { key: 'roomType', label: 'Room Type', type: 'select', options: ['All Room Types', 'Deluxe', 'Suite', 'Family Villa'] },
   { key: 'guestType', label: 'Guest Type', type: 'select', options: ['All Guest Types', 'FIT', 'Corporate', 'OTA', 'Group'] },
-  { key: 'reservationSource', label: 'Reservation Source', type: 'select', options: ['All Sources', 'Direct', 'OTA', 'Corporate', 'Walk-in'] },
-  { key: 'paymentMethod', label: 'Payment Method', type: 'select', options: ['All Methods', 'Cash', 'Card', 'Mobile Banking', 'Bank Transfer'] },
-  { key: 'status', label: 'Status', type: 'select', options: ['All Status', 'Open', 'Approved', 'Posted', 'Settled', 'Cancelled'] },
-  { key: 'user', label: 'User', type: 'select', options: ['All Users'] },
   { key: 'currency', label: 'Currency', type: 'select', options: ['BDT', 'USD'] },
+  { key: 'paymentMethod', label: 'Payment Method', type: 'select', options: ['All Methods', 'Cash', 'Card', 'Mobile Banking', 'Bank Transfer'] },
+  { key: 'reservationSource', label: 'Reservation Source', type: 'select', options: ['All Sources', 'Direct', 'OTA', 'Corporate', 'Walk-in'] },
+  { key: 'user', label: 'User', type: 'select', options: ['All Users'] },
+  { key: 'status', label: 'Status', type: 'select', options: ['All Status', 'Open', 'Approved', 'Posted', 'Settled', 'Cancelled'] },
+  { key: 'businessUnit', label: 'Business Unit', type: 'select', options: ['All Business Units', 'Hospitality', 'Shared Services'] },
+  { key: 'segment', label: 'Segment', type: 'select', options: ['All Segments', 'Rooms', 'Food & Beverage', 'Corporate', 'Group'] },
+  { key: 'tags', label: 'Tags', type: 'select', options: ['All Tags', 'IFRS', 'Month End', 'Audit Review', 'Operations'] },
 ]
 
 export const STANDARD_COLUMNS = [
@@ -194,5 +197,8 @@ export function getDefaultFilters(todayISO) {
     status: 'All Status',
     user: 'All Users',
     currency: 'BDT',
+    businessUnit: 'All Business Units',
+    segment: 'All Segments',
+    tags: 'All Tags',
   }
 }

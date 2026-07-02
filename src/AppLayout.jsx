@@ -23,6 +23,7 @@ import { WelcomePopover } from './components/WelcomePopover.jsx'
 import { PopoverDisplay } from './components/PopoverDisplay.jsx'
 import { useWelcomePopover } from './hooks/useWelcomePopover'
 import AppRoutes from './AppRoutes.jsx'
+import AppTopBar from './components/layout/AppTopBar.jsx'
 import {
   LogOut, Menu, X, ChevronDown,
 } from 'lucide-react'
@@ -32,9 +33,9 @@ import {
 /* ------------------------------------------------------------------ */
 function BrandLogo({ url, softwareName }) {
   const [ok, setOk] = useState(true)
-  if (url && ok) return <img src={url} alt="logo" onError={() => setOk(false)} className="w-9 h-9 rounded-lg object-contain bg-white/90 p-0.5" />
+  if (url && ok) return <img src={url} alt="logo" onError={() => setOk(false)} className="w-9 h-9 rounded-xl object-contain bg-white p-1 ring-1 ring-black/5" />
   const abbr = (softwareName || 'AS').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-  return <div className="w-9 h-9 rounded-lg bg-amber-400 flex items-center justify-center shadow-sm flex-shrink-0"><span className="text-pine font-bold text-sm leading-none">{abbr}</span></div>
+  return <div className="w-9 h-9 rounded-xl bg-white text-slate-700 flex items-center justify-center shadow-sm ring-1 ring-white/20 flex-shrink-0"><span className="font-bold text-sm leading-none">{abbr}</span></div>
 }
 
 /* ------------------------------------------------------------------ */
@@ -47,7 +48,7 @@ function HrSubGroup({ grp, navigate }) {
       <button
         onClick={() => setOpen((p) => !p)}
         className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center justify-between gap-2 ${
-          grp.active ? 'text-white font-semibold' : 'text-white/65 hover:text-white'
+          grp.active ? 'text-white font-semibold' : 'text-white/75 hover:text-white'
         }`}>
         <span className="flex items-center gap-2">
           {grp.icon && <grp.icon size={12} className="shrink-0 opacity-70" />}
@@ -60,7 +61,7 @@ function HrSubGroup({ grp, navigate }) {
           {grp.children.map((c) => (
             <button key={c.id}
               className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
-                c.active ? 'bg-white/14 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                c.active ? 'bg-white/18 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
               }`}
               onClick={() => navigate(c.path)}>
               {c.label}
@@ -213,11 +214,11 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
 
   const SidebarContent = (
     <>
-      <div className="px-5 py-5 flex items-center gap-3 border-b border-white/10">
+      <div className="px-5 py-5 flex items-center gap-3 border-b border-white/15">
         <BrandLogo url={company?.logo_url} softwareName={softwareName} />
         <div className="min-w-0 flex-1">
           <div className="font-display font-bold leading-tight truncate text-white">{softwareName}</div>
-          <div className="text-[11px] text-white/60 truncate">{company?.name || ''}</div>
+          <div className="text-[11px] text-white/70 truncate">{company?.name || ''}</div>
         </div>
         <button onClick={() => setMobileNavOpen(false)} className="lg:hidden text-white/50 hover:text-white shrink-0">
           <X size={20} />
@@ -248,8 +249,8 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                       <button key={n.id}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors min-w-0 ${
                           currentTopId === n.id
-                            ? 'bg-white/14 text-white ring-1 ring-white/20'
-                            : 'text-white/75 hover:bg-white/10 hover:text-white'
+                            ? 'bg-white text-slate-900 ring-1 ring-white/40 shadow-sm'
+                            : 'text-white/80 hover:bg-white/12 hover:text-white'
                         }`}
                         onClick={() => navigate(navPathById(n.id))}>
                         <n.icon size={17} className="shrink-0" />
@@ -442,7 +443,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                     <div key={n.id} className="space-y-1">
                       <button
                         className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          isOpen ? 'bg-white/14 text-white ring-1 ring-white/20' : 'text-white/75 hover:bg-white/10 hover:text-white'
+                          isOpen ? 'bg-white text-slate-900 ring-1 ring-white/40 shadow-sm' : 'text-white/80 hover:bg-white/12 hover:text-white'
                         }`}
                         onClick={() => {
                           setOpenSystemMenu(isOpen ? null : n.id)
@@ -466,10 +467,10 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                               key={child.id}
                               className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center gap-2 ${
                                 child.active
-                                  ? 'bg-white/14 text-white'
+                                  ? 'bg-white/18 text-white'
                                   : child.path
-                                  ? 'text-white/65 hover:bg-white/10 hover:text-white'
-                                  : 'text-white/45 cursor-default'
+                                  ? 'text-white/75 hover:bg-white/10 hover:text-white'
+                                  : 'text-white/50 cursor-default'
                               }`}
                               onClick={() => child.path && navigate(child.path)}
                             >
@@ -488,11 +489,11 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
         })}
       </nav>
 
-      <div className="px-5 py-4 border-t border-white/10 text-xs text-white/65">
+      <div className="px-5 py-4 border-t border-white/15 text-xs text-white/70">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate font-semibold text-white">{userName}</div>
-            <div className="text-[10px] text-white/50">{ROLE_LABELS[role] || role}</div>
+            <div className="text-[10px] text-white/60">{ROLE_LABELS[role] || role}</div>
           </div>
           <button title="Sign out" onClick={async () => {
             const tenantId = getTenantId()
@@ -504,7 +505,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
               .maybeSingle()
             const slug = prop?.slug
             window.location.href = slug ? `/${slug}/login` : '/login'
-          }} className="text-white/55 hover:text-white shrink-0"><LogOut size={15} /></button>
+          }} className="text-white/65 hover:text-white shrink-0"><LogOut size={15} /></button>
         </div>
       </div>
     </>
@@ -514,7 +515,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
     <div className="min-h-screen flex app-shell">
       {/* Desktop sidebar — hidden on Booking Calendar for full-page view */}
       {!sidebarHidden && (
-        <aside style={sidebarThemeStyle} className="hidden lg:flex w-60 text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
+        <aside style={sidebarThemeStyle} className="hidden lg:flex w-64 text-white flex-col fixed inset-y-0 overflow-y-auto z-30 border-r border-white/15 shadow-[0_12px_34px_rgba(15,23,42,0.28)]">
           {SidebarContent}
         </aside>
       )}
@@ -524,7 +525,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
         <button
           onClick={() => setSidebarHidden(false)}
           title="Show sidebar"
-          className="hidden lg:flex fixed top-4 left-4 z-40 items-center justify-center w-9 h-9 rounded-lg bg-pine/80 hover:bg-pine text-white shadow-lg transition-colors"
+          className="hidden lg:flex fixed top-4 left-4 z-40 items-center justify-center w-9 h-9 rounded-lg bg-slate-900/80 hover:bg-slate-900 text-white shadow-lg transition-colors"
         >
           <Menu size={18} />
         </button>
@@ -533,16 +534,16 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
       {/* Mobile drawer */}
       {mobileNavOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-ink/35" onClick={() => setMobileNavOpen(false)} />
-          <aside style={sidebarThemeStyle} className="absolute inset-y-0 left-0 w-72 max-w-[85vw] text-white flex flex-col shadow-2xl border-r border-white/10">
+          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" onClick={() => setMobileNavOpen(false)} />
+          <aside style={sidebarThemeStyle} className="absolute inset-y-0 left-0 w-72 max-w-[85vw] text-white flex flex-col shadow-2xl border-r border-white/15">
             {SidebarContent}
           </aside>
         </div>
       )}
 
       {/* Mobile top bar */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-20 bg-white/95 backdrop-blur text-pine flex items-center gap-3 px-4 shadow-sm border-b border-leaf/80 app-shell-mobile-bar">
-        <button onClick={() => setMobileNavOpen(true)} className="text-pine/70 hover:text-forest">
+      <div className="lg:hidden fixed top-0 inset-x-0 z-20 bg-white/95 backdrop-blur text-slate-900 flex items-center gap-3 px-4 shadow-sm border-b border-slate-200 app-shell-mobile-bar">
+        <button onClick={() => setMobileNavOpen(true)} className="text-slate-600 hover:text-slate-900">
           <Menu size={22} />
         </button>
         <BrandLogo url={company?.logo_url} softwareName={softwareName} />
@@ -552,10 +553,12 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
       </div>
 
       <main className="app-shell-main" style={sidebarHidden ? { marginLeft: 0 } : undefined}>
+        <AppTopBar userName={userName} role={role} company={company} />
+
         {company?.maintenance_mode && (
           <div className="no-print app-shell-banner" style={{ background:'#b91c1c',
             color:'#fff', textAlign:'center', padding:'6px', fontWeight:600, fontSize:13 }}>
-            ⚠ Maintenance mode — posting & edits are locked while accounts reconcile.
+            ⚠ Maintenance mode — posting &amp; edits are locked while accounts reconcile.
           </div>
         )}
 
@@ -574,9 +577,15 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
           navigate={navigate}
         />
 
-        <footer className="no-print mt-10 pt-4 border-t border-leaf/80 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-pine/45">
-          <div>© {new Date().getFullYear()} Aura Stay</div>
-          <div>Powered by <span className="font-semibold text-pine/60">Aura Stay</span></div>
+        <footer className="no-print mt-12 pt-4 border-t border-slate-200/80 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-500">Aura Stay ERP</span>
+            <span className="text-slate-300">·</span>
+            <span>© {new Date().getFullYear()} Aura Stay</span>
+          </div>
+          <div className="text-slate-400">
+            {company?.name && <span className="font-medium text-slate-500">{company.name}</span>}
+          </div>
         </footer>
       </main>
 
