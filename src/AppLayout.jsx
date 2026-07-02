@@ -23,6 +23,7 @@ import { WelcomePopover } from './components/WelcomePopover.jsx'
 import { PopoverDisplay } from './components/PopoverDisplay.jsx'
 import { useWelcomePopover } from './hooks/useWelcomePopover'
 import AppRoutes from './AppRoutes.jsx'
+import AppTopBar from './components/layout/AppTopBar.jsx'
 import {
   LogOut, Menu, X, ChevronDown,
 } from 'lucide-react'
@@ -552,10 +553,12 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
       </div>
 
       <main className="app-shell-main" style={sidebarHidden ? { marginLeft: 0 } : undefined}>
+        <AppTopBar userName={userName} role={role} company={company} />
+
         {company?.maintenance_mode && (
           <div className="no-print app-shell-banner" style={{ background:'#b91c1c',
             color:'#fff', textAlign:'center', padding:'6px', fontWeight:600, fontSize:13 }}>
-            ⚠ Maintenance mode — posting & edits are locked while accounts reconcile.
+            ⚠ Maintenance mode — posting &amp; edits are locked while accounts reconcile.
           </div>
         )}
 
@@ -574,9 +577,15 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
           navigate={navigate}
         />
 
-        <footer className="no-print mt-10 pt-4 border-t border-slate-200/90 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
-          <div>© {new Date().getFullYear()} Aura Stay</div>
-          <div>Powered by <span className="font-semibold text-slate-700">Aura Stay</span></div>
+        <footer className="no-print mt-12 pt-4 border-t border-slate-200/80 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-500">Aura Stay ERP</span>
+            <span className="text-slate-300">·</span>
+            <span>© {new Date().getFullYear()} Aura Stay</span>
+          </div>
+          <div className="text-slate-400">
+            {company?.name && <span className="font-medium text-slate-500">{company.name}</span>}
+          </div>
         </footer>
       </main>
 

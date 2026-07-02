@@ -130,7 +130,7 @@
 
   body {
     @apply font-body antialiased bg-background text-foreground;
-    background: linear-gradient(180deg, #f8fafc 0%, #f3f4f6 100%);
+    background: #f1f5f9;
     min-height: 100vh;
     font-family: var(--tenant-font-family);
     font-size: 14.5px;
@@ -190,11 +190,12 @@
 
     .app-shell-main {
       margin-left: 16rem;
-      padding: 2rem 2.25rem;
+      /* top padding reduced — AppTopBar sticky header accounts for first ~3rem */
+      padding: 0 2.25rem 2rem;
     }
 
     .app-shell-banner {
-      top: 0;
+      top: 3rem; /* below topbar */
       margin: 0 0 1rem;
     }
   }
@@ -340,8 +341,8 @@
     );
   }
   .card:hover {
-    transform: translateY(-2px);
-    border-color: rgb(var(--tenant-primary-rgb) / 0.28);
+    transform: translateY(-1px);
+    border-color: rgb(var(--tenant-primary-rgb) / 0.22);
     box-shadow: var(--interactive-shadow);
   }
   .card:hover::after { opacity: 1; }
