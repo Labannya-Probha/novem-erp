@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { PanelLeft } from 'lucide-react'
 import Breadcrumb from '../components/layout/Breadcrumb'
+import KpiStrip from '../components/layout/KpiStrip'
 import ModuleTabs from '../components/layout/ModuleTabs'
 import PageHeader from '../components/layout/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -31,6 +32,18 @@ export default function Reportmodule({ userName, userId, role, company }) {
   const selectedCount = useMemo(() => (
     reportsForCategory.filter((item) => item.enabled !== false).length
   ), [reportsForCategory])
+  const legacyRouteCount = useMemo(() => (
+    reportsForCategory.filter((item) => item.route).length
+  ), [reportsForCategory])
+  const directReportCount = useMemo(() => (
+    reportsForCategory.filter((item) => item.reportCode).length
+  ), [reportsForCategory])
+  const kpis = useMemo(() => ([
+    { label: 'Available reports', value: selectedCount },
+    { label: 'Direct report templates', value: directReportCount },
+    { label: 'Legacy route links', value: legacyRouteCount },
+    { label: 'Current category', value: categoryLabel },
+  ]), [categoryLabel, directReportCount, legacyRouteCount, selectedCount])
 
   return (
     <div className="space-y-6">
@@ -46,6 +59,7 @@ export default function Reportmodule({ userName, userId, role, company }) {
             </Button>
           </div>
         )}
+        kpiStrip={<KpiStrip items={kpis} />}
         tabs={<ModuleTabs tabs={categoryTabs} activeTab={category} onChange={setCategory} />}
       />
 
@@ -58,7 +72,7 @@ export default function Reportmodule({ userName, userId, role, company }) {
           />
         </aside>
 
-        <Card className="border-border">
+        <Card className="border-border shadow-sm">
           <CardHeader>
             <CardTitle>{activeReport?.label || 'Select a report'}</CardTitle>
             <CardDescription>
@@ -80,6 +94,9 @@ export default function Reportmodule({ userName, userId, role, company }) {
             )}
             <p>
               Signed in as <span className="font-medium text-foreground">{userName || 'User'}</span>.
+            </p>
+            <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+              This redesigned Reports Center uses standardized page header, KPI strip, module tabs, and responsive side panel patterns.
             </p>
           </CardContent>
         </Card>

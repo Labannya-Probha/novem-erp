@@ -130,37 +130,20 @@
 
   body {
     @apply font-body antialiased bg-background text-foreground;
-    background: #F7F5F2;
-    background-image:
-      radial-gradient(1000px 650px at 8% -10%,  rgba(31,111,120,0.08), transparent 58%),
-      radial-gradient(900px  700px at 112% 0%,  rgba(208,169,104,0.08), transparent 52%),
-      linear-gradient(180deg, #FBFAF8 0%, #F7F5F2 100%);
+    background: linear-gradient(180deg, #f8fafc 0%, #f3f4f6 100%);
     min-height: 100vh;
     font-family: var(--tenant-font-family);
     font-size: 14.5px;
     line-height: 1.5;
     overflow-x: hidden;
-    background-size: 140% 140%;
   }
 
   button, input, select, textarea { min-width: 0; }
   img, svg, video, canvas, iframe { max-width: 100%; }
 
-  /* Gate animation — no !important override needed in reduced-motion block */
-  @media (prefers-reduced-motion: no-preference) {
-    body {
-      animation: aura-bg-drift 18s ease-in-out infinite alternate;
-    }
-  }
-
   #root { width: 100%; max-width: 100%; }
   h1, h2, h3, h4 { line-height: 1.25; }
   h1 { letter-spacing: -0.01em; }
-
-  @keyframes aura-bg-drift {
-    0%   { background-position: 0% 0%,  100% 0%, 0% 0%; }
-    100% { background-position: 8% 10%, 92% -4%, 0% 0%; }
-  }
 
   .app-shell {
     width: 100%;
@@ -190,6 +173,7 @@
     overflow-x: clip;
     overflow-y: auto;
     z-index: var(--z-base);
+    background: transparent;
   }
 
   .app-shell-banner {
@@ -205,8 +189,8 @@
     }
 
     .app-shell-main {
-      margin-left: 15rem;
-      padding: 2rem;
+      margin-left: 16rem;
+      padding: 2rem 2.25rem;
     }
 
     .app-shell-banner {
