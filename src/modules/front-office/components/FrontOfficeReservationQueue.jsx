@@ -30,8 +30,20 @@ export default function FrontOfficeReservationQueue({
       .in('status', ['QUERY', 'QUOTED', 'CONFIRMED', 'CHECKED_IN'])
       .order('check_in', { ascending: false })
       .limit(250)
-      .then(({ data }) => {
-        if (mounted) setRows(data || [])
+      .then(({ data, error }) => {
+        if (!mounted) return
+        if (error) {
+          console.error('FrontOfficeReservationQueue fetch error:', error)
+          setRows([])
+        } else {
+          setRows(data || [])
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          console.error('FrontOfficeReservationQueue unexpected error:', err)
+          setRows([])
+        }
       })
       .finally(() => {
         if (mounted) setBusy(false)
