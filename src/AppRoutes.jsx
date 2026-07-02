@@ -1,11 +1,11 @@
 /* ------------------------------------------------------------------ */
 /*  APP ROUTES                                                          */
 /* ------------------------------------------------------------------ */
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { isModuleEnabled } from './lib/saasModules'
 import { firstAccessiblePath } from './app/navigation/helpers'
 import { PATHS } from './app/paths'
-import { SaasModuleFrame } from './components/saas/SaasModuleFrame.jsx'
+import { SaasModuleBlocked, SaasModuleFrame } from './components/saas/SaasModuleFrame.jsx'
 import {
   SaasModuleRoute,
   TenantReportsRedirect,
@@ -57,27 +57,13 @@ import TaskManagement from './pages/TaskManagement.jsx'
 import TasksPage from './modules/tasks/TasksPage.jsx'
 import RestaurantPage from './modules/restaurant/RestaurantPage.jsx'
 import PosPrintCenter from './pages/PosPrintCenter.jsx'
-import { RESERVATION_TABS, DEFAULT_RESERVATION_TAB } from './modules/reservations/reservations.config'
-
-const RESERVATION_NAV_BY_TAB = {
-  list: 'reservations',
-  payments: 'reservations',
-  calendar: 'calendar',
-  crm: 'crm',
-}
-
-const VALID_RESERVATION_TABS = new Set(RESERVATION_TABS.map((tab) => tab.id))
+import { getVisibleReservationTabs } from './modules/reservations/reservations.config'
 
 export default function AppRoutes({
   role, isAdmin, userName, userId, company, privileges, modulesEnabled, loadCompany,
   openReservation, openFrontOfficeReservation, startReservation, navigate,
 }) {
-  const location = useLocation()
-  const reservationTab = new URLSearchParams(location.search).get('tab')
-  const safeReservationTab = VALID_RESERVATION_TABS.has(reservationTab)
-    ? reservationTab
-    : DEFAULT_RESERVATION_TAB
-  const reservationNavId = RESERVATION_NAV_BY_TAB[safeReservationTab]
+  const visibleReservationTabs = getVisibleReservationTabs({ role, isAdmin, privileges })
 
   return (
     <Routes>
@@ -100,15 +86,22 @@ export default function AppRoutes({
 
       {/* Reservations — unified tab page */}
       <Route path={PATHS.RESERVATIONS} element={
-        <SaasModuleRoute moduleId="reservations" role={role} navId={reservationNavId} privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
-          <ReservationsPage
-            openReservation={openReservation}
-            startReservation={startReservation}
-            userName={userName}
-            isAdmin={isAdmin}
-            role={role}
-          />
-        </SaasModuleRoute>
+        !isModuleEnabled('reservations', modulesEnabled, role) ? (
+          <SaasModuleBlocked moduleId="reservations" />
+        ) : visibleReservationTabs.length ? (
+          <SaasModuleFrame moduleId="reservations" company={company} role={role} userName={userName}>
+            <ReservationsPage
+              openReservation={openReservation}
+              startReservation={startReservation}
+              userName={userName}
+              isAdmin={isAdmin}
+              role={role}
+              privileges={privileges}
+            />
+          </SaasModuleFrame>
+        ) : (
+          <Navigate to={firstAccessiblePath(role, privileges, modulesEnabled)} replace />
+        )
       } />
       <Route path={PATHS.RESERVATION_DETAIL} element={
         <SaasModuleRoute moduleId="reservations" role={role} navId="reservations" privileges={privileges} modulesEnabled={modulesEnabled} company={company} userName={userName}>
@@ -123,8 +116,9 @@ export default function AppRoutes({
 
       {/* Legacy routes — redirect to unified tab page for backward compatibility */}
       <Route path={PATHS.RESERVATION_PAYMENTS} element={<Navigate to={`${PATHS.RESERVATIONS}?tab=payments`} replace />} />
-      <Route path={PATHS.CRM} element={<Navigate to={`${PATHS.RESERVATIONS}?tab=crm`} replace />} />
+      <Route path={PATHS.CRM} element={<Navigate to={`${PATHS.RESERVATIONS}?tab=guest-crm`} replace />} />
       <Route path={PATHS.CALENDAR} element={<Navigate to={`${PATHS.RESERVATIONS}?tab=calendar`} replace />} />
+      <Route path={PATHS.BOOKING_CALENDAR} element={<Navigate to={`${PATHS.RESERVATIONS}?tab=calendar`} replace />} />
 
       {/* Front Office */}
       <Route path={PATHS.NIGHTAUDIT} element={

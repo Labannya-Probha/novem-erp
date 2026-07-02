@@ -17,8 +17,7 @@ import { getActiveNavGroupTitle } from './app/navigation/helpers'
 import { getVisibleSettingsSections } from './app/navigation/settingsSections'
 import { PATHS } from './app/paths'
 import { getTenantId } from './lib/tenant'
-import { firstAccessiblePath } from './app/navigation/helpers'
-import { RESERVATION_TABS, DEFAULT_RESERVATION_TAB } from './modules/reservations/reservations.config'
+import { DEFAULT_RESERVATION_TAB, getVisibleReservationTabs, resolveReservationTab } from './modules/reservations/reservations.config'
 import { WelcomePopover } from './components/WelcomePopover.jsx'
 import { PopoverDisplay } from './components/PopoverDisplay.jsx'
 import { useWelcomePopover } from './hooks/useWelcomePopover'
@@ -98,6 +97,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
   const [modulesEnabled, setModulesEnabled] = useState(null)
   const [sidebarHidden,  setSidebarHidden]  = useState(false)
 
+  const visibleReservationTabs = getVisibleReservationTabs({ role, isAdmin, privileges })
   const currentTopSegment = location.pathname.split('/').filter(Boolean)[0] || 'front-office'
   const currentTopId = (currentTopSegment === 'frontoffice' || currentTopSegment === 'front-office')
     ? 'nightaudit'
@@ -125,7 +125,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
     const q = tab ? `?tab=${encodeURIComponent(tab)}` : ''
     navigate(`${withId(PATHS.FRONTOFFICE_RESERVATION_DETAIL, id)}${q}`)
   }
-  const startReservation = (prefill = {}) => navigate(PATHS.RESERVATIONS, { state: { prefill } })
+  const startReservation = (prefill = {}) => navigate(`${PATHS.RESERVATIONS}?tab=new`, { state: { prefill } })
 
   const softwareName    = company?.software_name || 'Aura Stay'
   const sidebarThemeStyle = { background: 'var(--sidebar-bg)' }
@@ -228,6 +228,7 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
               can(role, 'nightaudit', privileges) ||
               can(role, 'facilities', privileges)
             )
+            if (n.id === 'reservations') return visibleReservationTabs.length > 0
             return can(role, n.id, privileges)
           })
           if (items.length === 0) return null
@@ -260,37 +261,20 @@ export default function AppShell({ company, role, isAdmin, userName, userId, loa
                       active: currentTopId === 'settings' && location.search.includes(`section=${s.id}`),
                     }))
                   } else if (n.id === 'reservations') {
-                    const resTab = new URLSearchParams(location.search).get('tab')
+                    const resTab = resolveReservationTab(new URLSearchParams(location.search).get('tab'))
                     const isResPath = location.pathname === PATHS.RESERVATIONS
-                    const validResTabs = new Set(RESERVATION_TABS.map((tab) => tab.id))
-                    const safeResTab = validResTabs.has(resTab) ? resTab : DEFAULT_RESERVATION_TAB
-                    const isListTab = safeResTab === DEFAULT_RESERVATION_TAB
-                    nested = [
-                      {
-                        id: 'reservations-list',
-                        label: 'Reservations',
-                        path: `${PATHS.RESERVATIONS}?tab=list`,
-                        active: isResPath && isListTab,
-                      },
-                      {
-                        id: 'calendar',
-                        label: 'Booking Calendar',
-                        path: `${PATHS.RESERVATIONS}?tab=calendar`,
-                        active: (isResPath && resTab === 'calendar') || location.pathname === PATHS.CALENDAR || location.pathname === PATHS.BOOKING_CALENDAR,
-                      },
-                      {
-                        id: 'reservation-payments',
-                        label: 'Reservation Payments',
-                        path: `${PATHS.RESERVATIONS}?tab=payments`,
-                        active: (isResPath && resTab === 'payments') || location.pathname === PATHS.RESERVATION_PAYMENTS,
-                      },
-                      {
-                        id: 'crm',
-                        label: 'Guest CRM',
-                        path: `${PATHS.RESERVATIONS}?tab=crm`,
-                        active: (isResPath && resTab === 'crm') || location.pathname === PATHS.CRM,
-                      },
-                    ]
+                    nested = visibleReservationTabs.map((tab) => ({
+                      id: `reservations-${tab.id}`,
+                      label: tab.label,
+                      path: `${PATHS.RESERVATIONS}?tab=${tab.id}`,
+                      active: (() => {
+                        if (tab.id === DEFAULT_RESERVATION_TAB) return isResPath && resTab === DEFAULT_RESERVATION_TAB
+                        if (tab.id === 'calendar') return (isResPath && resTab === 'calendar') || location.pathname === PATHS.CALENDAR || location.pathname === PATHS.BOOKING_CALENDAR
+                        if (tab.id === 'payments') return (isResPath && resTab === 'payments') || location.pathname === PATHS.RESERVATION_PAYMENTS
+                        if (tab.id === 'guest-crm') return (isResPath && resTab === 'guest-crm') || location.pathname === PATHS.CRM
+                        return isResPath && resTab === tab.id
+                      })(),
+                    }))
                   } else if (n.id === 'nightaudit') {
                     const foTab = new URLSearchParams(location.search).get('tab')
                     const isFoPath = location.pathname === PATHS.FRONT_OFFICE
